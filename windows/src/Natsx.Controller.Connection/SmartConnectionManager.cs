@@ -90,7 +90,8 @@ public sealed class SmartConnectionManager
         int breakerFailures = candidate.Failures.Count(
             timestamp => Elapsed(timestamp, now) <= _policy.CircuitBreakerWindow);
 
-        if (breakerFailures >= _policy.CircuitBreakerFailureCount)
+        if (breakerFailures >= _policy.CircuitBreakerFailureCount &&
+            !IsCircuitOpen(candidate, now))
         {
             candidate.CircuitOpenLevel++;
             candidate.CircuitOpenedAt = now;
@@ -100,9 +101,6 @@ public sealed class SmartConnectionManager
                 2 => _policy.CircuitBreakerSecondOpen,
                 _ => _policy.CircuitBreakerMaximumOpen,
             };
-
-            candidate.Failures.RemoveAll(
-                timestamp => Elapsed(timestamp, now) <= _policy.CircuitBreakerWindow);
         }
     }
 
