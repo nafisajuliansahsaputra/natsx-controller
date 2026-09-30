@@ -16,9 +16,9 @@ data class WifiResolvedEndpoint(
 /**
  * Resolves the trusted Windows receiver endpoint using the fast path first.
  *
- * 1. Try the last known endpoint with an authenticated direct probe.
+ * 1. Try the last known endpoint with the configured direct probe.
  * 2. If that fails, discard the stale cache entry.
- * 3. Fall back to LAN discovery constrained to the trusted receiver Peer ID.
+ * 3. Fall back to LAN discovery constrained to the expected receiver Peer ID.
  * 4. Cache a successful discovery result for the next reconnect.
  */
 fun interface WifiEndpointProvider {
