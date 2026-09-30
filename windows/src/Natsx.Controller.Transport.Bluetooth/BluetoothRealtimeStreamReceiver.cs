@@ -238,6 +238,17 @@ public sealed class BluetoothRealtimeStreamReceiver : IAsyncDisposable
             when (cancellationToken.IsCancellationRequested)
         {
         }
+        catch (FormatException)
+        {
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                Interlocked.Increment(
+                    ref _rejectedFrames);
+
+                _lifecycle.SetState(
+                    TransportRuntimeState.Failed);
+            }
+        }
         catch (EndOfStreamException)
         {
             if (!cancellationToken.IsCancellationRequested)
