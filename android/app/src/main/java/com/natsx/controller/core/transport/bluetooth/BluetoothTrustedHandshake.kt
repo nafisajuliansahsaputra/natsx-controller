@@ -17,6 +17,7 @@ import com.natsx.controller.core.protocol.SessionReadyPayload
 import com.natsx.controller.core.protocol.SessionReadyPayloadCodec
 import com.natsx.controller.core.protocol.TransportCapabilities
 import com.natsx.controller.core.protocol.TrustedReconnectCrypto
+import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import java.io.Closeable
 import java.io.InputStream
 import java.io.OutputStream
@@ -382,6 +383,7 @@ class BluetoothTrustedHandshakeChallenge private constructor(
 
 class BluetoothTrustedReconnectClient(
     private val localPeerId: PeerId,
+    private val sessionRegistry: TrustedSessionRegistry? = null,
     private val monotonicMicros: () -> ULong = {
         SystemClock.elapsedRealtimeNanos()
             .toULong() / 1_000uL
@@ -459,6 +461,13 @@ class BluetoothTrustedReconnectClient(
                         "Bluetooth SESSION_READY does not match the trusted Windows receiver.",
                     )
                 }
+
+                sessionRegistry?.replace(
+                    peerId = receiverPeerId,
+                    sessionId = trustedSession.sessionId,
+                    sessionKey =
+                        trustedSession.authenticationKey(),
+                )
 
                 return trustedSession
             } catch (exception: Exception) {
