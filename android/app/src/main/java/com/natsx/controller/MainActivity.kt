@@ -1,7 +1,10 @@
 package com.natsx.controller
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
@@ -18,6 +21,7 @@ class MainActivity : Activity() {
     private var pairingView: PairingScreenView? = null
     private var pairingClient: AndroidPairingClient? = null
     private var currentScreen = Screen.PAIRING
+    private var controllerServiceStarted = false
 
     private val app: NatsxControllerApp
         get() = application as NatsxControllerApp
@@ -41,9 +45,7 @@ class MainActivity : Activity() {
             showControllerScreen()
         }
 
-        startForegroundService(
-            Intent(this, ControllerService::class.java),
-        )
+        ensureBluetoothPermissionAndStartService()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -92,6 +94,86 @@ class MainActivity : Activity() {
         pairingClient?.close()
         pairingClient = null
         super.onDestroy()
+    }
+
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(
+            requestCode,
+            permissions,
+            grantResults,
+        )
+
+        if (requestCode ==
+            BLUETOOTH_PERMISSION_REQUEST
+        ) {
+            startControllerServiceIfNeeded()
+
+            if (grantResults.any {
+                    it ==
+                        PackageManager
+                            .PERMISSION_GRANTED
+                }
+            ) {
+                app.connectionRuntime
+                    .refreshBluetoothFallback()
+            }
+        }
+    }
+
+    private fun ensureBluetoothPermissionAndStartService() {
+        if (Build.VERSION.SDK_INT <
+            Build.VERSION_CODES.S
+        ) {
+            startControllerServiceIfNeeded()
+            return
+        }
+
+        val required =
+            arrayOf(
+                Manifest.permission
+                    .BLUETOOTH_CONNECT,
+                Manifest.permission
+                    .BLUETOOTH_ADVERTISE,
+            )
+
+        val missing =
+            required.filter {
+                checkSelfPermission(it) !=
+                    PackageManager
+                        .PERMISSION_GRANTED
+            }
+
+        if (missing.isEmpty()) {
+            startControllerServiceIfNeeded()
+            app.connectionRuntime
+                .refreshBluetoothFallback()
+            return
+        }
+
+        requestPermissions(
+            missing.toTypedArray(),
+            BLUETOOTH_PERMISSION_REQUEST,
+        )
+    }
+
+    private fun startControllerServiceIfNeeded() {
+        if (controllerServiceStarted) {
+            return
+        }
+
+        startForegroundService(
+            Intent(
+                this,
+                ControllerService::class.java,
+            ),
+        )
+
+        controllerServiceStarted = true
     }
 
     private fun showPairingScreen() {
@@ -300,6 +382,11 @@ class MainActivity : Activity() {
                 View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
                 View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+    }
+
+    private companion object {
+        const val BLUETOOTH_PERMISSION_REQUEST =
+            4101
     }
 
     private enum class Screen {
