@@ -467,6 +467,19 @@ Normal  3 s
 Long    10 s
 ```
 
+The windows have distinct responsibilities:
+
+- **Fast** keeps a recently unstable active transport in `SUSPECT` briefly
+  after its latest sample recovers, without delaying hard lost/critical
+  detection.
+- **Normal** caps the score used for ordinary candidate selection to the recent
+  average, so a transport cannot jump immediately from poor history to a
+  perfect takeover score after one good sample.
+- **Long** acts as a reliability tie-break when candidates have the same
+  effective selection score.
+
+Emergency/lost decisions still use the newest transport snapshot directly.
+
 ### Silence thresholds
 
 ```text

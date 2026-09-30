@@ -20,7 +20,7 @@ public sealed class SmartConnectionManager
 
         foreach (TransportKind kind in Enum.GetValues<TransportKind>())
         {
-            _candidates[kind] = new CandidateState();
+            _candidates[kind] = new CandidateState(_timeProvider);
         }
     }
 
@@ -36,6 +36,9 @@ public sealed class SmartConnectionManager
         TransportHealthSnapshot? previous = candidate.Snapshot;
 
         candidate.Snapshot = snapshot;
+        candidate.HealthHistory.Record(now, snapshot, _policy.LongWindow);
+        candidate.HealthWindows =
+            candidate.HealthHistory.Snapshot(now, _policy);
 
         bool good =
             snapshot.State is TransportRuntimeState.Ready or TransportRuntimeState.Active &&
@@ -214,9 +217,26 @@ public sealed class SmartConnectionManager
             return betterProposal;
         }
 
-        State = activeSnapshot.Value.Grade == TransportHealthGrade.Degraded
-            ? ConnectionManagerState.Degraded
-            : ConnectionManagerState.Active;
+        activeCandidate.HealthWindows =
+            activeCandidate.HealthHistory.Snapshot(now, _policy);
+
+        if (activeSnapshot.Value.Grade is
+            TransportHealthGrade.Degraded or
+            TransportHealthGrade.Critical or
+            TransportHealthGrade.Lost)
+        {
+            State = ConnectionManagerState.Degraded;
+        }
+        else if (activeCandidate.HealthWindows.Fast.HasSamples &&
+                 (int)activeCandidate.HealthWindows.Fast.WorstGrade >=
+                 (int)TransportHealthGrade.Warning)
+        {
+            State = ConnectionManagerState.Suspect;
+        }
+        else
+        {
+            State = ConnectionManagerState.Active;
+        }
 
         return null;
     }
@@ -278,6 +298,15 @@ public sealed class SmartConnectionManager
         return candidate.Snapshot is null
             ? 0
             : EffectiveScore(transport, candidate, candidate.Snapshot.Value, now);
+    }
+
+    public TransportHealthWindows GetHealthWindows(TransportKind transport)
+    {
+        long now = _timeProvider.GetTimestamp();
+        CandidateState candidate = _candidates[transport];
+        candidate.HealthWindows =
+            candidate.HealthHistory.Snapshot(now, _policy);
+        return candidate.HealthWindows;
     }
 
     private HandoverProposal? EvaluateUsbPreference(
@@ -458,6 +487,7 @@ public sealed class SmartConnectionManager
                 EffectiveScore(pair.Key, pair.Value, pair.Value.Snapshot!.Value, now) >= minimumScore)
             .OrderByDescending(pair =>
                 EffectiveScore(pair.Key, pair.Value, pair.Value.Snapshot!.Value, now))
+            .ThenByDescending(pair => LongWindowScore(pair.Value, now))
             .ThenBy(pair => PreferenceOrder(pair.Key))
             .Select(pair => (TransportKind?)pair.Key)
             .FirstOrDefault();
@@ -477,13 +507,35 @@ public sealed class SmartConnectionManager
             _ => 0,
         };
 
+        candidate.HealthWindows =
+            candidate.HealthHistory.Snapshot(now, _policy);
+
+        int observedScore = snapshot.Score;
+
+        if (candidate.HealthWindows.Normal.HasSamples)
+        {
+            observedScore = Math.Min(
+                observedScore,
+                candidate.HealthWindows.Normal.AverageScore);
+        }
+
         int failurePenalty = FailurePenalty(candidate, now);
-        int preferredScore = Math.Clamp(snapshot.Score + preferenceBonus, 0, 100);
+        int preferredScore = Math.Clamp(observedScore + preferenceBonus, 0, 100);
 
         // Preference is a tie-break/transport bias, not a way to erase
         // reliability history. Apply the failure penalty after capping the
         // quality+preference score so repeated failures always reduce trust.
         return Math.Clamp(preferredScore - failurePenalty, 0, 100);
+    }
+
+    private int LongWindowScore(CandidateState candidate, long now)
+    {
+        candidate.HealthWindows =
+            candidate.HealthHistory.Snapshot(now, _policy);
+
+        return candidate.HealthWindows.Long.HasSamples
+            ? candidate.HealthWindows.Long.AverageScore
+            : 0;
     }
 
     private int FailurePenalty(CandidateState candidate, long now)
@@ -626,7 +678,16 @@ public sealed class SmartConnectionManager
 
     private sealed class CandidateState
     {
+        public CandidateState(TimeProvider timeProvider)
+        {
+            HealthHistory = new TransportHealthWindowHistory(timeProvider);
+        }
+
         public TransportHealthSnapshot? Snapshot { get; set; }
+
+        public TransportHealthWindowHistory HealthHistory { get; }
+
+        public TransportHealthWindows HealthWindows { get; set; }
 
         public long? GoodSince { get; set; }
 
