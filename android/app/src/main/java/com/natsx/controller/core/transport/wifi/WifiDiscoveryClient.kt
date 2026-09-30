@@ -37,8 +37,10 @@ class WifiDiscoveryClient(
         require(timeoutMillis in 100..10_000)
     }
 
+    fun discover(): WifiDiscoveredReceiver? = discover(null)
+
     override fun discover(
-        expectedReceiverPeerId: PeerId? = null,
+        expectedReceiverPeerId: PeerId?,
     ): WifiDiscoveredReceiver? {
         val nonce = SecureRandom().nextInt().toUInt()
         val requestPayload = HelloPayload(
