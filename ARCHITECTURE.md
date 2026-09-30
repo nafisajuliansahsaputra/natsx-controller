@@ -593,6 +593,13 @@ Backoff:
 
 The transport may still perform low-impact monitoring/recovery checks while not eligible for normal takeover.
 
+Failure history also contributes a score penalty independently from the circuit
+breaker. The current penalty tier is based on the number of hard failures still
+inside the 30-second failure-history window, then decays linearly toward zero
+from the most recent hard failure. A new hard failure recomputes the tier and
+restarts that decay period. This avoids both immediate trust restoration and an
+abrupt score jump at the end of the window.
+
 ---
 
 ## 19. Handover algorithm

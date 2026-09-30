@@ -251,7 +251,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Failure switch cooldown.
 - [x] Repeated failure cooldown.
 - [x] Circuit breaker.
-- [ ] Failure penalty decay.
+- [x] Failure penalty decay.
 
 ### Handover
 

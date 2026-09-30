@@ -180,6 +180,41 @@ public sealed class SmartConnectionManagerTests
     }
 
     [Fact]
+    public void FailurePenalty_DecaysGraduallyAfterHardFailure()
+    {
+        var clock = new ManualTimeProvider();
+        var manager = new SmartConnectionManager(timeProvider: clock);
+
+        manager.Report(Snapshot(TransportKind.Wifi, 80));
+        manager.RecordHardFailure(TransportKind.Wifi);
+
+        Assert.Equal(80, manager.GetEffectiveScore(TransportKind.Wifi));
+
+        clock.Advance(TimeSpan.FromSeconds(15));
+        Assert.Equal(85, manager.GetEffectiveScore(TransportKind.Wifi));
+
+        clock.Advance(TimeSpan.FromSeconds(15));
+        Assert.Equal(90, manager.GetEffectiveScore(TransportKind.Wifi));
+    }
+
+    [Fact]
+    public void RepeatedFailurePenalty_DecaysFromCurrentTier()
+    {
+        var clock = new ManualTimeProvider();
+        var manager = new SmartConnectionManager(timeProvider: clock);
+
+        manager.Report(Snapshot(TransportKind.Wifi, 100));
+        manager.RecordHardFailure(TransportKind.Wifi);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        manager.RecordHardFailure(TransportKind.Wifi);
+
+        Assert.Equal(80, manager.GetEffectiveScore(TransportKind.Wifi));
+
+        clock.Advance(TimeSpan.FromSeconds(15));
+        Assert.Equal(90, manager.GetEffectiveScore(TransportKind.Wifi));
+    }
+
+    [Fact]
     public void CircuitBreaker_BlocksRepeatedlyFailingCandidate()
     {
         var clock = new ManualTimeProvider();
