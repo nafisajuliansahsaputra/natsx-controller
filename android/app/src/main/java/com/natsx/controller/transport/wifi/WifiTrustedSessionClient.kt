@@ -71,12 +71,19 @@ class WifiTrustedSessionClient(
                             continue
                         }
 
-                        runCatching {
-                            ProtocolFrameCodec.decode(
-                                datagram,
-                                handshake.sessionKeyForAuthenticatedDecode(),
-                            )
-                        }.getOrNull() ?: continue
+                        val decodeKey =
+                            handshake.sessionKeyForAuthenticatedDecode()
+
+                        try {
+                            runCatching {
+                                ProtocolFrameCodec.decode(
+                                    datagram,
+                                    decodeKey,
+                                )
+                            }.getOrNull() ?: continue
+                        } finally {
+                            decodeKey.fill(0)
+                        }
                     } else {
                         runCatching {
                             ProtocolFrameCodec.decode(datagram)
