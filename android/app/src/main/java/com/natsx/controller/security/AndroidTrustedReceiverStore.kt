@@ -21,6 +21,13 @@ data class TrustedReceiverRecord(
     val lastPort: Int,
 )
 
+data class TrustedReceiverMetadata(
+    val windowsDeviceId: SessionId,
+    val displayName: String?,
+    val lastHostAddress: String?,
+    val lastPort: Int,
+)
+
 class AndroidTrustedReceiverStore(
     context: Context,
 ) {
@@ -156,6 +163,39 @@ class AndroidTrustedReceiverStore(
                     SessionId.fromBytes(hexToBytes(encoded))
                 }.getOrNull()
             }
+    }
+
+    fun listMetadata(): List<TrustedReceiverMetadata> {
+        return listTrustedDeviceIds()
+            .map { deviceId ->
+                val prefix = keyPrefix(deviceId)
+
+                TrustedReceiverMetadata(
+                    windowsDeviceId = deviceId,
+                    displayName =
+                        preferences.getString(
+                            prefix + KEY_NAME_SUFFIX,
+                            null,
+                        ),
+                    lastHostAddress =
+                        preferences.getString(
+                            prefix + KEY_HOST_SUFFIX,
+                            null,
+                        ),
+                    lastPort =
+                        preferences.getInt(
+                            prefix + KEY_PORT_SUFFIX,
+                            DEFAULT_CONTROLLER_PORT,
+                        ),
+                )
+            }
+            .sortedWith(
+                compareBy<TrustedReceiverMetadata> {
+                    it.displayName.orEmpty().lowercase()
+                }.thenBy {
+                    it.windowsDeviceId.toString()
+                },
+            )
     }
 
     fun forget(windowsDeviceId: SessionId): Boolean {
