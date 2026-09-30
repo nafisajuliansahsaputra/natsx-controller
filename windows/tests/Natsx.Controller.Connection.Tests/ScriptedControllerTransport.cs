@@ -18,6 +18,8 @@ internal sealed class ScriptedControllerTransport : IControllerTransport
 
     public event EventHandler<TransportGamepadStateEventArgs>? GamepadStateReceived;
 
+    public event EventHandler<TransportRuntimeStateChangedEventArgs>? StateChanged;
+
     public TransportKind Kind { get; }
 
     public TransportRuntimeState State => Snapshot.State;
@@ -63,6 +65,12 @@ internal sealed class ScriptedControllerTransport : IControllerTransport
         }
 
         Snapshot = snapshot;
+
+        StateChanged?.Invoke(
+            this,
+            new TransportRuntimeStateChangedEventArgs(
+                Kind,
+                snapshot.State));
     }
 
     public void Publish(uint sequence, GamepadState state)
