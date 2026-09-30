@@ -1,5 +1,6 @@
 package com.natsx.controller.core.transport.bluetooth
 
+import android.os.SystemClock
 import com.natsx.controller.core.protocol.PeerId
 import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import com.natsx.controller.core.session.RealtimeStateEnvelope
@@ -13,6 +14,10 @@ class TrustedBluetoothRealtimeLinkFactory(
     private val sessionRegistry: TrustedSessionRegistry,
     private val candidateProvider:
         BluetoothRfcommCandidateProvider,
+    private val monotonicMicros: () -> ULong = {
+        SystemClock.elapsedRealtimeNanos()
+            .toULong() / 1_000uL
+    },
 ) : BluetoothRealtimeLinkFactory {
     override fun create():
         BluetoothRealtimeLink {
@@ -89,6 +94,7 @@ class TrustedBluetoothRealtimeLinkFactory(
                 localPeerId = localPeerId,
                 receiverPeerId = receiverPeerId,
                 sessionRegistry = sessionRegistry,
+                monotonicMicros = monotonicMicros,
             ).join(
                 inputStream =
                     connection.inputStream,
@@ -115,6 +121,8 @@ class TrustedBluetoothRealtimeLinkFactory(
                     localPeerId = localPeerId,
                     sessionRegistry =
                         sessionRegistry,
+                    monotonicMicros =
+                        monotonicMicros,
                 ).connect(
                     inputStream =
                         connection.inputStream,
