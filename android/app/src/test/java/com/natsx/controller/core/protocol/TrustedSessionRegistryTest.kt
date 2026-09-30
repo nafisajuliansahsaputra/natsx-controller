@@ -57,6 +57,57 @@ class TrustedSessionRegistryTest {
     }
 
     @Test
+    fun getBySessionIdReturnsPeerAndCopy() {
+        TrustedSessionRegistry().use { registry ->
+            val firstPeer = PeerId.createRandom()
+            val secondPeer = PeerId.createRandom()
+            val firstSession =
+                SessionId.createRandom()
+            val secondSession =
+                SessionId.createRandom()
+            val firstKey =
+                ByteArray(32) { 3 }
+            val secondKey =
+                ByteArray(32) { 4 }
+
+            registry.replace(
+                firstPeer,
+                firstSession,
+                firstKey,
+            )
+            registry.replace(
+                secondPeer,
+                secondSession,
+                secondKey,
+            )
+
+            registry
+                .getBySessionId(
+                    secondSession,
+                )!!
+                .use { registration ->
+                    assertEquals(
+                        secondPeer,
+                        registration.peerId,
+                    )
+                    assertEquals(
+                        secondSession,
+                        registration.material.sessionId,
+                    )
+                }
+
+            assertNull(
+                registry.getBySessionId(
+                    SessionId.createRandom(),
+                ),
+            )
+
+            firstKey.fill(0)
+            secondKey.fill(0)
+        }
+    }
+
+    @Test
     fun replacementAndRemovalTrackCurrentSession() {
         TrustedSessionRegistry().use { registry ->
             val peerId = PeerId.createRandom()
