@@ -17,8 +17,6 @@ object PairingCrypto {
     private val sasContext = ascii("NATSX-SAS-V1")
     private val pairingResponseContext = ascii("NATSX-PAIRING-RESPONSE-V1")
     private val trustSecretInfo = ascii("NATSX-TRUST-SECRET-V1")
-    private val reconnectContext = ascii("NATSX-RECONNECT-V1")
-    private val sessionKeyInfo = ascii("NATSX-SESSION-KEY-V1")
 
     fun computePairingTranscriptHash(
         androidPeerId: PeerId,
@@ -122,53 +120,6 @@ object PairingCrypto {
             salt = pairingTranscriptHash,
             info = trustSecretInfo,
         )
-    }
-
-    fun buildReconnectTranscript(
-        androidPeerId: PeerId,
-        windowsPeerId: PeerId,
-        androidNonce: ByteArray,
-        windowsNonce: ByteArray,
-        sessionId: SessionId,
-    ): ByteArray {
-        validateNonce(androidNonce)
-        validateNonce(windowsNonce)
-
-        return reconnectContext +
-            androidPeerId.toByteArray() +
-            windowsPeerId.toByteArray() +
-            androidNonce +
-            windowsNonce +
-            sessionId.toByteArray()
-    }
-
-    fun computeReconnectProof(
-        trustSecret: ByteArray,
-        reconnectTranscript: ByteArray,
-    ): ByteArray {
-        validateKey(trustSecret)
-        return hmacSha256(trustSecret, reconnectTranscript)
-    }
-
-    fun deriveSessionKey(
-        trustSecret: ByteArray,
-        reconnectTranscript: ByteArray,
-    ): ByteArray {
-        validateKey(trustSecret)
-
-        val hash =
-            MessageDigest.getInstance("SHA-256")
-                .digest(reconnectTranscript)
-
-        return try {
-            hkdfSha256Derive32(
-                ikm = trustSecret,
-                salt = hash,
-                info = sessionKeyInfo,
-            )
-        } finally {
-            hash.fill(0)
-        }
     }
 
     private fun hkdfSha256Derive32(
