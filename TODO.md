@@ -198,8 +198,8 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Implement jitter calculation.
 - [x] Implement packet-loss estimation.
 - [x] Implement stale/duplicate rejection.
-- [ ] Implement direct reconnect to last endpoint.
-- [ ] Fall back to discovery when direct reconnect fails.
+- [x] Implement direct reconnect to last endpoint.
+- [x] Fall back to discovery when direct reconnect fails.
 - [ ] Add diagnostics.
 - [ ] Add network-loss test harness.
 
