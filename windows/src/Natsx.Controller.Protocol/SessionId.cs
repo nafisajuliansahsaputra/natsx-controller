@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Security.Cryptography;
 
 namespace Natsx.Controller.Protocol;
 
@@ -7,6 +8,13 @@ public readonly record struct SessionId(ulong Part0, ulong Part1)
     public const int Size = 16;
 
     public static SessionId Zero => default;
+
+    public static SessionId CreateRandom()
+    {
+        Span<byte> bytes = stackalloc byte[Size];
+        RandomNumberGenerator.Fill(bytes);
+        return FromBytes(bytes);
+    }
 
     public static SessionId FromBytes(ReadOnlySpan<byte> bytes)
     {
