@@ -8,6 +8,41 @@ public static class WifiControlDatagramCodec
 {
     public const int HeartbeatAckPayloadSize = sizeof(ulong);
 
+
+    public static byte[] EncodeSessionReady(
+        WifiTrustedSession trustedSession,
+        SessionReadyPayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.SessionReady,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                SessionReadyPayloadCodec.Encode(payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static SessionReadyPayload DecodeSessionReady(
+        ReadOnlySpan<byte> datagram,
+        WifiTrustedSession trustedSession)
+    {
+        ProtocolFrame frame = DecodeAuthenticatedFrame(datagram, trustedSession);
+
+        if (frame.MessageType != MessageType.SessionReady)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.SessionReady}, received {frame.MessageType}.");
+        }
+
+        return SessionReadyPayloadCodec.Decode(frame.Payload);
+    }
+
     public static byte[] EncodeHeartbeat(
         WifiTrustedSession trustedSession,
         ulong monotonicTimestampMicros)
