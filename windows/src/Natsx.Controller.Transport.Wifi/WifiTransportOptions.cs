@@ -13,12 +13,30 @@ public sealed record WifiTransportOptions
 
     public IPAddress BindAddress { get; init; } = IPAddress.Any;
 
+    public bool HasPreAuthenticatedSession =>
+        SessionId != SessionId.Zero &&
+        SessionKey.Length == TrustedSessionCrypto.SessionKeySize;
+
     public void Validate()
     {
         if (ListenPort is < 1 or > 65535)
             throw new ArgumentOutOfRangeException(nameof(ListenPort));
 
-        if (SessionKey.Length != TrustedSessionCrypto.SessionKeySize)
-            throw new ArgumentException("Wi-Fi transport requires a 32-byte session key.", nameof(SessionKey));
+        bool hasSessionId = SessionId != SessionId.Zero;
+        bool hasSessionKey = SessionKey.Length != 0;
+
+        if (hasSessionId != hasSessionKey)
+        {
+            throw new ArgumentException(
+                "Session ID and session key must either both be supplied or both be omitted.");
+        }
+
+        if (hasSessionKey &&
+            SessionKey.Length != TrustedSessionCrypto.SessionKeySize)
+        {
+            throw new ArgumentException(
+                "Wi-Fi session key must be exactly 32 bytes.",
+                nameof(SessionKey));
+        }
     }
 }
