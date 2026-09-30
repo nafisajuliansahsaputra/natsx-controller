@@ -116,6 +116,52 @@ public sealed class BluetoothControllerTransport : IControllerTransport
         }
     }
 
+    public async ValueTask AttachAuthenticatedStreamAsync(
+        Stream inputStream,
+        Stream outputStream,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(
+            _disposed,
+            this);
+        ArgumentNullException.ThrowIfNull(inputStream);
+        ArgumentNullException.ThrowIfNull(outputStream);
+
+        if (_pumpTask is not null)
+        {
+            throw new InvalidOperationException(
+                "Bluetooth transport already has an attached realtime stream.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _lifecycle.SetState(
+            TransportRuntimeState.Stabilizing);
+
+        var pumpCancellation =
+            new CancellationTokenSource();
+
+        try
+        {
+            await _receiver.StartAsync(
+                inputStream,
+                outputStream,
+                cancellationToken).ConfigureAwait(false);
+
+            _pumpCancellation = pumpCancellation;
+            _pumpTask =
+                PumpStatesAsync(
+                    pumpCancellation.Token);
+        }
+        catch
+        {
+            pumpCancellation.Dispose();
+            _lifecycle.SetState(
+                TransportRuntimeState.Failed);
+            throw;
+        }
+    }
+
     public async ValueTask AttachAuthenticatedSocketAsync(
         StreamSocket socket,
         CancellationToken cancellationToken = default)
@@ -127,11 +173,14 @@ public sealed class BluetoothControllerTransport : IControllerTransport
 
         Stream inputStream =
             socket.InputStream.AsStreamForRead();
+        Stream outputStream =
+            socket.OutputStream.AsStreamForWrite();
 
         try
         {
             await AttachAuthenticatedStreamAsync(
                 inputStream,
+                outputStream,
                 cancellationToken).ConfigureAwait(false);
 
             _socket = socket;
@@ -139,6 +188,8 @@ public sealed class BluetoothControllerTransport : IControllerTransport
         catch
         {
             await inputStream.DisposeAsync()
+                .ConfigureAwait(false);
+            await outputStream.DisposeAsync()
                 .ConfigureAwait(false);
             socket.Dispose();
             throw;
