@@ -26,9 +26,12 @@ public sealed class WifiControllerTransport : IControllerTransport
             new IPEndPoint(IPAddress.Any, WifiRealtimeReceiver.DefaultPort);
         _timeProvider = timeProvider ?? TimeProvider.System;
         _lifecycle = lifecycle ?? new TransportLifecycle();
+        _lifecycle.StateChanged += OnLifecycleStateChanged;
     }
 
     public event EventHandler<TransportGamepadStateEventArgs>? GamepadStateReceived;
+
+    public event EventHandler<TransportRuntimeStateChangedEventArgs>? StateChanged;
 
     public TransportKind Kind => TransportKind.Wifi;
 
@@ -172,6 +175,15 @@ public sealed class WifiControllerTransport : IControllerTransport
         }
     }
 
+    private void OnLifecycleStateChanged(TransportRuntimeState state)
+    {
+        StateChanged?.Invoke(
+            this,
+            new TransportRuntimeStateChangedEventArgs(
+                TransportKind.Wifi,
+                state));
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -182,6 +194,7 @@ public sealed class WifiControllerTransport : IControllerTransport
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         await DisconnectAsync(timeout.Token).ConfigureAwait(false);
         await _receiver.DisposeAsync().ConfigureAwait(false);
+        _lifecycle.StateChanged -= OnLifecycleStateChanged;
 
         _disposed = true;
         GC.SuppressFinalize(this);
