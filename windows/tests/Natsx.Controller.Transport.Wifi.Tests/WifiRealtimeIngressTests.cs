@@ -8,8 +8,13 @@ public sealed class WifiRealtimeIngressTests
     [Fact]
     public void TryAccept_RejectsWifiUntilItIsAuthoritative()
     {
-        var controllerSession = new ControllerSession();
-        var ingress = new WifiRealtimeIngress(controllerSession);
+        var session = new ControllerSession();
+        var backend = new FakeBackend();
+        var safety = new InputSafetyEngine(
+            session,
+            backend,
+            ConnectionPolicy.Competitive);
+        var ingress = new WifiRealtimeIngress(safety);
 
         bool accepted = ingress.TryAccept(
             new WifiGamepadDatagram(
@@ -19,16 +24,23 @@ public sealed class WifiRealtimeIngressTests
 
         Assert.False(accepted);
         Assert.Equal(1, ingress.RejectedStates);
-        Assert.Equal(GamepadState.Neutral, controllerSession.CurrentState);
+        Assert.Equal(GamepadState.Neutral, session.CurrentState);
+        Assert.Equal(GamepadState.Neutral, backend.LastState);
     }
 
     [Fact]
-    public void TryAccept_AcceptsFreshAuthoritativeWifiState()
+    public void TryAccept_SubmitsFreshAuthoritativeWifiStateToBackend()
     {
-        var controllerSession = new ControllerSession();
-        controllerSession.SetAuthoritativeTransport(TransportKind.Wifi);
+        var session = new ControllerSession();
+        session.SetAuthoritativeTransport(TransportKind.Wifi);
 
-        var ingress = new WifiRealtimeIngress(controllerSession);
+        var backend = new FakeBackend();
+        var safety = new InputSafetyEngine(
+            session,
+            backend,
+            ConnectionPolicy.Competitive);
+        var ingress = new WifiRealtimeIngress(safety);
+
         GamepadState expected =
             GamepadState.Neutral with
             {
@@ -40,17 +52,23 @@ public sealed class WifiRealtimeIngressTests
             ingress.TryAccept(
                 new WifiGamepadDatagram(10, 100, expected)));
 
-        Assert.Equal(expected, controllerSession.CurrentState);
+        Assert.Equal(expected, session.CurrentState);
+        Assert.Equal(expected, backend.LastState);
         Assert.Equal(1, ingress.AcceptedStates);
     }
 
     [Fact]
     public void TryAccept_RejectsDuplicateAndOutOfOrderState()
     {
-        var controllerSession = new ControllerSession();
-        controllerSession.SetAuthoritativeTransport(TransportKind.Wifi);
+        var session = new ControllerSession();
+        session.SetAuthoritativeTransport(TransportKind.Wifi);
 
-        var ingress = new WifiRealtimeIngress(controllerSession);
+        var backend = new FakeBackend();
+        var safety = new InputSafetyEngine(
+            session,
+            backend,
+            ConnectionPolicy.Competitive);
+        var ingress = new WifiRealtimeIngress(safety);
 
         Assert.True(
             ingress.TryAccept(
@@ -73,7 +91,37 @@ public sealed class WifiRealtimeIngressTests
                     102,
                     GamepadState.Neutral with { LeftX = 3000 })));
 
-        Assert.Equal((short)1000, controllerSession.CurrentState.LeftX);
+        Assert.Equal((short)1000, session.CurrentState.LeftX);
+        Assert.Equal((short)1000, backend.LastState.LeftX);
         Assert.Equal(2, ingress.RejectedStates);
+    }
+
+    private sealed class FakeBackend : IVirtualGamepadBackend
+    {
+        public bool IsStarted => true;
+
+        public GamepadState LastState { get; private set; } =
+            GamepadState.Neutral;
+
+        public event Action<RumbleState>? RumbleReceived
+        {
+            add { }
+            remove { }
+        }
+
+        public ValueTask StartAsync(
+            CancellationToken cancellationToken = default) =>
+            ValueTask.CompletedTask;
+
+        public ValueTask StopAsync(
+            CancellationToken cancellationToken = default) =>
+            ValueTask.CompletedTask;
+
+        public void Submit(GamepadState state)
+        {
+            LastState = state;
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }
