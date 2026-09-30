@@ -1,9 +1,11 @@
 package com.natsx.controller.core.transport.bluetooth
 
+import android.os.SystemClock
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.RealtimeStateSink
 import java.io.Closeable
 import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -13,6 +15,9 @@ import java.util.concurrent.atomic.AtomicReference
 class BluetoothRealtimeSender(
     private val outputStream: OutputStream,
     private val trustedSession: BluetoothTrustedSession,
+    private val inputStream: InputStream? = null,
+    private val nowNanos: () -> Long =
+        SystemClock::elapsedRealtimeNanos,
 ) : RealtimeStateSink, Closeable {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -24,6 +29,20 @@ class BluetoothRealtimeSender(
                 priority = Thread.NORM_PRIORITY + 1
             }
         }
+
+    private val controlExecutor: ExecutorService? =
+        inputStream?.let {
+            Executors.newSingleThreadExecutor { runnable ->
+                Thread(
+                    runnable,
+                    "natsx-bluetooth-control",
+                ).apply {
+                    isDaemon = true
+                }
+            }
+        }
+
+    private val outputLock = Any()
 
     private val pendingEnvelope =
         AtomicReference<RealtimeStateEnvelope?>(null)
@@ -41,6 +60,28 @@ class BluetoothRealtimeSender(
     @Volatile
     var sendFailures: Long = 0
         private set
+
+    @Volatile
+    var heartbeatsReceived: Long = 0
+        private set
+
+    @Volatile
+    var heartbeatAcksSent: Long = 0
+        private set
+
+    @Volatile
+    var controlFailures: Long = 0
+        private set
+
+    @Volatile
+    var lastHeartbeatReceivedNanos: Long = 0
+        private set
+
+    init {
+        controlExecutor?.execute(
+            ::receiveControlLoop,
+        )
+    }
 
     override fun publish(
         envelope: RealtimeStateEnvelope,
@@ -71,10 +112,18 @@ class BluetoothRealtimeSender(
 
         pendingEnvelope.set(null)
         executor.shutdownNow()
+        controlExecutor?.shutdownNow()
 
         try {
-            outputStream.close()
+            inputStream?.close()
         } catch (_: IOException) {
+        }
+
+        synchronized(outputLock) {
+            try {
+                outputStream.close()
+            } catch (_: IOException) {
+            }
         }
 
         // BluetoothTrustedSession belongs to the logical controller
@@ -122,8 +171,7 @@ class BluetoothRealtimeSender(
                             envelope.monotonicTimestampMicros,
                     )
 
-            outputStream.write(bytes)
-            outputStream.flush()
+            writePacket(bytes)
             sentFrames += 1
         } catch (_: IOException) {
             if (!closed.get()) {
@@ -135,4 +183,74 @@ class BluetoothRealtimeSender(
             }
         }
     }
+
+    private fun receiveControlLoop() {
+        val activeInput = inputStream ?: return
+
+        while (!closed.get()) {
+            try {
+                val frame =
+                    BluetoothStreamFrameCodec
+                        .readFrame(activeInput)
+
+                val echoedProbe =
+                    BluetoothControlFrameCodec
+                        .decodeHeartbeat(
+                            frame,
+                            trustedSession,
+                        )
+
+                heartbeatsReceived += 1
+                lastHeartbeatReceivedNanos =
+                    nowNanos()
+
+                val ack =
+                    BluetoothControlFrameCodec
+                        .encodeHeartbeatAck(
+                            trustedSession =
+                                trustedSession,
+                            responderTimestampMicros =
+                                monotonicMicroseconds(),
+                            echoedProbeTimestampMicros =
+                                echoedProbe,
+                        )
+
+                writePacket(
+                    BluetoothStreamFrameCodec
+                        .encode(ack),
+                )
+
+                heartbeatAcksSent += 1
+            } catch (_: IOException) {
+                if (!closed.get()) {
+                    controlFailures += 1
+                }
+                return
+            } catch (_: IllegalArgumentException) {
+                if (!closed.get()) {
+                    controlFailures += 1
+                }
+            } catch (_: IllegalStateException) {
+                if (!closed.get()) {
+                    controlFailures += 1
+                }
+            }
+        }
+    }
+
+    private fun writePacket(
+        bytes: ByteArray,
+    ) {
+        synchronized(outputLock) {
+            check(!closed.get()) {
+                "Bluetooth realtime sender is closed."
+            }
+
+            outputStream.write(bytes)
+            outputStream.flush()
+        }
+    }
+
+    private fun monotonicMicroseconds(): ULong =
+        nowNanos().toULong() / 1_000uL
 }
