@@ -5,6 +5,7 @@ namespace Natsx.Controller.Receiver;
 public partial class MainWindow : Window
 {
     private readonly ReceiverRuntime _runtime;
+    private readonly ReceiverPairingServer _pairingServer;
 
     public MainWindow()
     {
@@ -12,12 +13,20 @@ public partial class MainWindow : Window
 
         var identityStore = new ReceiverIdentityStore();
         var trustedPeers = new WindowsTrustedPeerStore();
+        var windowsDeviceId = identityStore.GetOrCreate();
 
         _runtime = new ReceiverRuntime(
-            identityStore.GetOrCreate(),
+            windowsDeviceId,
+            trustedPeers);
+
+        _pairingServer = new ReceiverPairingServer(
+            windowsDeviceId,
             trustedPeers);
 
         _runtime.StatusChanged += OnRuntimeStatusChanged;
+        _pairingServer.PromptReady += OnPairingPromptReady;
+        _pairingServer.PairingCompleted += OnPairingCompleted;
+        _pairingServer.PairingFailed += OnPairingFailed;
 
         Loaded += OnLoaded;
         Closed += OnClosed;
@@ -43,6 +52,17 @@ public partial class MainWindow : Window
     private async void OnClosed(object? sender, EventArgs e)
     {
         _runtime.StatusChanged -= OnRuntimeStatusChanged;
+        _pairingServer.PromptReady -= OnPairingPromptReady;
+        _pairingServer.PairingCompleted -= OnPairingCompleted;
+        _pairingServer.PairingFailed -= OnPairingFailed;
+
+        try
+        {
+            await _pairingServer.DisposeAsync();
+        }
+        catch
+        {
+        }
 
         try
         {
@@ -52,6 +72,95 @@ public partial class MainWindow : Window
         {
             // Window is already closing. Runtime cleanup is best effort here.
         }
+    }
+
+    private void StartPairingButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            _pairingServer.StartPairing();
+
+            StartPairingButton.IsEnabled = false;
+            ConfirmPairingButton.IsEnabled = false;
+            CancelPairingButton.IsEnabled = true;
+            PairingCodeText.Text = "------";
+            PairingInfoText.Text =
+                "Waiting for the Android phone on the local network…";
+        }
+        catch (Exception exception)
+        {
+            ResetPairingUi(
+                "Could not start pairing: " + exception.Message);
+        }
+    }
+
+    private void ConfirmPairingButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        ConfirmPairingButton.IsEnabled = false;
+        PairingInfoText.Text =
+            "Code confirmed on this PC. Waiting for the phone…";
+        _pairingServer.Confirm();
+    }
+
+    private void CancelPairingButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        _pairingServer.Cancel();
+        ResetPairingUi("Pairing cancelled.");
+    }
+
+    private void OnPairingPromptReady(PairingPrompt prompt)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            PairingCodeText.Text = prompt.SasCode;
+            PairingInfoText.Text =
+                "Phone: " +
+                (string.IsNullOrWhiteSpace(prompt.AndroidName)
+                    ? "Android device"
+                    : prompt.AndroidName) +
+                ". Confirm only if this exact code is shown on the phone.";
+
+            ConfirmPairingButton.IsEnabled = true;
+            CancelPairingButton.IsEnabled = true;
+        });
+    }
+
+    private void OnPairingCompleted(
+        Natsx.Controller.Protocol.SessionId deviceId,
+        string androidName)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            ResetPairingUi(
+                "Paired successfully with " +
+                (string.IsNullOrWhiteSpace(androidName)
+                    ? "Android device."
+                    : androidName + ".") +
+                " The controller can now reconnect automatically.");
+        });
+    }
+
+    private void OnPairingFailed(string message)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            ResetPairingUi(message);
+        });
+    }
+
+    private void ResetPairingUi(string message)
+    {
+        PairingInfoText.Text = message;
+        PairingCodeText.Text = "------";
+        StartPairingButton.IsEnabled = true;
+        ConfirmPairingButton.IsEnabled = false;
+        CancelPairingButton.IsEnabled = false;
     }
 
     private void OnRuntimeStatusChanged(ReceiverRuntimeStatus status)
