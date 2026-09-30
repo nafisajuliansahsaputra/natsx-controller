@@ -188,7 +188,7 @@ class WifiControllerTransport(
 
         synchronized(sendLock) {
             val activeSocket = socket ?: return
-            activeSocket.send(DatagramPacket(encoded, encoded.size))
+            activeSocket.send(DatagramPacket(encoded, encoded.size, config.endpoint))
         }
     }
 
@@ -206,7 +206,6 @@ class WifiControllerTransport(
         executor.shutdown()
         executor.awaitTermination(1, TimeUnit.SECONDS)
 
-        stateStore.neutralize()
         state.set(WifiTransportState.DISCONNECTED)
     }
 }
