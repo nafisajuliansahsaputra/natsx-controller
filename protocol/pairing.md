@@ -228,3 +228,60 @@ Storage records may contain non-secret metadata in plaintext, including Peer ID 
 3. remove cached transport endpoints;
 4. terminate active sessions for that peer;
 5. require first pairing again before accepting controller state.
+
+
+## 16. Canonical derivation test vector
+
+This vector verifies cross-language transcript ordering, HKDF, SAS, reconnect proof, and session-key derivation.
+
+Inputs:
+
+```text
+Android Peer ID:
+000102030405060708090a0b0c0d0e0f
+
+Windows Peer ID:
+101112131415161718191a1b1c1d1e1f
+
+Android nonce:
+202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f
+
+Windows nonce:
+404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f
+
+Android public key:
+04 || bytes 60..9f
+
+Windows public key:
+04 || bytes a0..df
+
+ECDH test shared secret:
+c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf
+
+Session ID:
+e0e1e2e3e4e5e6e7e8e9eaebecedeeef
+```
+
+Expected outputs:
+
+```text
+Pairing transcript SHA-256:
+ae3a44b49aa7a34878ed64efa63cfb5d3a06b041515fe3fb77a93f14377a6bb0
+
+Pairing key:
+8a12e9de1c2df8d5e83d7ab02effffc2d543d52af0da156fd912138dc8c791cb
+
+Six-digit SAS:
+432656
+
+Trust secret:
+014850a457b18a4a55758249ade00423852dfb44a6c4a9a8bc422a28379ede4f
+
+Reconnect proof:
+f7a5e3ff77584a64cd92a239ae2d75293a77c8b81c66a91a54095654976230de
+
+Session key:
+a1241e0b7d71918fd9e506d597a0c29a4531b94723064ea84260fb03705ed63a
+```
+
+The ECDH shared secret in this vector is injected directly to test key derivation. A separate ECDH test must verify platform P-256 public-key parsing and shared-secret agreement.
