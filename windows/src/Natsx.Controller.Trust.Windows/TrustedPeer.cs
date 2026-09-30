@@ -8,7 +8,7 @@ public sealed record TrustedPeerRecord(
     string? DisplayName,
     byte Capabilities,
     DateTimeOffset PairedAt,
-    int PairingVersion = CurrentPairingVersion)
+    int PairingVersion = 1)
 {
     public const int CurrentPairingVersion = 1;
 }
