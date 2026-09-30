@@ -51,6 +51,15 @@ class TrustedSessionMaterial(
     }
 }
 
+data class TrustedSessionRegistration(
+    val peerId: PeerId,
+    val material: TrustedSessionMaterial,
+) : Closeable {
+    override fun close() {
+        material.close()
+    }
+}
+
 class TrustedSessionRegistry : Closeable {
     private val gate = Any()
     private val sessions =
@@ -93,6 +102,32 @@ class TrustedSessionRegistry : Closeable {
 
         return synchronized(gate) {
             sessions[peerId]?.copy()
+        }
+    }
+
+    fun getBySessionId(
+        sessionId: SessionId,
+    ): TrustedSessionRegistration? {
+        check(!closed) {
+            "Trusted session registry is closed."
+        }
+
+        if (sessionId == SessionId.Zero) {
+            return null
+        }
+
+        return synchronized(gate) {
+            sessions.entries
+                .firstOrNull {
+                    it.value.sessionId ==
+                        sessionId
+                }
+                ?.let {
+                    TrustedSessionRegistration(
+                        peerId = it.key,
+                        material = it.value.copy(),
+                    )
+                }
         }
     }
 
