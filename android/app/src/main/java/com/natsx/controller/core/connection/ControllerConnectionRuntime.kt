@@ -1,9 +1,12 @@
 package com.natsx.controller.core.connection
 
 import com.natsx.controller.core.gamepad.GamepadStateStore
+import com.natsx.controller.core.haptics.ControllerHapticSink
 import com.natsx.controller.core.protocol.CapabilityFlags
+import com.natsx.controller.core.protocol.ControlPayloadCodec
 import com.natsx.controller.core.protocol.DeviceRole
 import com.natsx.controller.core.protocol.HelloPayload
+import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.SessionId
 import com.natsx.controller.core.protocol.TransportMask
 import com.natsx.controller.core.protocol.TrustState
@@ -39,6 +42,7 @@ class ControllerConnectionRuntime(
     private val androidDeviceId: SessionId,
     private val stateStore: GamepadStateStore,
     private val trustedReceivers: AndroidTrustedReceiverStore,
+    private val haptics: ControllerHapticSink,
 ) : AutoCloseable {
     private val running = AtomicBoolean(false)
     private val lastInboundNanos = AtomicLong(0)
@@ -87,6 +91,7 @@ class ControllerConnectionRuntime(
 
         activeTransport?.close()
         activeTransport = null
+        haptics.stopRumble()
 
         worker?.interrupt()
         worker = null
@@ -292,8 +297,25 @@ class ControllerConnectionRuntime(
             sessionKey = session.sessionKey,
         )
 
-        transport.onFrameReceived = {
+        transport.onFrameReceived = { frame ->
             lastInboundNanos.set(System.nanoTime())
+
+            if (frame.messageType == MessageType.RUMBLE) {
+                runCatching {
+                    ControlPayloadCodec.decodeRumble(
+                        frame.payload,
+                    )
+                }.getOrNull()?.let { rumble ->
+                    haptics.applyRumble(
+                        lowFrequency =
+                            rumble.lowFrequency,
+                        highFrequency =
+                            rumble.highFrequency,
+                        durationMilliseconds =
+                            rumble.durationMilliseconds,
+                    )
+                }
+            }
         }
 
         transport.onTransportError = {
@@ -342,6 +364,7 @@ class ControllerConnectionRuntime(
 
             activeTransport?.close()
             activeTransport = null
+            haptics.stopRumble()
 
             session.sessionKey.fill(0)
 
