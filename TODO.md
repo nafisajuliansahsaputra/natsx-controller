@@ -273,7 +273,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [ ] Implement first-time OS pairing flow.
 - [ ] Implement RFCOMM transport.
 - [ ] Implement trusted auto-reconnect.
-- [ ] Implement protocol handshake.
+- [x] Implement protocol handshake.
 - [ ] Implement health metrics appropriate to Bluetooth.
 - [ ] Integrate with Smart Connection Manager.
 - [ ] Support READY/warm standby.
