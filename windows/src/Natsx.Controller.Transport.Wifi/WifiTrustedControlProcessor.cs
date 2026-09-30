@@ -111,8 +111,7 @@ public sealed class WifiTrustedControlProcessor : IDisposable
                     remoteEndPoint,
                     session);
 
-                _lifecycle?.SetState(
-                    TransportRuntimeState.Authenticating);
+                MarkAuthenticating();
 
                 return response.ResponseDatagram.ToArray();
             }
@@ -165,8 +164,7 @@ public sealed class WifiTrustedControlProcessor : IDisposable
                     local,
                     monotonicTimestampMicros);
 
-            _lifecycle?.SetState(
-                TransportRuntimeState.Stabilizing);
+            MarkStabilizing();
 
             return new WifiTrustedControlCompletion(
                 pending.RemotePeerId,
@@ -275,6 +273,45 @@ public sealed class WifiTrustedControlProcessor : IDisposable
             PendingSession pending = _pending[sessionId];
             _pending.Remove(sessionId);
             pending.Session.Dispose();
+        }
+    }
+
+    private void MarkAuthenticating()
+    {
+        if (_lifecycle is null)
+        {
+            return;
+        }
+
+        if (_lifecycle.State is
+            TransportRuntimeState.Unavailable or
+            TransportRuntimeState.Available or
+            TransportRuntimeState.Connecting or
+            TransportRuntimeState.Authenticating or
+            TransportRuntimeState.Failed)
+        {
+            _lifecycle.SetState(
+                TransportRuntimeState.Authenticating);
+        }
+    }
+
+    private void MarkStabilizing()
+    {
+        if (_lifecycle is null)
+        {
+            return;
+        }
+
+        if (_lifecycle.State is
+            TransportRuntimeState.Unavailable or
+            TransportRuntimeState.Available or
+            TransportRuntimeState.Connecting or
+            TransportRuntimeState.Authenticating or
+            TransportRuntimeState.Stabilizing or
+            TransportRuntimeState.Failed)
+        {
+            _lifecycle.SetState(
+                TransportRuntimeState.Stabilizing);
         }
     }
 
