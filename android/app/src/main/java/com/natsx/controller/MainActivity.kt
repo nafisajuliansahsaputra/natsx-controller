@@ -41,9 +41,14 @@ class MainActivity : Activity() {
     }
 
     private fun requestBluetoothPermissionsIfNeeded() {
+        val permissionGate = BluetoothPermissionGate(this)
+
+        if (!permissionGate.isBluetoothSupported()) {
+            return
+        }
+
         val missingPermissions =
-            BluetoothPermissionGate(this)
-                .missingRuntimePermissions()
+            permissionGate.missingRuntimePermissions()
 
         if (missingPermissions.isNotEmpty()) {
             requestPermissions(
