@@ -6,5 +6,6 @@
   <ItemGroup>
     <ProjectReference Include="../Natsx.Controller.Core/Natsx.Controller.Core.csproj" />
     <ProjectReference Include="../Natsx.Controller.Protocol/Natsx.Controller.Protocol.csproj" />
+    <ProjectReference Include="../Natsx.Controller.Connection/Natsx.Controller.Connection.csproj" />
   </ItemGroup>
 </Project>
