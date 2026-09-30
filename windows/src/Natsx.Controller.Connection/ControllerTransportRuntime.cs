@@ -15,6 +15,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     private readonly TimeProvider _timeProvider;
     private readonly IReadOnlyDictionary<TransportKind, IControllerTransport> _transports;
     private readonly Dictionary<TransportKind, LatestTransportState> _latestStates = new();
+    private readonly object _connectionGate = new();
     private readonly object _stateGate = new();
 
     private CancellationTokenSource? _lifetime;
@@ -49,6 +50,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
             }
 
             transport.GamepadStateReceived += OnGamepadStateReceived;
+            transport.StateChanged += OnTransportStateChanged;
         }
 
         _transports = map;
@@ -58,9 +60,27 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
 
     public event Action<TransportKind, Exception>? TransportFaulted;
 
-    public TransportKind? ActiveTransport => _connectionManager.ActiveTransport;
+    public TransportKind? ActiveTransport
+    {
+        get
+        {
+            lock (_connectionGate)
+            {
+                return _connectionManager.ActiveTransport;
+            }
+        }
+    }
 
-    public ConnectionManagerState State => _connectionManager.State;
+    public ConnectionManagerState State
+    {
+        get
+        {
+            lock (_connectionGate)
+            {
+                return _connectionManager.State;
+            }
+        }
+    }
 
     public async ValueTask StartAsync(CancellationToken cancellationToken = default)
     {
@@ -79,7 +99,11 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         {
             try
             {
+                ReportTransportHealth(transport);
+
                 await transport.ConnectAsync(cancellationToken).ConfigureAwait(false);
+
+                ReportTransportHealth(transport);
             }
             catch (Exception exception)
             {
@@ -100,22 +124,18 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        foreach (IControllerTransport transport in _transports.Values)
+        lock (_connectionGate)
         {
-            try
+            foreach (IControllerTransport transport in _transports.Values)
             {
-                _connectionManager.Report(transport.GetHealthSnapshot());
+                ReportTransportHealth(transport);
             }
-            catch (Exception exception)
-            {
-                TransportFaulted?.Invoke(transport.Kind, exception);
-            }
-        }
 
-        HandoverProposal? proposal = _connectionManager.Evaluate();
-        if (proposal is HandoverProposal value)
-        {
-            TryCommitHandover(value);
+            HandoverProposal? proposal = _connectionManager.Evaluate();
+            if (proposal is HandoverProposal value)
+            {
+                TryCommitHandover(value);
+            }
         }
 
         lock (_stateGate)
@@ -175,7 +195,11 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
             _latestStates.Clear();
         }
 
-        _connectionManager.ClearActiveTransport();
+        lock (_connectionGate)
+        {
+            _connectionManager.ClearActiveTransport();
+        }
+
         lifetime?.Dispose();
     }
 
@@ -194,6 +218,36 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+        }
+    }
+
+    private void OnTransportStateChanged(
+        object? sender,
+        TransportRuntimeStateChangedEventArgs eventArgs)
+    {
+        if (sender is not IControllerTransport transport)
+        {
+            return;
+        }
+
+        ReportTransportHealth(transport);
+    }
+
+    private void ReportTransportHealth(IControllerTransport transport)
+    {
+        lock (_connectionGate)
+        {
+            try
+            {
+                _connectionManager.Report(
+                    transport.GetHealthSnapshot());
+            }
+            catch (Exception exception)
+            {
+                TransportFaulted?.Invoke(
+                    transport.Kind,
+                    exception);
+            }
         }
     }
 
@@ -307,6 +361,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         foreach (IControllerTransport transport in _transports.Values)
         {
             transport.GamepadStateReceived -= OnGamepadStateReceived;
+            transport.StateChanged -= OnTransportStateChanged;
             await transport.DisposeAsync().ConfigureAwait(false);
         }
 
