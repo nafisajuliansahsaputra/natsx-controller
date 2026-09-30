@@ -188,19 +188,19 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Define Wi-Fi transport interface implementation.
 - [x] Implement local receiver binding.
 - [x] Implement discovery.
-- [ ] Implement trusted peer identification.
-- [ ] Implement authentication.
+- [x] Implement trusted peer identification.
+- [x] Implement authentication.
 - [x] Implement realtime UDP state flow.
-- [ ] Implement control/handshake flow.
+- [x] Implement control/handshake flow.
 - [x] Implement bounded/latest-state behavior.
-- [ ] Implement heartbeat.
-- [ ] Implement RTT measurement.
-- [ ] Implement jitter calculation.
+- [x] Implement heartbeat.
+- [x] Implement RTT measurement.
+- [x] Implement jitter calculation.
 - [x] Implement packet-loss estimation.
 - [x] Implement stale/duplicate rejection.
-- [ ] Implement direct reconnect to last endpoint.
-- [ ] Fall back to discovery when direct reconnect fails.
-- [ ] Add diagnostics.
+- [x] Implement direct reconnect to last endpoint.
+- [x] Fall back to discovery when direct reconnect fails.
+- [x] Add diagnostics.
 - [ ] Add network-loss test harness.
 
 **Playable milestone:** pressing/holding controls on Android affects the virtual Windows controller and eFootball over Wi-Fi.
@@ -308,13 +308,13 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M10 — Pairing and trust
 
-- [ ] Define first-pair user flow.
-- [ ] Generate/store peer identity.
-- [ ] Protect long-term trust material using platform secure storage.
-- [ ] Implement pairing code/confirmation flow.
-- [ ] Bind trust to the intended device.
-- [ ] Reject untrusted LAN state packets.
-- [ ] Reject stale session packets.
+- [x] Define first-pair user flow.
+- [x] Generate/store peer identity.
+- [x] Protect long-term trust material using platform secure storage.
+- [x] Implement pairing code/confirmation flow.
+- [x] Bind trust to the intended device.
+- [x] Reject untrusted LAN state packets.
+- [x] Reject stale session packets.
 - [ ] Add “Forget device”.
 - [ ] Add pairing reset/recovery.
 
@@ -338,15 +338,15 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [ ] Connected device status.
 - [ ] Active transport.
 - [ ] Backup transport status.
-- [ ] Virtual controller status.
-- [ ] RTT.
-- [ ] Jitter.
-- [ ] packet loss/error health.
+- [x] Virtual controller status.
+- [x] RTT.
+- [x] Jitter.
+- [x] packet loss/error health.
 - [ ] Input rate.
 - [ ] Reconnect count.
 - [ ] Recent handover reason.
 - [ ] Settings.
-- [ ] Diagnostics view.
+- [x] Diagnostics view.
 - [ ] Minimize to system tray.
 - [ ] Optional startup with Windows.
 - [ ] Clear error states for missing backend/permissions.
@@ -355,10 +355,10 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M13 — Android UX
 
-- [ ] Pairing screen.
+- [x] Pairing screen.
 - [ ] Trusted PC list.
 - [ ] Smart Auto connection status.
-- [ ] Gameplay screen.
+- [x] Gameplay screen.
 - [ ] Connection overlay that does not interrupt controls unnecessarily.
 - [ ] Controller profile chooser.
 - [ ] Sensitivity/deadzone settings.
