@@ -487,7 +487,12 @@ public sealed class SmartConnectionManager
             _ => 50,
         };
 
-        return Math.Clamp(snapshot.Score + preferenceBonus - failurePenalty, 0, 100);
+        int preferredScore = Math.Clamp(snapshot.Score + preferenceBonus, 0, 100);
+
+        // Preference is a tie-break/transport bias, not a way to erase
+        // reliability history. Apply the failure penalty after capping the
+        // quality+preference score so repeated failures always reduce trust.
+        return Math.Clamp(preferredScore - failurePenalty, 0, 100);
     }
 
     private int RecentFailureCount(CandidateState candidate, long now)
