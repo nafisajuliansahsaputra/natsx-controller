@@ -308,9 +308,9 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M10 — Pairing and trust
 
-- [ ] Define first-pair user flow.
-- [ ] Generate/store peer identity.
-- [ ] Protect long-term trust material using platform secure storage.
+- [x] Define first-pair user flow.
+- [x] Generate/store peer identity.
+- [x] Protect long-term trust material using platform secure storage.
 - [ ] Implement pairing code/confirmation flow.
 - [ ] Bind trust to the intended device.
 - [ ] Reject untrusted LAN state packets.
