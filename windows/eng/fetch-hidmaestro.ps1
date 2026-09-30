@@ -14,7 +14,7 @@ if ($Version -ne $ExpectedVersion) {
 }
 
 $WindowsRoot = Split-Path -Parent $PSScriptRoot
-$OutputDir = Join-Path $WindowsRoot "lib/HIDMaestro"
+$OutputDir = [System.IO.Path]::Combine($WindowsRoot, "lib", "HIDMaestro")
 $DestinationDll = Join-Path $OutputDir "HIDMaestro.Core.dll"
 
 if ((Test-Path $DestinationDll) -and -not $Force) {
