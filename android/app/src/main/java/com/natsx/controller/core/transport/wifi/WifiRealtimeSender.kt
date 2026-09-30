@@ -1,28 +1,25 @@
 package com.natsx.controller.core.transport.wifi
 
 import android.os.SystemClock
-import com.natsx.controller.core.gamepad.GamepadState
-import com.natsx.controller.core.session.SessionSequence
+import com.natsx.controller.core.session.RealtimeStateEnvelope
+import com.natsx.controller.core.session.RealtimeStateSink
 import java.io.Closeable
 import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import java.net.SocketTimeoutException
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class WifiRealtimeSender(
     private val remoteEndpoint: InetSocketAddress,
     private val trustedSession: WifiTrustedSession,
-    private val sequenceSource: SessionSequence,
-    private val keepAliveIntervalMillis: Long = DEFAULT_KEEPALIVE_MILLIS,
-) : Closeable {
-    private val executor: ScheduledExecutorService =
-        Executors.newSingleThreadScheduledExecutor { runnable ->
+) : Closeable, RealtimeStateSink {
+    private val executor: ExecutorService =
+        Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "natsx-wifi-realtime").apply {
                 isDaemon = true
                 priority = Thread.NORM_PRIORITY + 1
@@ -39,8 +36,7 @@ class WifiRealtimeSender(
     private val socketLock = Any()
     private var socket: DatagramSocket? = null
 
-    private val latestState = AtomicReference(GamepadState.Neutral)
-    private val pendingState = AtomicReference<GamepadState?>(null)
+    private val pendingEnvelope = AtomicReference<RealtimeStateEnvelope?>(null)
     private val drainScheduled = AtomicBoolean(false)
     private val closed = AtomicBoolean(false)
 
@@ -68,35 +64,32 @@ class WifiRealtimeSender(
     var controlFailures: Long = 0
         private set
 
+    @Volatile
+    var lastHeartbeatReceivedNanos: Long = 0
+        private set
+
     init {
         require(!remoteEndpoint.address.isAnyLocalAddress) {
             "Remote endpoint must identify the trusted receiver."
         }
-        require(keepAliveIntervalMillis in MIN_KEEPALIVE_MILLIS..MAX_KEEPALIVE_MILLIS) {
-            "Keepalive interval is outside the supported range."
-        }
-
-        executor.scheduleWithFixedDelay(
-            ::scheduleKeepAlive,
-            keepAliveIntervalMillis,
-            keepAliveIntervalMillis,
-            TimeUnit.MILLISECONDS,
-        )
 
         receiveExecutor.execute(::receiveControlLoop)
     }
 
     /**
-     * Publishes the newest full controller state.
+     * Queues the newest session-global full-state revision.
      *
-     * This path never creates an unbounded event queue. If state changes faster
-     * than UDP can send, intermediate snapshots are replaced by the newest one.
+     * Every ready transport receives the same envelope from
+     * ControllerRealtimePublisher. Wi-Fi never allocates its own sequence.
      */
-    fun publish(state: GamepadState) {
+    override fun publish(envelope: RealtimeStateEnvelope) {
         check(!closed.get()) { "Wi-Fi realtime sender is closed." }
 
-        latestState.set(state)
-        enqueueLatest(state)
+        pendingEnvelope.set(envelope)
+
+        if (drainScheduled.compareAndSet(false, true)) {
+            executor.execute(::drainLatest)
+        }
     }
 
     override fun close() {
@@ -104,7 +97,7 @@ class WifiRealtimeSender(
             return
         }
 
-        pendingState.set(null)
+        pendingEnvelope.set(null)
 
         synchronized(socketLock) {
             socket?.close()
@@ -113,40 +106,23 @@ class WifiRealtimeSender(
 
         executor.shutdownNow()
         receiveExecutor.shutdownNow()
-        trustedSession.close()
-    }
 
-    private fun scheduleKeepAlive() {
-        if (closed.get()) {
-            return
-        }
-
-        // A periodic full-state packet doubles as liveness traffic and ensures
-        // a recovered Wi-Fi path retries automatically even when the user's
-        // fingers have not moved since the network interruption.
-        enqueueLatest(latestState.get())
-    }
-
-    private fun enqueueLatest(state: GamepadState) {
-        pendingState.set(state)
-
-        if (drainScheduled.compareAndSet(false, true)) {
-            executor.execute(::drainLatest)
-        }
+        // WifiTrustedSession belongs to the logical controller session and may
+        // be reused when this transport reconnects at a new endpoint.
     }
 
     private fun drainLatest() {
         while (!closed.get()) {
-            val state = pendingState.getAndSet(null)
+            val envelope = pendingEnvelope.getAndSet(null)
 
-            if (state != null) {
-                send(state)
+            if (envelope != null) {
+                send(envelope)
             }
 
             drainScheduled.set(false)
 
             if (
-                pendingState.get() != null &&
+                pendingEnvelope.get() != null &&
                 drainScheduled.compareAndSet(false, true)
             ) {
                 continue
@@ -158,16 +134,13 @@ class WifiRealtimeSender(
         drainScheduled.set(false)
     }
 
-    private fun send(state: GamepadState) {
+    private fun send(envelope: RealtimeStateEnvelope) {
         try {
-            val nextSequence = sequenceSource.next()
-            val timestampMicros = monotonicMicroseconds()
-
             val bytes = WifiRealtimeDatagramEncoder.encodeGamepadState(
-                state = state,
+                state = envelope.state,
                 trustedSession = trustedSession,
-                sequence = nextSequence,
-                monotonicTimestampMicros = timestampMicros,
+                sequence = envelope.sequence,
+                monotonicTimestampMicros = envelope.monotonicTimestampMicros,
             )
 
             val activeSocket = ensureSocket()
@@ -217,6 +190,7 @@ class WifiRealtimeSender(
                     )
 
                 heartbeatsReceived += 1
+                lastHeartbeatReceivedNanos = SystemClock.elapsedRealtimeNanos()
 
                 val ack =
                     WifiControlDatagramCodec.encodeHeartbeatAck(
@@ -293,9 +267,6 @@ class WifiRealtimeSender(
         SystemClock.elapsedRealtimeNanos().toULong() / 1_000uL
 
     companion object {
-        const val DEFAULT_KEEPALIVE_MILLIS = 8L
-        const val MIN_KEEPALIVE_MILLIS = 4L
-        const val MAX_KEEPALIVE_MILLIS = 1_000L
         const val RECEIVE_TIMEOUT_MILLIS = 1_000
         const val RECONNECT_RETRY_MILLIS = 250L
         const val MAXIMUM_DATAGRAM_SIZE = 512
