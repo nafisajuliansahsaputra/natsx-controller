@@ -15,9 +15,9 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Add `TODO.md`.
 - [x] Add `SKILL.md`.
 - [x] Add `WORKFLOW.md`.
-- [ ] Add top-level `README.md` once build/run commands exist.
+- [x] Add top-level `README.md` once build/run commands exist.
 - [ ] Add license decision.
-- [ ] Add contributor/development environment notes when scaffolding exists.
+- [x] Add contributor/development environment notes when scaffolding exists.
 
 ---
 
@@ -38,23 +38,23 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Create protocol library.
 - [x] Create connection library.
 - [x] Create receiver WPF application.
-- [ ] Create test projects.
+- [x] Create test projects.
 - [x] Establish dependency direction.
 
 ### Android
 
-- [ ] Create Android project under `android/`.
-- [ ] Establish Kotlin package structure.
+- [x] Create Android project under `android/`.
+- [x] Establish Kotlin package structure.
 - [ ] Create gameplay/core/transport separation.
-- [ ] Add unit-test setup.
-- [ ] Add foreground-service skeleton.
+- [x] Add unit-test setup.
+- [x] Add foreground-service skeleton.
 
 ### CI
 
 - [x] Build Windows projects in CI.
-- [ ] Run Windows tests in CI.
-- [ ] Build Android project in CI.
-- [ ] Run Android unit tests in CI.
+- [x] Run Windows tests in CI.
+- [x] Build Android project in CI.
+- [x] Run Android unit tests in CI.
 - [ ] Add formatting/lint checks.
 
 **Exit criteria:** empty product shells build consistently on clean environments.
@@ -63,28 +63,28 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M2 — Protocol v1
 
-- [ ] Define protocol version negotiation.
+- [x] Define protocol version negotiation.
 - [ ] Define peer/device identity fields.
-- [ ] Define session ID.
-- [ ] Define global realtime sequence format.
-- [ ] Define monotonic timestamp representation.
-- [ ] Define `GamepadState` bit layout.
-- [ ] Define D-pad encoding.
-- [ ] Define analog encoding.
+- [x] Define session ID.
+- [x] Define global realtime sequence format.
+- [x] Define monotonic timestamp representation.
+- [x] Define `GamepadState` bit layout.
+- [x] Define D-pad encoding.
+- [x] Define analog encoding.
 - [ ] Define handshake messages.
 - [ ] Define capability messages.
 - [ ] Define heartbeat/health messages.
-- [ ] Define realtime state message.
+- [x] Define realtime state message.
 - [ ] Define state-sync/handover messages.
 - [ ] Define output/rumble message.
 - [ ] Define disconnect/recovery semantics.
-- [ ] Define invalid/stale packet handling.
-- [ ] Define sequence wrap behavior.
+- [x] Define invalid/stale packet handling.
+- [x] Define sequence wrap behavior.
 - [ ] Define authentication/integrity strategy.
-- [ ] Add protocol test vectors.
-- [ ] Add Android encoder/decoder.
-- [ ] Add C# encoder/decoder.
-- [ ] Verify cross-language round-trip fixtures.
+- [x] Add protocol test vectors.
+- [x] Add Android encoder/decoder.
+- [x] Add C# encoder/decoder.
+- [x] Verify cross-language round-trip fixtures.
 
 **Exit criteria:** Kotlin and C# encode/decode the same v1 fixtures exactly.
 
@@ -92,21 +92,21 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M3 — Windows controller core
 
-- [ ] Implement `GamepadState`.
-- [ ] Implement neutral state.
-- [ ] Implement `ControllerSession`.
-- [ ] Implement authoritative transport ownership.
-- [ ] Implement global sequence validation.
-- [ ] Implement `InputSafetyEngine`.
-- [ ] Implement 150 ms default neutralization policy via centralized config.
-- [ ] Define `IVirtualGamepadBackend`.
+- [x] Implement `GamepadState`.
+- [x] Implement neutral state.
+- [x] Implement `ControllerSession`.
+- [x] Implement authoritative transport ownership.
+- [x] Implement global sequence validation.
+- [x] Implement `InputSafetyEngine`.
+- [x] Implement 150 ms default neutralization policy via centralized config.
+- [x] Define `IVirtualGamepadBackend`.
 - [ ] Implement HIDMaestro adapter.
 - [ ] Create one virtual Xbox 360-compatible controller.
 - [ ] Submit digital buttons.
 - [ ] Submit sticks.
 - [ ] Submit triggers.
 - [ ] Verify device remains alive while session transport is absent/recovering.
-- [ ] Implement output/rumble callback boundary.
+- [x] Implement output/rumble callback boundary.
 - [ ] Add virtual-backend diagnostics.
 
 **Exit criteria:** Windows can drive the virtual controller from deterministic internal test states without any phone connection.
@@ -117,45 +117,45 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ### Touch engine
 
-- [ ] Build dedicated landscape gameplay surface.
-- [ ] Track pointer IDs independently.
-- [ ] Implement control ownership.
+- [x] Build dedicated landscape gameplay surface.
+- [x] Track pointer IDs independently.
+- [x] Implement control ownership.
 - [ ] Implement touch hysteresis.
-- [ ] Prevent unrelated pointer cancellation.
-- [ ] Handle ACTION_CANCEL safely.
-- [ ] Handle app focus loss safely.
+- [x] Prevent unrelated pointer cancellation.
+- [x] Handle ACTION_CANCEL safely.
+- [x] Handle app focus loss safely.
 
 ### Left stick
 
-- [ ] Fixed center.
-- [ ] Radial normalization.
-- [ ] Configurable deadzone.
-- [ ] Outer clamp.
-- [ ] Linear response curve.
+- [x] Fixed center.
+- [x] Radial normalization.
+- [x] Configurable deadzone.
+- [x] Outer clamp.
+- [x] Linear response curve.
 - [ ] Light anti-jitter.
-- [ ] Instant recenter.
+- [x] Instant recenter.
 
 ### Right stick
 
-- [ ] Same core analog pipeline.
-- [ ] Independent sizing/hitbox.
+- [x] Same core analog pipeline.
+- [x] Independent sizing/hitbox.
 
 ### Digital controls
 
-- [ ] A/B/X/Y.
-- [ ] LB/RB.
-- [ ] LT/RT.
-- [ ] L3/R3.
-- [ ] Back/View.
-- [ ] Start/Menu.
-- [ ] Guide where supported.
-- [ ] D-pad.
+- [x] A/B/X/Y.
+- [x] LB/RB.
+- [x] LT/RT.
+- [x] L3/R3.
+- [x] Back/View.
+- [x] Start/Menu.
+- [x] Guide where supported.
+- [x] D-pad.
 
 ### State
 
-- [ ] Implement Android `GamepadStateStore`.
-- [ ] Publish full-state snapshots.
-- [ ] Avoid unbounded event queues.
+- [x] Implement Android `GamepadStateStore`.
+- [x] Publish full-state snapshots.
+- [x] Avoid unbounded event queues.
 
 **Exit criteria:** touch tests prove simultaneous independent controls and stable analog values.
 
@@ -163,19 +163,19 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M5 — eFootball Layout v1
 
-- [ ] Recreate the established Monect-derived baseline.
-- [ ] Keep large left stick.
-- [ ] Place LT/LB upper-left.
-- [ ] Place RT/RB upper-right.
-- [ ] Place large A/B/X/Y on the right.
-- [ ] Place Back/Start/L3/R3 center.
-- [ ] Place D-pad lower-middle.
-- [ ] Increase right-stick usability.
-- [ ] Separate visual size from invisible hitbox size.
-- [ ] Add basic layout scale.
+- [x] Recreate the established Monect-derived baseline.
+- [x] Keep large left stick.
+- [x] Place LT/LB upper-left.
+- [x] Place RT/RB upper-right.
+- [x] Place large A/B/X/Y on the right.
+- [x] Place Back/Start/L3/R3 center.
+- [x] Place D-pad lower-middle.
+- [x] Increase right-stick usability.
+- [x] Separate visual size from invisible hitbox size.
+- [x] Add basic layout scale.
 - [ ] Add safe-area handling.
-- [ ] Add landscape orientation enforcement.
-- [ ] Add keep-screen-awake behavior during gameplay.
+- [x] Add landscape orientation enforcement.
+- [x] Add keep-screen-awake behavior during gameplay.
 - [ ] Add configurable haptic strength.
 - [ ] Validate common multi-touch combinations used in eFootball.
 
@@ -211,46 +211,46 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ### Policy
 
-- [ ] Implement centralized `ConnectionPolicy`.
+- [x] Implement centralized `ConnectionPolicy`.
 - [ ] Implement Fast/Normal/Long health windows.
-- [ ] Implement transport-specific latency bands.
-- [ ] Implement jitter bands.
-- [ ] Implement Wi-Fi packet-loss bands.
+- [x] Implement transport-specific latency bands.
+- [x] Implement jitter bands.
+- [x] Implement Wi-Fi packet-loss bands.
 - [ ] Implement silence timers.
 
 ### States
 
-- [ ] DISCONNECTED.
-- [ ] DISCOVERING.
+- [x] DISCONNECTED.
+- [x] DISCOVERING.
 - [ ] CONNECTING.
 - [ ] AUTHENTICATING.
 - [ ] STABILIZING.
-- [ ] READY.
-- [ ] ACTIVE.
+- [x] READY.
+- [x] ACTIVE.
 - [ ] SUSPECT.
-- [ ] DEGRADED.
-- [ ] HANDOVER.
-- [ ] RECOVERING.
-- [ ] COOLDOWN.
+- [x] DEGRADED.
+- [x] HANDOVER.
+- [x] RECOVERING.
+- [x] COOLDOWN.
 
 ### Selection
 
-- [ ] Implement base preference USB > Wi-Fi > Bluetooth.
-- [ ] Implement health score.
-- [ ] Implement 15-point normal switch margin.
-- [ ] Implement candidate minimum-health rule.
-- [ ] Implement emergency override.
+- [x] Implement base preference USB > Wi-Fi > Bluetooth.
+- [x] Implement health score.
+- [x] Implement 15-point normal switch margin.
+- [x] Implement candidate minimum-health rule.
+- [x] Implement emergency override.
 
 ### Stability
 
-- [ ] USB stabilization.
-- [ ] Wi-Fi degraded recovery hysteresis.
-- [ ] Wi-Fi failed recovery hysteresis.
-- [ ] Bluetooth recovery hysteresis.
-- [ ] Normal switch cooldown.
-- [ ] Failure switch cooldown.
-- [ ] Repeated failure cooldown.
-- [ ] Circuit breaker.
+- [x] USB stabilization.
+- [x] Wi-Fi degraded recovery hysteresis.
+- [x] Wi-Fi failed recovery hysteresis.
+- [x] Bluetooth recovery hysteresis.
+- [x] Normal switch cooldown.
+- [x] Failure switch cooldown.
+- [x] Repeated failure cooldown.
+- [x] Circuit breaker.
 - [ ] Failure penalty decay.
 
 ### Handover
