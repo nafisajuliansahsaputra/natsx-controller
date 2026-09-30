@@ -23,6 +23,11 @@ public sealed class TransportHealthMonitorTests
 
         clock.Advance(TimeSpan.FromSeconds(3));
 
+        // The newest sample is exactly on the inclusive 3-second boundary.
+        Assert.Equal(1, monitor.GetNormal(TransportKind.Wifi).SampleCount);
+
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+
         Assert.Equal(0, monitor.GetNormal(TransportKind.Wifi).SampleCount);
         Assert.Equal(3, monitor.GetLong(TransportKind.Wifi).SampleCount);
     }
