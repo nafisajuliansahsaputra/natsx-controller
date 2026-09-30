@@ -206,6 +206,29 @@ Confirms:
 
 ### HEARTBEAT / HEARTBEAT_ACK
 
+Both messages are authenticated once a trusted session exists.
+
+`HEARTBEAT` uses an empty payload. Its header `monotonicTimestampMicros`
+contains the sender's local probe timestamp.
+
+`HEARTBEAT_ACK` has an 8-byte little-endian payload containing the exact
+`monotonicTimestampMicros` value from the heartbeat being acknowledged.
+The ACK header contains the responder's own local monotonic timestamp.
+
+This allows the heartbeat originator to calculate RTT using only its own
+monotonic clock:
+
+```text
+RTT = localNowMicros - echoedProbeTimestampMicros
+```
+
+No clock synchronization between Android and Windows is required.
+
+For v1 heartbeat/control frames, the common header sequence field may be zero.
+The global freshness sequence requirement applies to `GAMEPAD_STATE` and
+state synchronization; heartbeat traffic must not make a later controller
+state appear stale.
+
 Provides:
 
 - liveness;
