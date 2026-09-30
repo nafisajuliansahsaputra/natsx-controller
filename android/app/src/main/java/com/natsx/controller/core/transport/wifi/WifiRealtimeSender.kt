@@ -293,8 +293,8 @@ class WifiRealtimeSender(
         SystemClock.elapsedRealtimeNanos().toULong() / 1_000uL
 
     companion object {
-        const val DEFAULT_KEEPALIVE_MILLIS = 100L
-        const val MIN_KEEPALIVE_MILLIS = 25L
+        const val DEFAULT_KEEPALIVE_MILLIS = 8L
+        const val MIN_KEEPALIVE_MILLIS = 4L
         const val MAX_KEEPALIVE_MILLIS = 1_000L
         const val RECEIVE_TIMEOUT_MILLIS = 1_000
         const val RECONNECT_RETRY_MILLIS = 250L
