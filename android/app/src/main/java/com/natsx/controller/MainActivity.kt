@@ -172,8 +172,9 @@ class MainActivity : Activity() {
         pairingView = null
 
         controllerView = ControllerSurfaceView(
-            this,
-            app.gamepadStateStore,
+            context = this,
+            stateStore = app.gamepadStateStore,
+            haptics = app.controllerHaptics,
         )
 
         setContentView(controllerView)
