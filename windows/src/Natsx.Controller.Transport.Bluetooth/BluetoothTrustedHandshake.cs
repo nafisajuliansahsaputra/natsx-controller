@@ -91,6 +91,8 @@ public static class BluetoothAuthFrameCodec
 
 public static class BluetoothControlFrameCodec
 {
+    public const int HeartbeatAckPayloadSize = sizeof(ulong);
+
     public static byte[] EncodeSessionReady(
         BluetoothTrustedSession trustedSession,
         SessionReadyPayload payload,
@@ -130,6 +132,126 @@ public static class BluetoothControlFrameCodec
         }
 
         return SessionReadyPayloadCodec.Decode(frame.Payload);
+    }
+
+    public static byte[] EncodeHeartbeat(
+        BluetoothTrustedSession trustedSession,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.Heartbeat,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                Array.Empty<byte>()),
+            trustedSession.SessionKey);
+    }
+
+    public static ulong DecodeHeartbeat(
+        ReadOnlySpan<byte> frameBytes,
+        BluetoothTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession);
+
+        if (frame.MessageType != MessageType.Heartbeat)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.Heartbeat}, received {frame.MessageType}.");
+        }
+
+        if (frame.Payload.Length != 0)
+        {
+            throw new FormatException(
+                "HEARTBEAT payload must be empty.");
+        }
+
+        return frame.MonotonicTimestampMicros;
+    }
+
+    public static byte[] EncodeHeartbeatAck(
+        BluetoothTrustedSession trustedSession,
+        ulong responderTimestampMicros,
+        ulong echoedProbeTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(trustedSession);
+
+        var payload = new byte[HeartbeatAckPayloadSize];
+        System.Buffers.Binary.BinaryPrimitives
+            .WriteUInt64LittleEndian(
+                payload,
+                echoedProbeTimestampMicros);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.HeartbeatAck,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                responderTimestampMicros,
+                payload),
+            trustedSession.SessionKey);
+    }
+
+    public static ulong DecodeHeartbeatAck(
+        ReadOnlySpan<byte> frameBytes,
+        BluetoothTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession);
+
+        if (frame.MessageType != MessageType.HeartbeatAck)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.HeartbeatAck}, received {frame.MessageType}.");
+        }
+
+        if (frame.Payload.Length != HeartbeatAckPayloadSize)
+        {
+            throw new FormatException(
+                "HEARTBEAT_ACK payload must be exactly 8 bytes.");
+        }
+
+        return System.Buffers.Binary.BinaryPrimitives
+            .ReadUInt64LittleEndian(frame.Payload);
+    }
+
+    internal static ProtocolFrame DecodeAuthenticatedFrame(
+        ReadOnlySpan<byte> frameBytes,
+        BluetoothTrustedSession trustedSession)
+    {
+        ArgumentNullException.ThrowIfNull(trustedSession);
+
+        ProtocolFrame frame =
+            ProtocolFrameCodec.Decode(
+                frameBytes,
+                trustedSession.SessionKey);
+
+        if (!frame.Flags.HasFlag(
+                FrameFlags.Authenticated))
+        {
+            throw new CryptographicException(
+                "Bluetooth session traffic must be authenticated.");
+        }
+
+        if (frame.SessionId !=
+            trustedSession.SessionId)
+        {
+            throw new CryptographicException(
+                "Bluetooth frame belongs to a different controller session.");
+        }
+
+        return frame;
     }
 }
 
