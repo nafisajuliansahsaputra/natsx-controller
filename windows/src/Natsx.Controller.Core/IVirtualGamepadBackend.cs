@@ -4,7 +4,7 @@ public interface IVirtualGamepadBackend : IAsyncDisposable
 {
     bool IsStarted { get; }
 
-    event EventHandler<RumbleState>? RumbleReceived;
+    event Action<RumbleState>? RumbleReceived;
 
     ValueTask StartAsync(CancellationToken cancellationToken = default);
 
