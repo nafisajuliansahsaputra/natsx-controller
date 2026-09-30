@@ -144,6 +144,11 @@ public sealed class WifiControllerTransport : IControllerTransport
             catch (ObjectDisposedException)
             {
             }
+            catch (SocketException) when (
+                runCts?.IsCancellationRequested == true ||
+                _udp is null)
+            {
+            }
         }
 
         runCts?.Dispose();
@@ -237,6 +242,12 @@ public sealed class WifiControllerTransport : IControllerTransport
                 break;
             }
             catch (ObjectDisposedException)
+            {
+                break;
+            }
+            catch (SocketException) when (
+                cancellationToken.IsCancellationRequested ||
+                _udp is null)
             {
                 break;
             }
