@@ -21,6 +21,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     private CancellationTokenSource? _lifetime;
     private Task? _evaluationLoop;
     private bool _started;
+    private bool _suppressLifecycleReports;
     private bool _disposed;
 
     public ControllerTransportRuntime(
@@ -93,13 +94,17 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
 
         cancellationToken.ThrowIfCancellationRequested();
         _started = true;
+        _suppressLifecycleReports = false;
         _lifetime = new CancellationTokenSource();
 
         foreach (IControllerTransport transport in _transports.Values)
         {
             try
             {
-                ReportTransportHealth(transport);
+                if (transport.State != TransportRuntimeState.Unavailable)
+                {
+                    ReportTransportHealth(transport);
+                }
 
                 await transport.ConnectAsync(cancellationToken).ConfigureAwait(false);
 
@@ -152,6 +157,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         }
 
         _started = false;
+        _suppressLifecycleReports = true;
 
         CancellationTokenSource? lifetime = _lifetime;
         Task? loop = _evaluationLoop;
@@ -225,7 +231,8 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         object? sender,
         TransportRuntimeStateChangedEventArgs eventArgs)
     {
-        if (sender is not IControllerTransport transport)
+        if (_suppressLifecycleReports ||
+            sender is not IControllerTransport transport)
         {
             return;
         }
