@@ -33,6 +33,32 @@ public sealed class WifiControllerTransport : IControllerTransport
     public TransportRuntimeState State =>
         (TransportRuntimeState)Volatile.Read(ref _state);
 
+    public void SetAuthoritative(bool authoritative)
+    {
+        if (authoritative)
+        {
+            if (Interlocked.CompareExchange(
+                    ref _state,
+                    (int)TransportRuntimeState.Active,
+                    (int)TransportRuntimeState.Ready) ==
+                (int)TransportRuntimeState.Ready)
+            {
+                return;
+            }
+
+            Interlocked.CompareExchange(
+                ref _state,
+                (int)TransportRuntimeState.Active,
+                (int)TransportRuntimeState.Degraded);
+            return;
+        }
+
+        Interlocked.CompareExchange(
+            ref _state,
+            (int)TransportRuntimeState.Ready,
+            (int)TransportRuntimeState.Active);
+    }
+
     public async ValueTask ConnectAsync(CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -104,8 +130,6 @@ public sealed class WifiControllerTransport : IControllerTransport
             await foreach (WifiGamepadDatagram datagram in
                 _receiver.States.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
-                SetState(TransportRuntimeState.Active);
-
                 GamepadStateReceived?.Invoke(
                     this,
                     new TransportGamepadStateEventArgs(

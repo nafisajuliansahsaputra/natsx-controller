@@ -26,6 +26,22 @@ The runtime caches only its latest state snapshot. It does not forward that stan
 
 This gives Smart Auto a warm candidate for make-before-break handover without creating multiple authoritative writers.
 
+## Authority state
+
+Transport runtime state and packet flow are separate concerns.
+
+A transport becomes `ACTIVE` only when `ControllerTransportRuntime` grants it
+controller authority. Receiving fresh packets while acting as a warm standby
+must leave it `READY`; packet arrival alone is not permission to become active.
+
+After a committed handover, the new authoritative transport is promoted to
+`ACTIVE` and the previous authoritative transport is explicitly demoted to
+`READY` while it remains connected as a standby candidate.
+
+Authority-state updates are local and non-blocking. They must not perform
+network/Bluetooth/USB I/O or couple socket lifecycle to virtual-controller
+lifecycle.
+
 ## Handover
 
 A Smart Connection proposal is committed only when the target transport has a fresh state snapshot.

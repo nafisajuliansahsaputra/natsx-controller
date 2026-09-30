@@ -259,7 +259,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Candidate state synchronization.
 - [x] Global sequence continuity.
 - [x] Atomic authoritative switch.
-- [ ] Old transport demotion.
+- [x] Old transport demotion.
 - [x] No neutral frame during healthy handover.
 - [x] Neutralize safely when all transports fail.
 

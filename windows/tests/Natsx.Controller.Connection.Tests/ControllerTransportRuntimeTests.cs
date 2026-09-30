@@ -37,6 +37,8 @@ public sealed class ControllerTransportRuntimeTests
 
         Assert.Equal(TransportKind.Wifi, runtime.ActiveTransport);
         Assert.Equal(TransportKind.Wifi, session.AuthoritativeTransport);
+        Assert.True(wifi.IsAuthoritative);
+        Assert.Equal(TransportRuntimeState.Active, wifi.State);
         Assert.Equal((uint)10, session.LastAcceptedSequence);
         Assert.Equal(state, backend.LastState);
     }
@@ -100,6 +102,10 @@ public sealed class ControllerTransportRuntimeTests
 
         Assert.Equal(TransportKind.Bluetooth, runtime.ActiveTransport);
         Assert.Equal(TransportKind.Bluetooth, session.AuthoritativeTransport);
+        Assert.False(wifi.IsAuthoritative);
+        Assert.Equal(TransportRuntimeState.Ready, wifi.State);
+        Assert.True(bluetooth.IsAuthoritative);
+        Assert.Equal(TransportRuntimeState.Active, bluetooth.State);
         Assert.Equal((uint)11, session.LastAcceptedSequence);
         Assert.Equal(bluetoothState, backend.LastState);
     }
@@ -185,11 +191,32 @@ public sealed class ControllerTransportRuntimeTests
 
         public TransportHealthSnapshot Snapshot { get; set; }
 
+        public bool IsAuthoritative { get; private set; }
+
         public ValueTask ConnectAsync(CancellationToken cancellationToken) =>
             ValueTask.CompletedTask;
 
         public ValueTask DisconnectAsync(CancellationToken cancellationToken) =>
             ValueTask.CompletedTask;
+
+        public void SetAuthoritative(bool authoritative)
+        {
+            IsAuthoritative = authoritative;
+
+            if (Snapshot.State is
+                TransportRuntimeState.Failed or
+                TransportRuntimeState.Unavailable)
+            {
+                return;
+            }
+
+            Snapshot = Snapshot with
+            {
+                State = authoritative
+                    ? TransportRuntimeState.Active
+                    : TransportRuntimeState.Ready,
+            };
+        }
 
         public TransportHealthSnapshot GetHealthSnapshot() => Snapshot;
 

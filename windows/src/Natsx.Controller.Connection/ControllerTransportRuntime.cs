@@ -266,6 +266,21 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
             }
 
             _connectionManager.Commit(proposal);
+
+            if (oldAuthority is TransportKind previous &&
+                previous != proposal.To &&
+                _transports.TryGetValue(previous, out IControllerTransport? oldTransport))
+            {
+                oldTransport.SetAuthoritative(false);
+            }
+
+            if (_transports.TryGetValue(
+                    proposal.To,
+                    out IControllerTransport? newTransport))
+            {
+                newTransport.SetAuthoritative(true);
+            }
+
             committed = proposal;
         }
 
