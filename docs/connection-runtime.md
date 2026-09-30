@@ -105,6 +105,17 @@ Competitive policy evaluates transport health every 25 ms.
 
 The actual health thresholds remain centralized in `ConnectionPolicy`; this cadence is not permission to switch every 25 ms. Hysteresis, score margin, recovery stability, cooldown, and circuit breaker still govern normal handover.
 
+## Failure-history recovery
+
+Hard failures reduce a transport's effective selection score. The penalty uses
+the existing failure-count tiers, but the active tier now decays linearly over
+the configured `FailurePenaltyWindow` from the latest hard failure.
+
+A new hard failure immediately reapplies the appropriate full tier. If no new
+failure occurs, the penalty steadily returns to zero instead of disappearing in
+one step at the end of the window. Circuit-breaker eligibility remains a
+separate rule.
+
 ## Transport adapter rule
 
 Every production transport implements `IControllerTransport` and exposes:

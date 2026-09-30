@@ -477,22 +477,45 @@ public sealed class SmartConnectionManager
             _ => 0,
         };
 
-        int failures = RecentFailureCount(candidate, now);
-        int failurePenalty = failures switch
-        {
-            0 => 0,
-            1 => 10,
-            2 => 20,
-            3 => 35,
-            _ => 50,
-        };
-
+        int failurePenalty = FailurePenalty(candidate, now);
         int preferredScore = Math.Clamp(snapshot.Score + preferenceBonus, 0, 100);
 
         // Preference is a tie-break/transport bias, not a way to erase
         // reliability history. Apply the failure penalty after capping the
         // quality+preference score so repeated failures always reduce trust.
         return Math.Clamp(preferredScore - failurePenalty, 0, 100);
+    }
+
+    private int FailurePenalty(CandidateState candidate, long now)
+    {
+        int failures = RecentFailureCount(candidate, now);
+
+        if (failures == 0 || candidate.LastHardFailureAt is null)
+        {
+            return 0;
+        }
+
+        int fullPenalty = failures switch
+        {
+            1 => 10,
+            2 => 20,
+            3 => 35,
+            _ => 50,
+        };
+
+        TimeSpan age = Elapsed(candidate.LastHardFailureAt.Value, now);
+
+        if (age >= _policy.FailurePenaltyWindow)
+        {
+            return 0;
+        }
+
+        double remainingFraction =
+            1.0 -
+            (age.TotalMilliseconds /
+             _policy.FailurePenaltyWindow.TotalMilliseconds);
+
+        return (int)Math.Ceiling(fullPenalty * remainingFraction);
     }
 
     private int RecentFailureCount(CandidateState candidate, long now)
