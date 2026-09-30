@@ -1,11 +1,21 @@
 package com.natsx.controller.core.gamepad
 
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicReference
 
 class GamepadStateStore {
     private val state = AtomicReference(GamepadState.Neutral)
+    private val listeners = CopyOnWriteArrayList<GamepadStateListener>()
 
     fun snapshot(): GamepadState = state.get()
+
+    fun addListener(listener: GamepadStateListener) {
+        listeners.addIfAbsent(listener)
+    }
+
+    fun removeListener(listener: GamepadStateListener) {
+        listeners.remove(listener)
+    }
 
     fun setButton(mask: Int, pressed: Boolean) {
         update { current ->
@@ -66,7 +76,17 @@ class GamepadStateStore {
     }
 
     fun neutralize() {
-        state.set(GamepadState.Neutral)
+        while (true) {
+            val current = state.get()
+            if (current == GamepadState.Neutral) {
+                return
+            }
+
+            if (state.compareAndSet(current, GamepadState.Neutral)) {
+                notifyListeners(GamepadState.Neutral)
+                return
+            }
+        }
     }
 
     private inline fun update(transform: (GamepadState) -> GamepadState) {
@@ -74,9 +94,20 @@ class GamepadStateStore {
             val current = state.get()
             val next = transform(current)
 
-            if (state.compareAndSet(current, next)) {
+            if (next == current) {
                 return
             }
+
+            if (state.compareAndSet(current, next)) {
+                notifyListeners(next)
+                return
+            }
+        }
+    }
+
+    private fun notifyListeners(next: GamepadState) {
+        listeners.forEach { listener ->
+            listener.onGamepadStateChanged(next)
         }
     }
 }
