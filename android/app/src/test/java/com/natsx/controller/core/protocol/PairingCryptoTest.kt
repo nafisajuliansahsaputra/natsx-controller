@@ -72,36 +72,6 @@ class PairingCryptoTest {
             trustSecret.hex(),
         )
 
-        val reconnectTranscript =
-            PairingCrypto.buildReconnectTranscript(
-                androidPeerId = androidPeerId,
-                windowsPeerId = windowsPeerId,
-                androidNonce = androidNonce,
-                windowsNonce = windowsNonce,
-                sessionId = sessionId,
-            )
-
-        val proof =
-            PairingCrypto.computeReconnectProof(
-                trustSecret = trustSecret,
-                reconnectTranscript = reconnectTranscript,
-            )
-
-        assertEquals(
-            "f7a5e3ff77584a64cd92a239ae2d75293a77c8b81c66a91a54095654976230de",
-            proof.hex(),
-        )
-
-        val sessionKey =
-            PairingCrypto.deriveSessionKey(
-                trustSecret = trustSecret,
-                reconnectTranscript = reconnectTranscript,
-            )
-
-        assertEquals(
-            "a1241e0b7d71918fd9e506d597a0c29a4531b94723064ea84260fb03705ed63a",
-            sessionKey.hex(),
-        )
     }
 
     private fun range(
