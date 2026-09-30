@@ -14,7 +14,7 @@ public sealed record WifiTransportOptions
     public IPAddress BindAddress { get; init; } = IPAddress.Any;
 
     public bool HasPreAuthenticatedSession =>
-        SessionId != SessionId.Zero &&
+        SessionId != Natsx.Controller.Protocol.SessionId.Zero &&
         SessionKey.Length == TrustedSessionCrypto.SessionKeySize;
 
     public void Validate()
@@ -22,7 +22,7 @@ public sealed record WifiTransportOptions
         if (ListenPort is < 1 or > 65535)
             throw new ArgumentOutOfRangeException(nameof(ListenPort));
 
-        bool hasSessionId = SessionId != SessionId.Zero;
+        bool hasSessionId = SessionId != Natsx.Controller.Protocol.SessionId.Zero;
         bool hasSessionKey = SessionKey.Length != 0;
 
         if (hasSessionId != hasSessionKey)
