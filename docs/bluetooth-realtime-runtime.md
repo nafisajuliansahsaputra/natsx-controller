@@ -120,9 +120,27 @@ Final cross-transport authority and global freshness are still enforced by
 
 ## Health status
 
-This slice uses receiver silence plus the centralized Bluetooth latency policy
-boundary, but it does not yet implement Bluetooth heartbeat RTT/jitter
-measurement.
+Bluetooth uses authenticated framed heartbeat traffic on the same RFCOMM
+session.
 
-Therefore M8 `health metrics appropriate to Bluetooth` remains incomplete
-until control heartbeat/ACK sampling is wired over the RFCOMM stream.
+Windows sends `HEARTBEAT` frames every 500 ms. Android validates the session
+and HMAC, records liveness, and replies with an authenticated
+`HEARTBEAT_ACK` that echoes the Windows probe timestamp.
+
+Windows computes RTT only from its own monotonic clock:
+
+```text
+RTT = localNowMicros - echoedProbeTimestampMicros
+```
+
+Jitter is maintained as a light exponentially weighted deviation of consecutive
+RTT samples. RFCOMM is a reliable ordered stream, so Bluetooth packet-loss
+percentage is not inferred from application sequence gaps; the health evaluator
+uses RTT, jitter, realtime-state silence, and runtime failure state.
+
+Realtime-state silence remains the liveness/safety signal for controller input.
+Heartbeat frames measure link quality and do not consume the global gamepad
+sequence.
+
+Android serializes realtime frames and heartbeat ACK writes through one output
+lock so independent producers cannot interleave bytes on the RFCOMM stream.
