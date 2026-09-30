@@ -1,6 +1,7 @@
 package com.natsx.controller
 
 import android.app.Application
+import android.bluetooth.BluetoothManager
 import com.natsx.controller.core.connection.ControllerConnectionRuntime
 import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.haptics.AndroidControllerHaptics
@@ -38,6 +39,10 @@ class NatsxControllerApp : Application() {
             stateStore = gamepadStateStore,
             trustedReceivers = trustedReceiverStore,
             haptics = controllerHaptics,
+            bluetoothAdapter =
+                getSystemService(
+                    BluetoothManager::class.java,
+                )?.adapter,
         )
     }
 }
