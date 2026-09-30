@@ -239,8 +239,8 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
                 return false;
             }
 
-            if (_session.LastAcceptedSequence is uint previous &&
-                !SequenceNumber.IsNewer(candidate.Sequence, previous))
+            if (_session.LastAcceptedSequence is uint previousSequence &&
+                !SequenceNumber.IsNewer(candidate.Sequence, previousSequence))
             {
                 return false;
             }
@@ -253,9 +253,9 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
                     candidate.Sequence,
                     candidate.State))
             {
-                if (oldAuthority is TransportKind oldTransport)
+                if (oldAuthority is TransportKind previousAuthority)
                 {
-                    _session.SetAuthoritativeTransport(oldTransport);
+                    _session.SetAuthoritativeTransport(previousAuthority);
                 }
                 else
                 {
@@ -267,11 +267,13 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
 
             _connectionManager.Commit(proposal);
 
-            if (oldAuthority is TransportKind previous &&
-                previous != proposal.To &&
-                _transports.TryGetValue(previous, out IControllerTransport? oldTransport))
+            if (oldAuthority is TransportKind previousAuthorityKind &&
+                previousAuthorityKind != proposal.To &&
+                _transports.TryGetValue(
+                    previousAuthorityKind,
+                    out IControllerTransport? previousTransport))
             {
-                oldTransport.SetAuthoritative(false);
+                previousTransport.SetAuthoritative(false);
             }
 
             if (_transports.TryGetValue(
