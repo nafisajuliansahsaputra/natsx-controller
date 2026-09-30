@@ -2,6 +2,8 @@ namespace Natsx.Controller.Connection;
 
 public sealed record ConnectionPolicy
 {
+    public TimeSpan HealthEvaluationInterval { get; init; } = TimeSpan.FromMilliseconds(25);
+
     public TimeSpan FastWindow { get; init; } = TimeSpan.FromMilliseconds(500);
     public TimeSpan NormalWindow { get; init; } = TimeSpan.FromSeconds(3);
     public TimeSpan LongWindow { get; init; } = TimeSpan.FromSeconds(10);
