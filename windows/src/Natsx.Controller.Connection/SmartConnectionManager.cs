@@ -37,7 +37,7 @@ public sealed class SmartConnectionManager
 
         candidate.Snapshot = snapshot;
 
-        if (IsEligibleState(snapshot.State))
+        if (!IsPreReadyState(snapshot.State))
         {
             candidate.HealthHistory.Record(now, snapshot, _policy.LongWindow);
             candidate.HealthWindows =
@@ -687,6 +687,15 @@ public sealed class SmartConnectionManager
         return states.Any(state => state == TransportRuntimeState.Failed)
             ? ConnectionManagerState.Recovering
             : ConnectionManagerState.Disconnected;
+    }
+
+    private static bool IsPreReadyState(TransportRuntimeState state)
+    {
+        return state is
+            TransportRuntimeState.Available or
+            TransportRuntimeState.Connecting or
+            TransportRuntimeState.Authenticating or
+            TransportRuntimeState.Stabilizing;
     }
 
     private static bool IsEligibleState(TransportRuntimeState state)
