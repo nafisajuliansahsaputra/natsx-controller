@@ -15,7 +15,7 @@ public static class WifiDiscoveryProtocol
 
     public const int RequestSize = 8;
     public const int MaximumNameBytes = 63;
-    public const int FixedResponseSize = 28;
+    public const int FixedResponseSize = 29;
 
     public static byte[] CreateRequest() => RequestMagic.ToArray();
 
@@ -43,7 +43,7 @@ public static class WifiDiscoveryProtocol
         output[9] = 0;
         BinaryPrimitives.WriteUInt16LittleEndian(output.AsSpan(10, 2), response.RealtimePort);
         response.ReceiverId.CopyTo(output, 12);
-        output[28 - 1] = checked((byte)nameBytes.Length);
+        output[28] = checked((byte)nameBytes.Length);
         nameBytes.CopyTo(output, FixedResponseSize);
         return output;
     }
@@ -65,7 +65,7 @@ public static class WifiDiscoveryProtocol
             throw new FormatException($"Unsupported discovery major version {payload[8]}.");
         }
 
-        int nameLength = payload[27];
+        int nameLength = payload[28];
         if (nameLength is < 1 or > MaximumNameBytes || payload.Length != FixedResponseSize + nameLength)
         {
             throw new FormatException("Invalid discovery receiver name length.");
