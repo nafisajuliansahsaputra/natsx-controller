@@ -123,6 +123,11 @@ public sealed class WifiControllerTransport : IControllerTransport
         return _receiver.GetHealthSnapshot(State);
     }
 
+    public WifiDiagnosticsSnapshot GetDiagnosticsSnapshot()
+    {
+        return _receiver.GetDiagnosticsSnapshot(State);
+    }
+
     private async Task PumpStatesAsync(CancellationToken cancellationToken)
     {
         try
