@@ -197,7 +197,7 @@ object ProtocolFrameCodec {
         }
 
         if (frame.flags and FrameFlags.AUTHENTICATED != 0) {
-            require(!authenticationKey.isNullOrEmpty()) {
+            require(authenticationKey != null && authenticationKey.isNotEmpty()) {
                 "Authenticated frame requires a session key."
             }
         }
