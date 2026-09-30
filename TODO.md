@@ -192,12 +192,12 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [ ] Implement authentication.
 - [x] Implement realtime UDP state flow.
 - [ ] Implement control/handshake flow.
-- [ ] Implement bounded/latest-state behavior.
+- [x] Implement bounded/latest-state behavior.
 - [ ] Implement heartbeat.
 - [ ] Implement RTT measurement.
 - [ ] Implement jitter calculation.
-- [ ] Implement packet-loss estimation.
-- [ ] Implement stale/duplicate rejection.
+- [x] Implement packet-loss estimation.
+- [x] Implement stale/duplicate rejection.
 - [ ] Implement direct reconnect to last endpoint.
 - [ ] Fall back to discovery when direct reconnect fails.
 - [ ] Add diagnostics.
