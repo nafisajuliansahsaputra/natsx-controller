@@ -100,11 +100,11 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Implement `InputSafetyEngine`.
 - [x] Implement 150 ms default neutralization policy via centralized config.
 - [x] Define `IVirtualGamepadBackend`.
-- [ ] Implement HIDMaestro adapter.
+- [x] Implement HIDMaestro adapter.
 - [ ] Create one virtual Xbox 360-compatible controller.
-- [ ] Submit digital buttons.
-- [ ] Submit sticks.
-- [ ] Submit triggers.
+- [x] Submit digital buttons.
+- [x] Submit sticks.
+- [x] Submit triggers.
 - [ ] Verify device remains alive while session transport is absent/recovering.
 - [x] Implement output/rumble callback boundary.
 - [ ] Add virtual-backend diagnostics.
@@ -132,7 +132,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Configurable deadzone.
 - [x] Outer clamp.
 - [x] Linear response curve.
-- [ ] Light anti-jitter.
+- [x] Light anti-jitter.
 - [x] Instant recenter.
 
 ### Right stick
