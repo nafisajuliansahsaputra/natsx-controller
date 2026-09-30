@@ -119,8 +119,12 @@ Receiver safety deadlines are always based on the receiver's own monotonic clock
 | 10 | HANDOVER_COMMIT |
 | 11 | RUMBLE |
 | 12 | DISCONNECT |
+| 13 | PAIRING_OFFER |
+| 14 | PAIRING_RESPONSE |
+| 15 | PAIRING_CONFIRM |
+| 16 | PAIRING_ABORT |
 
-Values 13..255 are currently unassigned.
+Values 17..255 are currently unassigned.
 
 Unknown message types are rejected by v1 unless a later negotiated minor-version rule explicitly defines otherwise.
 
@@ -422,6 +426,55 @@ Reason values:
 | 4 | Authentication failed |
 
 Absence of a DISCONNECT message does not prevent timeout-based failure detection.
+
+### PAIRING_OFFER / PAIRING_RESPONSE
+
+These messages are used only for first-time trust establishment. They use the zero Session ID and are not authenticated by the common-frame HMAC because no trust/session key exists yet.
+
+Each payload is exactly **113 bytes**:
+
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 16 | Sender Peer ID |
+| 16 | 32 | Fresh random pairing nonce |
+| 48 | 65 | Uncompressed P-256 public key (`04 || X || Y`) |
+
+`PAIRING_OFFER` carries the initiator values. `PAIRING_RESPONSE` carries the responder values.
+
+Both peers compute the transcript, six-digit comparison code, and long-term trust key according to ADR 0004.
+
+### PAIRING_CONFIRM
+
+Payload length: **49 bytes**.
+
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 16 | Sender Peer ID |
+| 16 | 1 | Pairing role: 1 initiator, 2 responder |
+| 17 | 32 | HMAC-SHA-256 confirmation proof |
+
+Trust must not be persisted until the expected remote confirmation proof validates after the user approves matching comparison codes.
+
+### PAIRING_ABORT
+
+Payload length: **4 bytes**.
+
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 1 | Abort reason |
+| 1 | 3 | Reserved, zero |
+
+Abort reasons:
+
+| Value | Reason |
+|---:|---|
+| 1 | User rejected |
+| 2 | Code mismatch |
+| 3 | Timeout |
+| 4 | Protocol error |
+
+A pairing abort must leave no new trust relationship persisted.
+
 
 ---
 
