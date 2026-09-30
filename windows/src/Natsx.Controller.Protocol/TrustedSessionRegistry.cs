@@ -79,6 +79,16 @@ public sealed class TrustedSessionMaterial : IDisposable
 /// wrappers are created from copies of the same registry entry so Wi-Fi,
 /// Bluetooth, and USB may share one SessionId/session key during handover.
 /// </summary>
+public sealed record TrustedSessionRegistration(
+    PeerId PeerId,
+    TrustedSessionMaterial Material) : IDisposable
+{
+    public void Dispose()
+    {
+        Material.Dispose();
+    }
+}
+
 public sealed class TrustedSessionRegistry : IDisposable
 {
     private readonly object _gate = new();
@@ -130,6 +140,36 @@ public sealed class TrustedSessionRegistry : IDisposable
                 out TrustedSessionMaterial? material)
                 ? material.Clone()
                 : null;
+        }
+    }
+
+    public TrustedSessionRegistration? GetBySessionId(
+        SessionId sessionId)
+    {
+        ObjectDisposedException.ThrowIf(
+            _disposed,
+            this);
+
+        if (sessionId == SessionId.Zero)
+        {
+            return null;
+        }
+
+        lock (_gate)
+        {
+            foreach (
+                KeyValuePair<PeerId, TrustedSessionMaterial> pair in
+                _sessions)
+            {
+                if (pair.Value.SessionId == sessionId)
+                {
+                    return new TrustedSessionRegistration(
+                        pair.Key,
+                        pair.Value.Clone());
+                }
+            }
+
+            return null;
         }
     }
 
