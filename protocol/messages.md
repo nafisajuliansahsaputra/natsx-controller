@@ -189,6 +189,16 @@ Advertises:
 - transport capabilities;
 - pairing/trust status.
 
+### PAIR_REQUEST / PAIR_RESPONSE
+
+Purpose:
+
+- establish first-time trust from a one-time high-entropy invitation;
+- bind receiver and controller peer identities;
+- derive a long-term trust key using HMAC-SHA-256 and HKDF-SHA-256.
+
+Discovery never substitutes for pairing.
+
 ### AUTH_CHALLENGE / AUTH_RESPONSE
 
 Proves possession of trust material and establishes/binds the current connection to the session.
