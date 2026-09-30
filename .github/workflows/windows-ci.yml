@@ -1,0 +1,52 @@
+name: Windows CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feat/**"
+      - "fix/**"
+    paths:
+      - "windows/**"
+      - "Directory.Build.props"
+      - ".github/workflows/windows-ci.yml"
+  pull_request:
+    paths:
+      - "windows/**"
+      - "Directory.Build.props"
+      - ".github/workflows/windows-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Cache HIDMaestro SDK
+        uses: actions/cache@v4
+        with:
+          path: windows/lib/HIDMaestro
+          key: hidmaestro-v1.9.2-1c19e9a34360652a8f98c595ff6c03c1f1fd4c027f180cc4d1149e3d352643d7
+
+      - name: Fetch HIDMaestro SDK
+        shell: pwsh
+        run: ./windows/eng/fetch-hidmaestro.ps1
+
+      - name: Restore
+        run: dotnet restore windows/Natsx.Controller.slnx
+
+      - name: Build
+        run: dotnet build windows/Natsx.Controller.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test windows/Natsx.Controller.slnx --configuration Release --no-build --verbosity normal

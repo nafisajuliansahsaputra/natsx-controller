@@ -1,0 +1,35 @@
+<Window x:Class="Natsx.Controller.Receiver.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="NATSX Controller Receiver"
+        Width="720"
+        Height="440"
+        MinWidth="560"
+        MinHeight="360"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="32">
+        <StackPanel>
+            <TextBlock FontSize="28"
+                       FontWeight="SemiBold"
+                       Text="NATSX Controller" />
+            <TextBlock Margin="0,6,0,28"
+                       Opacity="0.7"
+                       Text="Windows Receiver" />
+
+            <Border Padding="20"
+                    BorderBrush="#33000000"
+                    BorderThickness="1"
+                    CornerRadius="14">
+                <StackPanel>
+                    <TextBlock FontSize="18"
+                               FontWeight="SemiBold"
+                               Text="Foundation ready" />
+                    <TextBlock Margin="0,8,0,0"
+                               TextWrapping="Wrap"
+                               Opacity="0.72"
+                               Text="Transport, pairing, virtual-controller, and Smart Auto services attach behind this UI. The UI does not own the realtime controller engine." />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</Window>

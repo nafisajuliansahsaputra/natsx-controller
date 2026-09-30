@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Natsx.Controller.Core/Natsx.Controller.Core.csproj" />
+    <ProjectReference Include="../Natsx.Controller.Protocol/Natsx.Controller.Protocol.csproj" />
+    <ProjectReference Include="../Natsx.Controller.Connection/Natsx.Controller.Connection.csproj" />
+    <ProjectReference Include="../Natsx.Controller.VirtualGamepad/Natsx.Controller.VirtualGamepad.csproj" />
+  </ItemGroup>
+</Project>
