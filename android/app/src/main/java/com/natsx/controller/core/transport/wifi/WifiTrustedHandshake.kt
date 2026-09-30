@@ -251,16 +251,16 @@ class WifiTrustedHandshakeResponder(
             trustKey = trustSecret,
             sessionId = challenge.sessionId,
             challengeNonce = challenge.payload.challengeNonce,
-            challengerPeerId = localPeerId,
-            responderPeerId = challenge.payload.challengerPeerId,
+            challengerPeerId = challenge.payload.challengerPeerId,
+            responderPeerId = localPeerId,
         )
 
         val sessionKey = TrustedReconnectCrypto.deriveSessionKey(
             trustKey = trustSecret,
             sessionId = challenge.sessionId,
             challengeNonce = challenge.payload.challengeNonce,
-            challengerPeerId = localPeerId,
-            responderPeerId = challenge.payload.challengerPeerId,
+            challengerPeerId = challenge.payload.challengerPeerId,
+            responderPeerId = localPeerId,
         )
 
         try {
