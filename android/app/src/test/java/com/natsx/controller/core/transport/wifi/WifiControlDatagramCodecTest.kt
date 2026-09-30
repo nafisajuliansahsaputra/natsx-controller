@@ -2,10 +2,14 @@ package com.natsx.controller.core.transport.wifi
 
 import com.natsx.controller.core.protocol.FrameFlags
 import com.natsx.controller.core.protocol.MessageType
+import com.natsx.controller.core.protocol.PeerId
+import com.natsx.controller.core.protocol.PeerRole
 import com.natsx.controller.core.protocol.ProtocolFrame
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
 import com.natsx.controller.core.protocol.ProtocolVersion
 import com.natsx.controller.core.protocol.SessionId
+import com.natsx.controller.core.protocol.SessionReadyPayload
+import com.natsx.controller.core.protocol.TransportCapabilities
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -69,6 +73,39 @@ class WifiControlDatagramCodecTest {
                 )
 
             assertEquals(123_456uL, decoded)
+        }
+    }
+
+    @Test
+    fun sessionReadyRoundTripPreservesTrustedIdentity() {
+        WifiTrustedSession(sessionId, key).use { trusted ->
+            val payload = SessionReadyPayload(
+                role = PeerRole.ANDROID_CONTROLLER,
+                capabilities =
+                    TransportCapabilities.WIFI or
+                        TransportCapabilities.BLUETOOTH,
+                peerId =
+                    PeerId.fromBytes(
+                        ByteArray(PeerId.SIZE) { (it + 20).toByte() },
+                    ),
+            )
+
+            val encoded =
+                WifiControlDatagramCodec.encodeSessionReady(
+                    trustedSession = trusted,
+                    payload = payload,
+                    monotonicTimestampMicros = 123_456uL,
+                )
+
+            val decoded =
+                WifiControlDatagramCodec.decodeSessionReady(
+                    encoded,
+                    trusted,
+                )
+
+            assertEquals(payload.role, decoded.role)
+            assertEquals(payload.capabilities, decoded.capabilities)
+            assertEquals(payload.peerId, decoded.peerId)
         }
     }
 
