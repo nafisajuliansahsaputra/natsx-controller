@@ -218,6 +218,10 @@ public sealed class TrustedReconnectServerHandshake
     public void Reset()
     {
         ResetSecrets();
+
+        if (EstablishedSession is not null)
+            CryptographicOperations.ZeroMemory(EstablishedSession.SessionKey);
+
         _androidHello = null;
         _androidHelloBytes = null;
         _windowsHelloBytes = null;
