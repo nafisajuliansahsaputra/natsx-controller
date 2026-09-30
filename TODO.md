@@ -25,11 +25,11 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ### Root
 
-- [ ] Add `.gitignore`.
-- [ ] Add `.editorconfig`.
-- [ ] Add formatting conventions.
-- [ ] Create `docs/decisions/`.
-- [ ] Create `protocol/`.
+- [x] Add `.gitignore`.
+- [x] Add `.editorconfig`.
+- [x] Add formatting conventions.
+- [x] Create `docs/decisions/`.
+- [x] Create `protocol/`.
 
 ### Windows
 
