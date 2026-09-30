@@ -1,0 +1,45 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.jks
+*.keystore
+local.properties
+
+# Android / Gradle
+.gradle/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# .NET / Visual Studio
+.vs/
+bin/
+obj/
+TestResults/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs / diagnostics
+*.log
+logs/
+diagnostics/
+traces/
+
+# Packaging
+dist/
+artifacts/
+release/
