@@ -26,6 +26,7 @@
         android:required="false" />
 
     <application
+        android:name=".NatsxControllerApp"
         android:allowBackup="false"
         android:label="NATSX Controller"
         android:supportsRtl="true"
