@@ -185,6 +185,10 @@ public sealed class ControllerTransportRuntimeTests
 
         public event EventHandler<TransportGamepadStateEventArgs>? GamepadStateReceived;
 
+    public event EventHandler<TransportRuntimeStateChangedEventArgs>? StateChanged;
+
+        public event EventHandler<TransportRuntimeStateChangedEventArgs>? StateChanged;
+
         public TransportKind Kind { get; }
 
         public TransportRuntimeState State => Snapshot.State;
