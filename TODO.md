@@ -185,18 +185,18 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M6 — Wi-Fi production transport
 
-- [ ] Define Wi-Fi transport interface implementation.
+- [x] Define Wi-Fi transport interface implementation.
 - [x] Implement local receiver binding.
-- [ ] Implement discovery.
-- [ ] Implement trusted peer identification.
+- [x] Implement discovery.
+- [x] Implement trusted peer identification.
 - [x] Implement authenticated realtime frame validation.
 - [x] Implement realtime UDP state flow.
 - [ ] Implement control/handshake flow.
 - [x] Implement bounded/latest-state behavior.
-- [ ] Implement heartbeat.
-- [ ] Implement RTT measurement.
-- [ ] Implement jitter calculation.
-- [ ] Implement packet-loss estimation.
+- [x] Implement heartbeat.
+- [x] Implement RTT measurement.
+- [x] Implement jitter calculation.
+- [x] Implement packet-loss estimation.
 - [x] Implement stale/duplicate rejection.
 - [ ] Implement direct reconnect to last endpoint.
 - [ ] Fall back to discovery when direct reconnect fails.
@@ -216,7 +216,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Implement transport-specific latency bands.
 - [x] Implement jitter bands.
 - [x] Implement Wi-Fi packet-loss bands.
-- [ ] Implement silence timers.
+- [x] Implement silence timers.
 
 ### States
 
@@ -255,13 +255,13 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ### Handover
 
-- [ ] Make-before-break flow.
-- [ ] Candidate state synchronization.
-- [ ] Global sequence continuity.
-- [ ] Atomic authoritative switch.
+- [x] Make-before-break flow.
+- [x] Candidate state synchronization.
+- [x] Global sequence continuity.
+- [x] Atomic authoritative switch.
 - [ ] Old transport demotion.
-- [ ] No neutral frame during healthy handover.
-- [ ] Neutralize safely when all transports fail.
+- [x] No neutral frame during healthy handover.
+- [x] Neutralize safely when all transports fail.
 
 **Exit criteria:** scripted Wi-Fi instability automatically reconnects/fails over according to policy without manual reconnect and without recreating the virtual controller.
 
