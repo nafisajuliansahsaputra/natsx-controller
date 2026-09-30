@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  build-and-test:
     runs-on: windows-latest
 
     steps:
@@ -37,3 +37,6 @@ jobs:
 
       - name: Build
         run: dotnet build windows/Natsx.Controller.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test windows/Natsx.Controller.slnx --configuration Release --no-build --verbosity normal
