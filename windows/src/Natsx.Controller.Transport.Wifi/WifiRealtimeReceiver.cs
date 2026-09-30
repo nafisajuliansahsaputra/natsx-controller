@@ -91,6 +91,41 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
 
     public ChannelReader<WifiGamepadDatagram> States => _latestState.Reader;
 
+    public IPEndPoint? LocalEndPoint
+    {
+        get
+        {
+            UdpClient? udpClient = _udpClient;
+            return CloneEndPoint(udpClient?.Client.LocalEndPoint as IPEndPoint);
+        }
+    }
+
+    public WifiDiagnosticsSnapshot GetDiagnosticsSnapshot(
+        TransportRuntimeState state = TransportRuntimeState.Ready)
+    {
+        WifiHealthSample health = _healthTracker.Snapshot();
+
+        IPEndPoint? remote;
+        lock (_remoteEndpointLock)
+        {
+            remote = CloneEndPoint(_remoteEndpoint);
+        }
+
+        return new WifiDiagnosticsSnapshot(
+            state,
+            IsRunning,
+            LocalEndPoint,
+            remote,
+            AcceptedDatagrams,
+            AcceptedControlDatagrams,
+            RejectedDatagrams,
+            HeartbeatsSent,
+            Silence,
+            health.RoundTripTime,
+            health.Jitter,
+            health.PacketLossPercent);
+    }
+
     public TransportHealthSnapshot GetHealthSnapshot(
         TransportRuntimeState state = TransportRuntimeState.Ready)
     {
@@ -329,6 +364,13 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
         {
             _remoteEndpoint = remoteEndPoint;
         }
+    }
+
+    private static IPEndPoint? CloneEndPoint(IPEndPoint? endPoint)
+    {
+        return endPoint is null
+            ? null
+            : new IPEndPoint(endPoint.Address, endPoint.Port);
     }
 
     private ulong GetMonotonicMicroseconds()

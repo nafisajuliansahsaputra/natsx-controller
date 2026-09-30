@@ -200,8 +200,8 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Implement stale/duplicate rejection.
 - [x] Implement direct reconnect to last endpoint.
 - [x] Fall back to discovery when direct reconnect fails.
-- [ ] Add diagnostics.
-- [ ] Add network-loss test harness.
+- [x] Add diagnostics.
+- [x] Add network-loss test harness.
 
 **Playable milestone:** pressing/holding controls on Android affects the virtual Windows controller and eFootball over Wi-Fi.
 
