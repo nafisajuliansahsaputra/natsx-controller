@@ -5,18 +5,18 @@ using Natsx.Controller.Core;
 namespace Natsx.Controller.Transport.Wifi;
 
 /// <summary>
-/// Bridges authenticated Wi-Fi datagrams into the shared ControllerSession.
-/// The ControllerSession remains the source of truth for authority and global
-/// sequence freshness, so Wi-Fi cannot bypass stale/duplicate rejection.
+/// Bridges authenticated Wi-Fi datagrams into the shared input safety path.
+/// Authority, global sequence freshness, backend submission and stuck-input
+/// protection remain centralized in InputSafetyEngine/ControllerSession.
 /// </summary>
 public sealed class WifiRealtimeIngress
 {
-    private readonly ControllerSession _controllerSession;
+    private readonly InputSafetyEngine _inputSafety;
 
-    public WifiRealtimeIngress(ControllerSession controllerSession)
+    public WifiRealtimeIngress(InputSafetyEngine inputSafety)
     {
-        _controllerSession = controllerSession
-            ?? throw new ArgumentNullException(nameof(controllerSession));
+        _inputSafety = inputSafety
+            ?? throw new ArgumentNullException(nameof(inputSafety));
     }
 
     public long AcceptedStates { get; private set; }
@@ -27,7 +27,7 @@ public sealed class WifiRealtimeIngress
 
     public bool TryAccept(WifiGamepadDatagram datagram)
     {
-        bool accepted = _controllerSession.TryAccept(
+        bool accepted = _inputSafety.TryAccept(
             TransportKind.Wifi,
             datagram.Sequence,
             datagram.State);
