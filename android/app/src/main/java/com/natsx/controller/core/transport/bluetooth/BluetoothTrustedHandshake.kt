@@ -12,10 +12,13 @@ import com.natsx.controller.core.protocol.PeerRole
 import com.natsx.controller.core.protocol.ProtocolFrame
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
 import com.natsx.controller.core.protocol.ProtocolVersion
+import com.natsx.controller.core.protocol.ProtocolTransport
 import com.natsx.controller.core.protocol.SessionId
 import com.natsx.controller.core.protocol.SessionReadyPayload
 import com.natsx.controller.core.protocol.SessionReadyPayloadCodec
 import com.natsx.controller.core.protocol.TransportCapabilities
+import com.natsx.controller.core.protocol.TransportReadyPayload
+import com.natsx.controller.core.protocol.TransportReadyPayloadCodec
 import com.natsx.controller.core.protocol.TrustedReconnectCrypto
 import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import java.io.Closeable
@@ -225,6 +228,58 @@ object BluetoothControlFrameCodec {
             )
             .long
             .toULong()
+    }
+
+    fun encodeTransportReady(
+        trustedSession: BluetoothTrustedSession,
+        transport: ProtocolTransport,
+        monotonicTimestampMicros: ULong,
+    ): ByteArray {
+        return ProtocolFrameCodec.encode(
+            ProtocolFrame(
+                version = ProtocolVersion.Current,
+                messageType =
+                    MessageType.TRANSPORT_READY,
+                flags = FrameFlags.AUTHENTICATED,
+                sessionId =
+                    trustedSession.sessionId,
+                sequence = 0u,
+                monotonicTimestampMicros =
+                    monotonicTimestampMicros,
+                payload =
+                    TransportReadyPayloadCodec
+                        .encode(
+                            TransportReadyPayload(
+                                transport,
+                            ),
+                        ),
+            ),
+            authenticationKey =
+                trustedSession.authenticationKey(),
+        )
+    }
+
+    fun decodeTransportReady(
+        frameBytes: ByteArray,
+        trustedSession: BluetoothTrustedSession,
+    ): TransportReadyPayload {
+        val frame =
+            decodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession,
+            )
+
+        require(
+            frame.messageType ==
+                MessageType.TRANSPORT_READY,
+        ) {
+            "Expected TRANSPORT_READY, received " +
+                frame.messageType +
+                "."
+        }
+
+        return TransportReadyPayloadCodec
+            .decode(frame.payload)
     }
 
     private fun decodeAuthenticatedFrame(

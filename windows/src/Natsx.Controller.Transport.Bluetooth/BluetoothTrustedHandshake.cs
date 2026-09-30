@@ -226,6 +226,47 @@ public static class BluetoothControlFrameCodec
             .ReadUInt64LittleEndian(frame.Payload);
     }
 
+    public static byte[] EncodeTransportReady(
+        BluetoothTrustedSession trustedSession,
+        ProtocolTransport transport,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.TransportReady,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                TransportReadyPayloadCodec.Encode(
+                    new TransportReadyPayload(
+                        transport))),
+            trustedSession.SessionKey);
+    }
+
+    public static TransportReadyPayload DecodeTransportReady(
+        ReadOnlySpan<byte> frameBytes,
+        BluetoothTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.TransportReady)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.TransportReady}, received {frame.MessageType}.");
+        }
+
+        return TransportReadyPayloadCodec.Decode(
+            frame.Payload);
+    }
+
     internal static ProtocolFrame DecodeAuthenticatedFrame(
         ReadOnlySpan<byte> frameBytes,
         BluetoothTrustedSession trustedSession)
