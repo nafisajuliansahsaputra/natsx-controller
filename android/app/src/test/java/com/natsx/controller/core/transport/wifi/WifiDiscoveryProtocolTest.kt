@@ -27,8 +27,8 @@ class WifiDiscoveryProtocolTest {
             .order(ByteOrder.LITTLE_ENDIAN)
             .apply {
                 put("NXCANN01".encodeToByteArray())
-                put(1)
-                put(0)
+                put(1.toByte())
+                put(0.toByte())
                 putShort(42161.toShort())
                 put(receiverId)
                 put(nameBytes.size.toByte())
