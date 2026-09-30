@@ -4,6 +4,8 @@ namespace Natsx.Controller.Connection;
 
 public interface IControllerTransport : IAsyncDisposable
 {
+    event EventHandler<TransportGamepadStateEventArgs>? GamepadStateReceived;
+
     TransportKind Kind { get; }
 
     TransportRuntimeState State { get; }
