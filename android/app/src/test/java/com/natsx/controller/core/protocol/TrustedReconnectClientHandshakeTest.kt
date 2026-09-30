@@ -25,7 +25,10 @@ class TrustedReconnectClientHandshakeTest {
         val androidHello = HelloPayload(
             deviceId = androidId,
             role = DeviceRole.ANDROID_CONTROLLER,
-            transports = TransportMask.WIFI or TransportMask.BLUETOOTH,
+            transports =
+                TransportMask.USB or
+                    TransportMask.WIFI or
+                    TransportMask.BLUETOOTH,
             capabilities =
                 CapabilityFlags.RUMBLE or
                     CapabilityFlags.COMPETITIVE_240_HZ or
@@ -45,7 +48,7 @@ class TrustedReconnectClientHandshakeTest {
                     TransportMask.BLUETOOTH,
             capabilities =
                 CapabilityFlags.RUMBLE or
-                    CapabilityFlags.GUIDE or
+                    CapabilityFlags.COMPETITIVE_240_HZ or
                     CapabilityFlags.WARM_STANDBY,
             minimumMajor = 1,
             maximumMajor = 1,
@@ -109,7 +112,9 @@ class TrustedReconnectClientHandshakeTest {
                     selectedMinor = 0,
                     currentTransport = 2,
                     negotiatedCapabilities =
-                        CapabilityFlags.RUMBLE or CapabilityFlags.WARM_STANDBY,
+                        CapabilityFlags.RUMBLE or
+                            CapabilityFlags.COMPETITIVE_240_HZ or
+                            CapabilityFlags.WARM_STANDBY,
                 ),
             ),
         )
