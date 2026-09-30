@@ -64,6 +64,8 @@ object BluetoothAuthFrameCodec {
 }
 
 object BluetoothControlFrameCodec {
+    private const val HEARTBEAT_ACK_PAYLOAD_SIZE = 8
+
     fun encodeSessionReady(
         trustedSession: BluetoothTrustedSession,
         payload: SessionReadyPayload,
@@ -105,6 +107,150 @@ object BluetoothControlFrameCodec {
         }
 
         return SessionReadyPayloadCodec.decode(frame.payload)
+    }
+
+    fun encodeHeartbeat(
+        trustedSession: BluetoothTrustedSession,
+        monotonicTimestampMicros: ULong,
+    ): ByteArray {
+        return ProtocolFrameCodec.encode(
+            ProtocolFrame(
+                version = ProtocolVersion.Current,
+                messageType = MessageType.HEARTBEAT,
+                flags = FrameFlags.AUTHENTICATED,
+                sessionId = trustedSession.sessionId,
+                sequence = 0u,
+                monotonicTimestampMicros =
+                    monotonicTimestampMicros,
+                payload = byteArrayOf(),
+            ),
+            authenticationKey =
+                trustedSession.authenticationKey(),
+        )
+    }
+
+    fun decodeHeartbeat(
+        frameBytes: ByteArray,
+        trustedSession: BluetoothTrustedSession,
+    ): ULong {
+        val frame =
+            decodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession,
+            )
+
+        require(
+            frame.messageType ==
+                MessageType.HEARTBEAT,
+        ) {
+            "Expected HEARTBEAT, received " +
+                frame.messageType +
+                "."
+        }
+
+        require(frame.payload.isEmpty()) {
+            "HEARTBEAT payload must be empty."
+        }
+
+        return frame.monotonicTimestampMicros
+    }
+
+    fun encodeHeartbeatAck(
+        trustedSession: BluetoothTrustedSession,
+        responderTimestampMicros: ULong,
+        echoedProbeTimestampMicros: ULong,
+    ): ByteArray {
+        val payload =
+            java.nio.ByteBuffer
+                .allocate(
+                    HEARTBEAT_ACK_PAYLOAD_SIZE,
+                )
+                .order(
+                    java.nio.ByteOrder.LITTLE_ENDIAN,
+                )
+                .putLong(
+                    echoedProbeTimestampMicros
+                        .toLong(),
+                )
+                .array()
+
+        return ProtocolFrameCodec.encode(
+            ProtocolFrame(
+                version = ProtocolVersion.Current,
+                messageType =
+                    MessageType.HEARTBEAT_ACK,
+                flags = FrameFlags.AUTHENTICATED,
+                sessionId = trustedSession.sessionId,
+                sequence = 0u,
+                monotonicTimestampMicros =
+                    responderTimestampMicros,
+                payload = payload,
+            ),
+            authenticationKey =
+                trustedSession.authenticationKey(),
+        )
+    }
+
+    fun decodeHeartbeatAck(
+        frameBytes: ByteArray,
+        trustedSession: BluetoothTrustedSession,
+    ): ULong {
+        val frame =
+            decodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession,
+            )
+
+        require(
+            frame.messageType ==
+                MessageType.HEARTBEAT_ACK,
+        ) {
+            "Expected HEARTBEAT_ACK, received " +
+                frame.messageType +
+                "."
+        }
+
+        require(
+            frame.payload.size ==
+                HEARTBEAT_ACK_PAYLOAD_SIZE,
+        ) {
+            "HEARTBEAT_ACK payload must be exactly 8 bytes."
+        }
+
+        return java.nio.ByteBuffer
+            .wrap(frame.payload)
+            .order(
+                java.nio.ByteOrder.LITTLE_ENDIAN,
+            )
+            .long
+            .toULong()
+    }
+
+    private fun decodeAuthenticatedFrame(
+        frameBytes: ByteArray,
+        trustedSession: BluetoothTrustedSession,
+    ): ProtocolFrame {
+        val frame =
+            ProtocolFrameCodec.decode(
+                frameBytes,
+                trustedSession.authenticationKey(),
+            )
+
+        require(
+            frame.flags and
+                FrameFlags.AUTHENTICATED != 0,
+        ) {
+            "Bluetooth session traffic must be authenticated."
+        }
+
+        require(
+            frame.sessionId ==
+                trustedSession.sessionId,
+        ) {
+            "Bluetooth frame belongs to a different controller session."
+        }
+
+        return frame
     }
 }
 
