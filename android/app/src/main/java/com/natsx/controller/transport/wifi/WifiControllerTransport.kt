@@ -1,7 +1,12 @@
 package com.natsx.controller.transport.wifi
 
+import android.os.SystemClock
+import com.natsx.controller.core.protocol.ControlPayloadCodec
+import com.natsx.controller.core.protocol.FrameFlags
+import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.ProtocolFrame
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
+import com.natsx.controller.core.protocol.ProtocolVersion
 import com.natsx.controller.core.protocol.SessionId
 import com.natsx.controller.core.protocol.TrustedSessionCrypto
 import java.net.DatagramPacket
@@ -65,6 +70,7 @@ class WifiControllerTransport(
 
     fun nextSequence(): UInt = sequence.incrementAndGet().toUInt()
 
+    @Synchronized
     fun send(frame: ProtocolFrame) {
         require(frame.sessionId == sessionId) {
             "Frame Session ID does not match active Wi-Fi session."
@@ -112,6 +118,10 @@ class WifiControllerTransport(
                     continue
                 }
 
+                if (frame.messageType == MessageType.HEARTBEAT) {
+                    sendHeartbeatAck(frame)
+                }
+
                 onFrameReceived?.invoke(frame)
             } catch (_: SocketException) {
                 if (running.get()) {
@@ -126,6 +136,24 @@ class WifiControllerTransport(
                 }
             }
         }
+    }
+
+    private fun sendHeartbeatAck(request: ProtocolFrame) {
+        val heartbeat = ControlPayloadCodec.decodeHeartbeat(request.payload)
+
+        send(
+            ProtocolFrame(
+                version = ProtocolVersion.Current,
+                messageType = MessageType.HEARTBEAT_ACK,
+                flags = FrameFlags.AUTHENTICATED,
+                sessionId = sessionId,
+                sequence = 0u,
+                monotonicTimestampMicros = (
+                    SystemClock.elapsedRealtimeNanos() / 1_000L
+                ).toULong(),
+                payload = ControlPayloadCodec.encodeHeartbeat(heartbeat),
+            ),
+        )
     }
 
     companion object {
