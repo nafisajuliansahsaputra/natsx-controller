@@ -10,6 +10,7 @@ import com.natsx.controller.core.trust.LocalPeerIdentityStore
 import com.natsx.controller.core.trust.SharedPreferencesTrustedPeerStore
 import com.natsx.controller.core.trust.TrustedPeerStore
 import com.natsx.controller.core.protocol.PeerId
+import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import com.natsx.controller.core.transport.wifi.SharedPreferencesWifiEndpointCache
 import com.natsx.controller.core.transport.wifi.WifiEndpointCache
 
@@ -43,6 +44,12 @@ class NatsxControllerApplication : Application() {
 
     val sessionSequence: SessionSequence by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         SessionSequence()
+    }
+
+    val trustedSessionRegistry: TrustedSessionRegistry by lazy(
+        LazyThreadSafetyMode.SYNCHRONIZED,
+    ) {
+        TrustedSessionRegistry()
     }
 
     val realtimeBroadcaster: RealtimeStateBroadcaster by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
