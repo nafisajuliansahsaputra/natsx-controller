@@ -75,7 +75,7 @@ class ControllerConnectionRuntime(
 
     @Volatile
     private var activeWifiPublisher:
-        LatestGamepadPublisher? = null
+        RealtimeGamepadPublisher? = null
 
     @Volatile
     private var bluetoothHost:
@@ -87,7 +87,7 @@ class ControllerConnectionRuntime(
 
     @Volatile
     private var standbyBluetoothPublisher:
-        LatestGamepadPublisher? = null
+        RealtimeGamepadPublisher? = null
 
     @Volatile
     var status = ControllerConnectionStatus(
@@ -409,7 +409,7 @@ class ControllerConnectionRuntime(
             transport.start()
 
             val publisher =
-                LatestGamepadPublisher(
+                RealtimeGamepadPublisher(
                     stateStore = stateStore,
                     sender =
                         WifiGamepadFrameSender(
@@ -418,6 +418,10 @@ class ControllerConnectionRuntime(
                             sessionId =
                                 session.sessionId,
                         ),
+                    rateHz = 120,
+                    onError = {
+                        wifiFailed.set(true)
+                    },
                 )
 
             activeWifiTransport =
@@ -425,9 +429,7 @@ class ControllerConnectionRuntime(
             activeWifiPublisher =
                 publisher
 
-            publisher.start(
-                sendInitialState = true,
-            )
+            publisher.start()
 
             updateStatus(
                 ControllerConnectionState.ACTIVE,
@@ -600,9 +602,13 @@ class ControllerConnectionRuntime(
             transport.start()
 
             val publisher =
-                LatestGamepadPublisher(
+                RealtimeGamepadPublisher(
                     stateStore = stateStore,
                     sender = transport,
+                    rateHz = 120,
+                    onError = {
+                        bluetoothFailed.set(true)
+                    },
                 )
 
             standbyBluetoothTransport =
