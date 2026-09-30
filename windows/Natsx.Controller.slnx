@@ -7,5 +7,6 @@
   <Project Path="src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj" />
   <Project Path="tests/Natsx.Controller.Protocol.Tests/Natsx.Controller.Protocol.Tests.csproj" />
   <Project Path="tests/Natsx.Controller.Connection.Tests/Natsx.Controller.Connection.Tests.csproj" />
+  <Project Path="tests/Natsx.Controller.Transport.Wifi.Tests/Natsx.Controller.Transport.Wifi.Tests.csproj" />
   <Project Path="tests/Natsx.Controller.VirtualGamepad.Tests/Natsx.Controller.VirtualGamepad.Tests.csproj" />
 </Solution>
