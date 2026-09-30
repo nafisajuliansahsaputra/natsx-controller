@@ -64,7 +64,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ## M2 — Protocol v1
 
 - [x] Define protocol version negotiation.
-- [ ] Define peer/device identity fields.
+- [x] Define peer/device identity fields.
 - [x] Define session ID.
 - [x] Define global realtime sequence format.
 - [x] Define monotonic timestamp representation.
@@ -80,7 +80,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [ ] Define disconnect/recovery semantics.
 - [x] Define invalid/stale packet handling.
 - [x] Define sequence wrap behavior.
-- [ ] Define authentication/integrity strategy.
+- [x] Define authentication/integrity strategy.
 - [x] Add protocol test vectors.
 - [x] Add Android encoder/decoder.
 - [x] Add C# encoder/decoder.
@@ -309,8 +309,8 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ## M10 — Pairing and trust
 
 - [ ] Define first-pair user flow.
-- [ ] Generate/store peer identity.
-- [ ] Protect long-term trust material using platform secure storage.
+- [x] Generate/store peer identity.
+- [x] Protect long-term trust material using platform secure storage.
 - [ ] Implement pairing code/confirmation flow.
 - [ ] Bind trust to the intended device.
 - [ ] Reject untrusted LAN state packets.
