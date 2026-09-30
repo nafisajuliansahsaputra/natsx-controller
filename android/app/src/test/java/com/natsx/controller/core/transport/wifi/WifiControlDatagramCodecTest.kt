@@ -53,4 +53,23 @@ class WifiControlDatagramCodecTest {
             assertEquals(444_000uL, decodedEcho)
         }
     }
+    @Test
+    fun heartbeatEncoderProducesAuthenticatedSessionProbe() {
+        WifiTrustedSession(sessionId, key).use { trusted ->
+            val encoded =
+                WifiControlDatagramCodec.encodeHeartbeat(
+                    trustedSession = trusted,
+                    monotonicTimestampMicros = 123_456uL,
+                )
+
+            val decoded =
+                WifiControlDatagramCodec.decodeHeartbeat(
+                    encoded,
+                    trusted,
+                )
+
+            assertEquals(123_456uL, decoded)
+        }
+    }
+
 }
