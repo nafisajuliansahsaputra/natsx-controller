@@ -4,44 +4,97 @@ namespace Natsx.Controller.Connection;
 
 public sealed class ControllerSession
 {
+    private readonly object _gate = new();
+
     private bool _hasAcceptedSequence;
     private uint _lastAcceptedSequence;
 
-    private TransportKind? _pendingTransport;
-    private uint _pendingSequence;
-    private GamepadState _pendingState = GamepadState.Neutral;
-    private bool _hasPendingState;
-
-    public TransportKind? AuthoritativeTransport { get; private set; }
-
-    public TransportKind? PendingHandoverTransport =>
-        _hasPendingState ? _pendingTransport : null;
-
-    public GamepadState CurrentState { get; private set; } =
+    private TransportKind? _authoritativeTransport;
+    private GamepadState _currentState =
         GamepadState.Neutral;
 
-    public uint? LastAcceptedSequence =>
-        _hasAcceptedSequence ? _lastAcceptedSequence : null;
+    private TransportKind? _pendingTransport;
+    private uint _pendingSequence;
+    private GamepadState _pendingState =
+        GamepadState.Neutral;
+    private bool _hasPendingState;
 
-    public void BeginNewSession(TransportKind initialTransport)
+    public TransportKind? AuthoritativeTransport
     {
-        AuthoritativeTransport = initialTransport;
-        _hasAcceptedSequence = false;
-        _lastAcceptedSequence = 0;
-        CurrentState = GamepadState.Neutral;
-        ClearPendingHandover();
+        get
+        {
+            lock (_gate)
+                return _authoritativeTransport;
+        }
     }
 
-    public void SetAuthoritativeTransport(TransportKind transport)
+    public TransportKind? PendingHandoverTransport
     {
-        AuthoritativeTransport = transport;
-        ClearPendingHandover();
+        get
+        {
+            lock (_gate)
+            {
+                return _hasPendingState
+                    ? _pendingTransport
+                    : null;
+            }
+        }
+    }
+
+    public GamepadState CurrentState
+    {
+        get
+        {
+            lock (_gate)
+                return _currentState;
+        }
+    }
+
+    public uint? LastAcceptedSequence
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hasAcceptedSequence
+                    ? _lastAcceptedSequence
+                    : null;
+            }
+        }
+    }
+
+    public void BeginNewSession(
+        TransportKind initialTransport)
+    {
+        lock (_gate)
+        {
+            _authoritativeTransport =
+                initialTransport;
+            _hasAcceptedSequence = false;
+            _lastAcceptedSequence = 0;
+            _currentState =
+                GamepadState.Neutral;
+            ClearPendingHandoverLocked();
+        }
+    }
+
+    public void SetAuthoritativeTransport(
+        TransportKind transport)
+    {
+        lock (_gate)
+        {
+            _authoritativeTransport = transport;
+            ClearPendingHandoverLocked();
+        }
     }
 
     public void ClearAuthority()
     {
-        AuthoritativeTransport = null;
-        ClearPendingHandover();
+        lock (_gate)
+        {
+            _authoritativeTransport = null;
+            ClearPendingHandoverLocked();
+        }
     }
 
     public bool TryAccept(
@@ -49,21 +102,27 @@ public sealed class ControllerSession
         uint sequence,
         GamepadState state)
     {
-        if (AuthoritativeTransport != transport)
-            return false;
-
-        if (_hasAcceptedSequence &&
-            !SequenceNumber.IsNewer(
-                sequence,
-                _lastAcceptedSequence))
+        lock (_gate)
         {
-            return false;
-        }
+            if (_authoritativeTransport !=
+                transport)
+            {
+                return false;
+            }
 
-        _lastAcceptedSequence = sequence;
-        _hasAcceptedSequence = true;
-        CurrentState = state;
-        return true;
+            if (_hasAcceptedSequence &&
+                !SequenceNumber.IsNewer(
+                    sequence,
+                    _lastAcceptedSequence))
+            {
+                return false;
+            }
+
+            _lastAcceptedSequence = sequence;
+            _hasAcceptedSequence = true;
+            _currentState = state;
+            return true;
+        }
     }
 
     public bool TryStageHandoverState(
@@ -71,86 +130,111 @@ public sealed class ControllerSession
         uint sequence,
         GamepadState state)
     {
-        if (AuthoritativeTransport is null ||
-            candidateTransport == AuthoritativeTransport)
+        lock (_gate)
         {
-            return false;
-        }
+            if (_authoritativeTransport is null ||
+                candidateTransport ==
+                    _authoritativeTransport)
+            {
+                return false;
+            }
 
-        if (_hasAcceptedSequence &&
-            !SequenceNumber.IsNewer(
-                sequence,
-                _lastAcceptedSequence))
-        {
-            return false;
-        }
+            if (_hasAcceptedSequence &&
+                !SequenceNumber.IsNewer(
+                    sequence,
+                    _lastAcceptedSequence))
+            {
+                return false;
+            }
 
-        if (_hasPendingState &&
-            _pendingTransport == candidateTransport &&
-            !SequenceNumber.IsNewer(
-                sequence,
-                _pendingSequence))
-        {
-            return false;
-        }
+            if (_hasPendingState &&
+                _pendingTransport ==
+                    candidateTransport &&
+                !SequenceNumber.IsNewer(
+                    sequence,
+                    _pendingSequence))
+            {
+                return false;
+            }
 
-        _pendingTransport = candidateTransport;
-        _pendingSequence = sequence;
-        _pendingState = state;
-        _hasPendingState = true;
-        return true;
+            _pendingTransport =
+                candidateTransport;
+            _pendingSequence = sequence;
+            _pendingState = state;
+            _hasPendingState = true;
+            return true;
+        }
     }
 
     public bool TryCommitHandover(
         TransportKind candidateTransport,
         out GamepadState committedState)
     {
-        committedState = CurrentState;
-
-        if (!_hasPendingState ||
-            _pendingTransport != candidateTransport)
+        lock (_gate)
         {
-            return false;
-        }
+            committedState =
+                _currentState;
 
-        if (_hasAcceptedSequence &&
-            !SequenceNumber.IsNewer(
-                _pendingSequence,
-                _lastAcceptedSequence))
-        {
-            ClearPendingHandover();
-            return false;
-        }
+            if (!_hasPendingState ||
+                _pendingTransport !=
+                    candidateTransport)
+            {
+                return false;
+            }
 
-        AuthoritativeTransport = candidateTransport;
-        _lastAcceptedSequence = _pendingSequence;
-        _hasAcceptedSequence = true;
-        CurrentState = _pendingState;
-        committedState = _pendingState;
-        ClearPendingHandover();
-        return true;
+            if (_hasAcceptedSequence &&
+                !SequenceNumber.IsNewer(
+                    _pendingSequence,
+                    _lastAcceptedSequence))
+            {
+                ClearPendingHandoverLocked();
+                return false;
+            }
+
+            _authoritativeTransport =
+                candidateTransport;
+            _lastAcceptedSequence =
+                _pendingSequence;
+            _hasAcceptedSequence = true;
+            _currentState =
+                _pendingState;
+            committedState =
+                _pendingState;
+
+            ClearPendingHandoverLocked();
+            return true;
+        }
     }
 
     public void AbortHandover(
         TransportKind candidateTransport)
     {
-        if (_hasPendingState &&
-            _pendingTransport == candidateTransport)
+        lock (_gate)
         {
-            ClearPendingHandover();
+            if (_hasPendingState &&
+                _pendingTransport ==
+                    candidateTransport)
+            {
+                ClearPendingHandoverLocked();
+            }
         }
     }
 
     public void Neutralize()
     {
-        CurrentState = GamepadState.Neutral;
+        lock (_gate)
+        {
+            _currentState =
+                GamepadState.Neutral;
+        }
     }
 
-    private void ClearPendingHandover()
+    private void ClearPendingHandoverLocked()
     {
         _pendingTransport = null;
         _pendingSequence = 0;
-        _pendingState = GamepadState.Neutral;
+        _pendingState =
+            GamepadState.Neutral;
         _hasPendingState = false;
     }
 }
