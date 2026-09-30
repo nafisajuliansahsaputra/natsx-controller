@@ -14,6 +14,8 @@ public sealed class NetworkLossHarnessTests
         var safety = new InputSafetyEngine(session, backend, policy, clock);
         var manager = new SmartConnectionManager(policy, clock);
 
+        await backend.StartAsync();
+
         var wifi = new ScriptedControllerTransport(
             TransportKind.Wifi,
             clock,
@@ -63,7 +65,7 @@ public sealed class NetworkLossHarnessTests
         runtime.EvaluateOnce();
 
         Assert.Equal(GamepadState.Neutral, backend.LastState);
-        Assert.Equal(0, backend.StartCount);
+        Assert.Equal(1, backend.StartCount);
         Assert.Equal(0, backend.StopCount);
 
         GamepadState recoveredWifiState = GamepadState.Neutral with
@@ -76,11 +78,17 @@ public sealed class NetworkLossHarnessTests
         wifi.Publish(12, recoveredWifiState);
         runtime.EvaluateOnce();
 
+        Assert.Equal(TransportKind.Bluetooth, runtime.ActiveTransport);
+
+        clock.Advance(policy.NormalWindow + TimeSpan.FromMilliseconds(1));
+        wifi.Publish(13, recoveredWifiState);
+        runtime.EvaluateOnce();
+
         Assert.Equal(TransportKind.Wifi, runtime.ActiveTransport);
         Assert.Equal(TransportKind.Wifi, session.AuthoritativeTransport);
         Assert.Equal(recoveredWifiState, backend.LastState);
-        Assert.Equal((uint)12, session.LastAcceptedSequence);
-        Assert.Equal(0, backend.StartCount);
+        Assert.Equal((uint)13, session.LastAcceptedSequence);
+        Assert.Equal(1, backend.StartCount);
         Assert.Equal(0, backend.StopCount);
     }
 
