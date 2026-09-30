@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Cryptography;
+using Natsx.Controller.Connection;
 using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Transport.Wifi.Tests;
@@ -19,8 +20,14 @@ public sealed class WifiTrustedControlProcessorTests
             windowsPeer,
             trustSecret);
 
+        var lifecycle = new TransportLifecycle(
+            TransportRuntimeState.Available);
+
         using var processor =
-            new WifiTrustedControlProcessor(windowsPeer);
+            new WifiTrustedControlProcessor(
+                windowsPeer,
+                timeProvider: null,
+                lifecycle: lifecycle);
 
         byte[] authResponse = processor.HandleChallenge(
             challenger.EncodeChallenge(100),
@@ -34,6 +41,9 @@ public sealed class WifiTrustedControlProcessorTests
             challenger.AcceptResponse(authResponse);
 
         Assert.Equal(1, processor.PendingCount);
+        Assert.Equal(
+            TransportRuntimeState.Authenticating,
+            lifecycle.State);
 
         byte[] androidReady =
             WifiControlDatagramCodec.EncodeSessionReady(
@@ -52,6 +62,9 @@ public sealed class WifiTrustedControlProcessorTests
 
         Assert.Equal(0, processor.PendingCount);
         Assert.Equal(androidPeer, completion.RemotePeerId);
+        Assert.Equal(
+            TransportRuntimeState.Stabilizing,
+            lifecycle.State);
 
         SessionReadyPayload windowsReady =
             WifiControlDatagramCodec.DecodeSessionReady(
