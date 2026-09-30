@@ -261,6 +261,7 @@ public sealed class BluetoothTrustedHandshakeServer
     private readonly TransportCapabilities _capabilities;
     private readonly TimeProvider _timeProvider;
     private readonly TransportLifecycle? _lifecycle;
+    private readonly TrustedSessionRegistry? _sessionRegistry;
 
     public BluetoothTrustedHandshakeServer(
         PeerId localPeerId,
@@ -269,7 +270,8 @@ public sealed class BluetoothTrustedHandshakeServer
             TransportCapabilities.Bluetooth |
             TransportCapabilities.UsbDirect,
         TimeProvider? timeProvider = null,
-        TransportLifecycle? lifecycle = null)
+        TransportLifecycle? lifecycle = null,
+        TrustedSessionRegistry? sessionRegistry = null)
     {
         if (!capabilities.HasFlag(TransportCapabilities.Bluetooth))
         {
@@ -282,6 +284,7 @@ public sealed class BluetoothTrustedHandshakeServer
         _capabilities = capabilities;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _lifecycle = lifecycle;
+        _sessionRegistry = sessionRegistry;
     }
 
     public async ValueTask<BluetoothTrustedHandshakeCompletion>
@@ -414,6 +417,11 @@ public sealed class BluetoothTrustedHandshakeServer
                     outputStream,
                     localReadyFrame,
                     cancellationToken).ConfigureAwait(false);
+
+                _sessionRegistry?.Replace(
+                    challenge.Payload.ChallengerPeerId,
+                    challenge.SessionId,
+                    sessionKey);
 
                 MarkState(TransportRuntimeState.Stabilizing);
 
