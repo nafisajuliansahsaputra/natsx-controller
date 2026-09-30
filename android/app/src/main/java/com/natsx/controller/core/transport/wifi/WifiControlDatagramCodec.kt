@@ -11,6 +11,24 @@ import java.nio.ByteOrder
 object WifiControlDatagramCodec {
     private const val HEARTBEAT_ACK_PAYLOAD_SIZE = 8
 
+    fun encodeHeartbeat(
+        trustedSession: WifiTrustedSession,
+        monotonicTimestampMicros: ULong,
+    ): ByteArray {
+        return ProtocolFrameCodec.encode(
+            frame = ProtocolFrame(
+                version = ProtocolVersion.Current,
+                messageType = MessageType.HEARTBEAT,
+                flags = FrameFlags.AUTHENTICATED,
+                sessionId = trustedSession.sessionId,
+                sequence = 0u,
+                monotonicTimestampMicros = monotonicTimestampMicros,
+                payload = byteArrayOf(),
+            ),
+            authenticationKey = trustedSession.authenticationKey(),
+        )
+    }
+
     fun decodeHeartbeat(
         datagram: ByteArray,
         trustedSession: WifiTrustedSession,
