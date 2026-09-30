@@ -13,6 +13,14 @@ public sealed class ControllerSession
 
     public uint? LastAcceptedSequence => _hasAcceptedSequence ? _lastAcceptedSequence : null;
 
+    public void BeginNewSession(TransportKind initialTransport)
+    {
+        AuthoritativeTransport = initialTransport;
+        _hasAcceptedSequence = false;
+        _lastAcceptedSequence = 0;
+        CurrentState = GamepadState.Neutral;
+    }
+
     public void SetAuthoritativeTransport(TransportKind transport)
     {
         AuthoritativeTransport = transport;
