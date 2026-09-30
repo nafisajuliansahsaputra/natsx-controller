@@ -45,7 +45,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 - [x] Create Android project under `android/`.
 - [x] Establish Kotlin package structure.
-- [ ] Create gameplay/core/transport separation.
+- [x] Create gameplay/core/transport separation.
 - [x] Add unit-test setup.
 - [x] Add foreground-service skeleton.
 
@@ -185,12 +185,12 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M6 — Wi-Fi production transport
 
-- [ ] Define Wi-Fi transport interface implementation.
-- [ ] Implement local receiver binding.
-- [ ] Implement discovery.
+- [x] Define Wi-Fi transport interface implementation.
+- [x] Implement local receiver binding.
+- [x] Implement discovery.
 - [ ] Implement trusted peer identification.
 - [ ] Implement authentication.
-- [ ] Implement realtime UDP state flow.
+- [x] Implement realtime UDP state flow.
 - [ ] Implement control/handshake flow.
 - [ ] Implement bounded/latest-state behavior.
 - [ ] Implement heartbeat.
