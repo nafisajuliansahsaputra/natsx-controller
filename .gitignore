@@ -43,3 +43,6 @@ traces/
 dist/
 artifacts/
 release/
+
+# Downloaded Windows SDK dependencies
+windows/lib/HIDMaestro/
