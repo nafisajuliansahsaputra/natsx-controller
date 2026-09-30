@@ -14,5 +14,12 @@ public interface IControllerTransport : IAsyncDisposable
 
     ValueTask DisconnectAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Updates only the transport's local authority state. Implementations must
+    /// keep this call non-blocking and must not perform transport I/O here.
+    /// Receiving packets alone must not make a standby transport authoritative.
+    /// </summary>
+    void SetAuthoritative(bool authoritative);
+
     TransportHealthSnapshot GetHealthSnapshot();
 }
