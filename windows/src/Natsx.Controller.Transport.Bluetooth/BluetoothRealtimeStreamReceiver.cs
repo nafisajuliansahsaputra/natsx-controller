@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Threading.Channels;
 using Natsx.Controller.Connection;
 using Natsx.Controller.Core;
+using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Transport.Bluetooth;
 
