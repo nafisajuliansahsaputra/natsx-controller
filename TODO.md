@@ -120,7 +120,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Build dedicated landscape gameplay surface.
 - [x] Track pointer IDs independently.
 - [x] Implement control ownership.
-- [ ] Implement touch hysteresis.
+- [x] Implement touch hysteresis.
 - [x] Prevent unrelated pointer cancellation.
 - [x] Handle ACTION_CANCEL safely.
 - [x] Handle app focus loss safely.
@@ -173,10 +173,10 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Increase right-stick usability.
 - [x] Separate visual size from invisible hitbox size.
 - [x] Add basic layout scale.
-- [ ] Add safe-area handling.
+- [x] Add safe-area handling.
 - [x] Add landscape orientation enforcement.
 - [x] Add keep-screen-awake behavior during gameplay.
-- [ ] Add configurable haptic strength.
+- [x] Add configurable haptic strength.
 - [ ] Validate common multi-touch combinations used in eFootball.
 
 **Exit criteria:** layout is comfortable enough for extended eFootball play before visual polish begins.
@@ -201,7 +201,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Implement direct reconnect to last endpoint.
 - [x] Fall back to discovery when direct reconnect fails.
 - [x] Add diagnostics.
-- [ ] Add network-loss test harness.
+- [x] Add network-loss test harness.
 
 **Playable milestone:** pressing/holding controls on Android affects the virtual Windows controller and eFootball over Wi-Fi.
 
@@ -212,22 +212,22 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ### Policy
 
 - [x] Implement centralized `ConnectionPolicy`.
-- [ ] Implement Fast/Normal/Long health windows.
+- [x] Implement Fast/Normal/Long health windows.
 - [x] Implement transport-specific latency bands.
 - [x] Implement jitter bands.
 - [x] Implement Wi-Fi packet-loss bands.
-- [ ] Implement silence timers.
+- [x] Implement silence timers.
 
 ### States
 
 - [x] DISCONNECTED.
 - [x] DISCOVERING.
-- [ ] CONNECTING.
-- [ ] AUTHENTICATING.
-- [ ] STABILIZING.
+- [x] CONNECTING.
+- [x] AUTHENTICATING.
+- [x] STABILIZING.
 - [x] READY.
 - [x] ACTIVE.
-- [ ] SUSPECT.
+- [x] SUSPECT.
 - [x] DEGRADED.
 - [x] HANDOVER.
 - [x] RECOVERING.
@@ -251,17 +251,17 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Failure switch cooldown.
 - [x] Repeated failure cooldown.
 - [x] Circuit breaker.
-- [ ] Failure penalty decay.
+- [x] Failure penalty decay.
 
 ### Handover
 
-- [ ] Make-before-break flow.
-- [ ] Candidate state synchronization.
-- [ ] Global sequence continuity.
-- [ ] Atomic authoritative switch.
-- [ ] Old transport demotion.
-- [ ] No neutral frame during healthy handover.
-- [ ] Neutralize safely when all transports fail.
+- [x] Make-before-break flow.
+- [x] Candidate state synchronization.
+- [x] Global sequence continuity.
+- [x] Atomic authoritative switch.
+- [x] Old transport demotion.
+- [x] No neutral frame during healthy handover.
+- [x] Neutralize safely when all transports fail.
 
 **Exit criteria:** scripted Wi-Fi instability automatically reconnects/fails over according to policy without manual reconnect and without recreating the virtual controller.
 
@@ -315,21 +315,21 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Bind trust to the intended device.
 - [x] Reject untrusted LAN state packets.
 - [x] Reject stale session packets.
-- [ ] Add “Forget device”.
+- [x] Add “Forget device”.
 - [ ] Add pairing reset/recovery.
 
 ---
 
 ## M11 — Rumble and haptics
 
-- [ ] Local touch haptics.
-- [ ] Off/Low/Medium/High settings.
-- [ ] Virtual-controller rumble capture.
-- [ ] Output protocol message.
-- [ ] Android rumble handler.
-- [ ] Ensure output cannot block input.
+- [x] Local touch haptics.
+- [x] Off/Low/Medium/High settings.
+- [x] Virtual-controller rumble capture.
+- [x] Output protocol message.
+- [x] Android rumble handler.
+- [x] Ensure output cannot block input.
 - [ ] Define behavior during transport handover.
-- [ ] Graceful fallback on devices with limited haptics.
+- [x] Graceful fallback on devices with limited haptics.
 
 ---
 
@@ -356,13 +356,13 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ## M13 — Android UX
 
 - [x] Pairing screen.
-- [ ] Trusted PC list.
+- [x] Trusted PC list.
 - [ ] Smart Auto connection status.
 - [x] Gameplay screen.
 - [ ] Connection overlay that does not interrupt controls unnecessarily.
 - [ ] Controller profile chooser.
 - [ ] Sensitivity/deadzone settings.
-- [ ] Haptic settings.
+- [x] Haptic settings.
 - [ ] Manual transport override.
 - [ ] Diagnostics.
 - [ ] Calibration flow.
