@@ -41,7 +41,7 @@ public sealed class HandoverSafetyTests
         Assert.Equal(
             TransportKind.Wifi,
             session.AuthoritativeTransport);
-        Assert.Equal(1, backend.Submitted.Count);
+        Assert.Single(backend.Submitted);
 
         Assert.True(engine.TryCommitHandover(
             TransportKind.Bluetooth));
@@ -51,7 +51,10 @@ public sealed class HandoverSafetyTests
             session.AuthoritativeTransport);
         Assert.Equal(101u, session.LastAcceptedSequence);
         Assert.Equal(bluetoothState, backend.LastState);
-        Assert.Equal(2, backend.Submitted.Count);
+        Assert.Collection(
+            backend.Submitted,
+            first => Assert.Equal(wifiState, first),
+            second => Assert.Equal(bluetoothState, second));
         Assert.DoesNotContain(
             GamepadState.Neutral,
             backend.Submitted);
