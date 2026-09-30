@@ -228,8 +228,8 @@ public sealed class SmartConnectionManager
             State = ConnectionManagerState.Degraded;
         }
         else if (activeCandidate.HealthWindows.Fast.HasSamples &&
-                 activeCandidate.HealthWindows.Fast.WorstGrade >=
-                 TransportHealthGrade.Warning)
+                 (int)activeCandidate.HealthWindows.Fast.WorstGrade >=
+                 (int)TransportHealthGrade.Warning)
         {
             State = ConnectionManagerState.Suspect;
         }
