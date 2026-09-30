@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/Natsx.Controller.Core/Natsx.Controller.Core.csproj" />
+  <Project Path="src/Natsx.Controller.Protocol/Natsx.Controller.Protocol.csproj" />
+  <Project Path="src/Natsx.Controller.Connection/Natsx.Controller.Connection.csproj" />
+  <Project Path="src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj" />
+</Solution>
