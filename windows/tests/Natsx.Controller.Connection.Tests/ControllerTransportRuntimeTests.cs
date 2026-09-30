@@ -5,6 +5,84 @@ namespace Natsx.Controller.Connection.Tests;
 public sealed class ControllerTransportRuntimeTests
 {
     [Fact]
+    public async Task LifecycleEvents_UpdateManagerStateWithoutPollingTick()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new FakeBackend();
+        var session = new ControllerSession();
+        ConnectionPolicy policy = ConnectionPolicy.Competitive;
+        var safety = new InputSafetyEngine(
+            session,
+            backend,
+            policy,
+            clock);
+        var manager = new SmartConnectionManager(policy, clock);
+
+        var wifi = new ScriptedControllerTransport(
+            TransportKind.Wifi,
+            clock,
+            new TransportHealthSnapshot(
+                TransportKind.Wifi,
+                TransportRuntimeState.Available,
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                0,
+                TimeSpan.Zero,
+                0,
+                TransportHealthGrade.Warning));
+
+        await using var runtime = new ControllerTransportRuntime(
+            session,
+            safety,
+            manager,
+            new IControllerTransport[] { wifi },
+            policy,
+            clock);
+
+        wifi.SetHealth(new TransportHealthSnapshot(
+            TransportKind.Wifi,
+            TransportRuntimeState.Connecting,
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            0,
+            TimeSpan.Zero,
+            0,
+            TransportHealthGrade.Warning));
+
+        Assert.Equal(
+            ConnectionManagerState.Connecting,
+            runtime.State);
+
+        wifi.SetHealth(new TransportHealthSnapshot(
+            TransportKind.Wifi,
+            TransportRuntimeState.Authenticating,
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            0,
+            TimeSpan.Zero,
+            0,
+            TransportHealthGrade.Warning));
+
+        Assert.Equal(
+            ConnectionManagerState.Authenticating,
+            runtime.State);
+
+        wifi.SetHealth(new TransportHealthSnapshot(
+            TransportKind.Wifi,
+            TransportRuntimeState.Stabilizing,
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            0,
+            TimeSpan.MaxValue,
+            0,
+            TransportHealthGrade.Lost));
+
+        Assert.Equal(
+            ConnectionManagerState.Stabilizing,
+            runtime.State);
+    }
+
+    [Fact]
     public async Task InitialSelection_SubmitsFreshCandidateAndSetsAuthority()
     {
         var clock = new ManualTimeProvider();
