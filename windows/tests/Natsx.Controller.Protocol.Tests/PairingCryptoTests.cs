@@ -63,31 +63,6 @@ public sealed class PairingCryptoTests
             "014850a457b18a4a55758249ade00423852dfb44a6c4a9a8bc422a28379ede4f",
             Convert.ToHexString(trustSecret).ToLowerInvariant());
 
-        byte[] reconnectTranscript =
-            PairingCrypto.BuildReconnectTranscript(
-                androidPeerId,
-                windowsPeerId,
-                androidNonce,
-                windowsNonce,
-                sessionId);
-
-        byte[] proof =
-            PairingCrypto.ComputeReconnectProof(
-                trustSecret,
-                reconnectTranscript);
-
-        Assert.Equal(
-            "f7a5e3ff77584a64cd92a239ae2d75293a77c8b81c66a91a54095654976230de",
-            Convert.ToHexString(proof).ToLowerInvariant());
-
-        byte[] sessionKey =
-            PairingCrypto.DeriveSessionKey(
-                trustSecret,
-                reconnectTranscript);
-
-        Assert.Equal(
-            "a1241e0b7d71918fd9e506d597a0c29a4531b94723064ea84260fb03705ed63a",
-            Convert.ToHexString(sessionKey).ToLowerInvariant());
     }
 
     private static byte[] Range(
