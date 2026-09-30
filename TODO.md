@@ -33,13 +33,13 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ### Windows
 
-- [ ] Create .NET 10 solution under `windows/`.
-- [ ] Create core library.
-- [ ] Create protocol library.
-- [ ] Create connection library.
-- [ ] Create receiver WPF application.
+- [x] Create .NET 10 solution under `windows/`.
+- [x] Create core library.
+- [x] Create protocol library.
+- [x] Create connection library.
+- [x] Create receiver WPF application.
 - [ ] Create test projects.
-- [ ] Establish dependency direction.
+- [x] Establish dependency direction.
 
 ### Android
 
@@ -51,7 +51,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ### CI
 
-- [ ] Build Windows projects in CI.
+- [x] Build Windows projects in CI.
 - [ ] Run Windows tests in CI.
 - [ ] Build Android project in CI.
 - [ ] Run Android unit tests in CI.
