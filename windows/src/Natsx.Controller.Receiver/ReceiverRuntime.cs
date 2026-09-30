@@ -134,11 +134,14 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         if (cts is not null)
             await cts.CancelAsync();
 
-        _safetyEngine.ForceNeutral();
+        if (_backend.IsStarted)
+            _safetyEngine.ForceNeutral();
 
         await _wifiTransport.DisconnectAsync(cancellationToken);
         await _discoveryResponder.StopAsync();
-        await _backend.StopAsync(cancellationToken);
+
+        if (_backend.IsStarted)
+            await _backend.StopAsync(cancellationToken);
 
         foreach (Task? task in new[] { safetyLoop, statusLoop })
         {
