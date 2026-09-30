@@ -67,7 +67,6 @@ public sealed class BluetoothRfcommServiceHost : IAsyncDisposable
             {
                 listener.ConnectionReceived -= OnConnectionReceived;
                 listener.Dispose();
-                provider.Dispose();
                 throw;
             }
         }
@@ -99,14 +98,7 @@ public sealed class BluetoothRfcommServiceHost : IAsyncDisposable
 
             if (provider is not null)
             {
-                try
-                {
-                    provider.StopAdvertising();
-                }
-                finally
-                {
-                    provider.Dispose();
-                }
+                provider.StopAdvertising();
             }
 
             if (listener is not null)
