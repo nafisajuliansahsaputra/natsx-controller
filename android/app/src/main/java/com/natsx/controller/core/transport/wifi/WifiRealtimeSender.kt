@@ -7,6 +7,7 @@ import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetSocketAddress
+import java.net.SocketTimeoutException
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -24,6 +25,13 @@ class WifiRealtimeSender(
             Thread(runnable, "natsx-wifi-realtime").apply {
                 isDaemon = true
                 priority = Thread.NORM_PRIORITY + 1
+            }
+        }
+
+    private val receiveExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "natsx-wifi-control").apply {
+                isDaemon = true
             }
         }
 
@@ -48,6 +56,18 @@ class WifiRealtimeSender(
     var socketReopens: Long = 0
         private set
 
+    @Volatile
+    var heartbeatsReceived: Long = 0
+        private set
+
+    @Volatile
+    var heartbeatAcksSent: Long = 0
+        private set
+
+    @Volatile
+    var controlFailures: Long = 0
+        private set
+
     init {
         require(!remoteEndpoint.address.isAnyLocalAddress) {
             "Remote endpoint must identify the trusted receiver."
@@ -62,6 +82,8 @@ class WifiRealtimeSender(
             keepAliveIntervalMillis,
             TimeUnit.MILLISECONDS,
         )
+
+        receiveExecutor.execute(::receiveControlLoop)
     }
 
     /**
@@ -90,6 +112,7 @@ class WifiRealtimeSender(
         }
 
         executor.shutdownNow()
+        receiveExecutor.shutdownNow()
         trustedSession.close()
     }
 
@@ -138,8 +161,7 @@ class WifiRealtimeSender(
     private fun send(state: GamepadState) {
         try {
             val nextSequence = sequence.getAndIncrement().toUInt()
-            val timestampMicros =
-                SystemClock.elapsedRealtimeNanos().toULong() / 1_000uL
+            val timestampMicros = monotonicMicroseconds()
 
             val bytes = WifiRealtimeDatagramEncoder.encodeGamepadState(
                 state = state,
@@ -170,6 +192,68 @@ class WifiRealtimeSender(
         }
     }
 
+    private fun receiveControlLoop() {
+        val receiveBuffer = ByteArray(MAXIMUM_DATAGRAM_SIZE)
+
+        while (!closed.get()) {
+            try {
+                val activeSocket = ensureSocket()
+                val packet = DatagramPacket(
+                    receiveBuffer,
+                    receiveBuffer.size,
+                )
+
+                activeSocket.receive(packet)
+
+                val datagram = packet.data.copyOfRange(
+                    packet.offset,
+                    packet.offset + packet.length,
+                )
+
+                val echoedProbeTimestamp =
+                    WifiControlDatagramCodec.decodeHeartbeat(
+                        datagram,
+                        trustedSession,
+                    )
+
+                heartbeatsReceived += 1
+
+                val ack =
+                    WifiControlDatagramCodec.encodeHeartbeatAck(
+                        trustedSession = trustedSession,
+                        responderTimestampMicros = monotonicMicroseconds(),
+                        echoedProbeTimestampMicros = echoedProbeTimestamp,
+                    )
+
+                activeSocket.send(
+                    DatagramPacket(
+                        ack,
+                        ack.size,
+                        remoteEndpoint,
+                    ),
+                )
+
+                heartbeatAcksSent += 1
+            } catch (_: SocketTimeoutException) {
+                // Periodically wake so close/recovery can be observed.
+            } catch (_: IOException) {
+                if (!closed.get()) {
+                    controlFailures += 1
+                    invalidateSocket()
+                    sleepBeforeReconnect()
+                }
+            } catch (_: IllegalArgumentException) {
+                if (!closed.get()) {
+                    controlFailures += 1
+                }
+            } catch (_: IllegalStateException) {
+                if (!closed.get()) {
+                    controlFailures += 1
+                }
+            }
+        }
+    }
+
     private fun ensureSocket(): DatagramSocket {
         synchronized(socketLock) {
             check(!closed.get()) { "Wi-Fi realtime sender is closed." }
@@ -180,6 +264,7 @@ class WifiRealtimeSender(
             }
 
             val reopened = DatagramSocket().apply {
+                soTimeout = RECEIVE_TIMEOUT_MILLIS
                 connect(remoteEndpoint)
             }
 
@@ -196,9 +281,23 @@ class WifiRealtimeSender(
         }
     }
 
+    private fun sleepBeforeReconnect() {
+        try {
+            Thread.sleep(RECONNECT_RETRY_MILLIS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
+    }
+
+    private fun monotonicMicroseconds(): ULong =
+        SystemClock.elapsedRealtimeNanos().toULong() / 1_000uL
+
     companion object {
         const val DEFAULT_KEEPALIVE_MILLIS = 100L
         const val MIN_KEEPALIVE_MILLIS = 25L
         const val MAX_KEEPALIVE_MILLIS = 1_000L
+        const val RECEIVE_TIMEOUT_MILLIS = 1_000
+        const val RECONNECT_RETRY_MILLIS = 250L
+        const val MAXIMUM_DATAGRAM_SIZE = 512
     }
 }
