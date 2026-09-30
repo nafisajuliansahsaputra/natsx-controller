@@ -79,6 +79,60 @@ public sealed class WifiTrustedControlProcessorTests
     }
 
     [Fact]
+    public void ReconnectHandshake_DoesNotDemoteAlreadyActiveTransport()
+    {
+        PeerId androidPeer = PeerId.CreateRandom();
+        PeerId windowsPeer = PeerId.CreateRandom();
+        byte[] trustSecret = RandomNumberGenerator.GetBytes(32);
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 55010);
+        var lifecycle = new TransportLifecycle(
+            TransportRuntimeState.Active);
+
+        using var challenger = WifiTrustedHandshakeChallenge.Create(
+            androidPeer,
+            windowsPeer,
+            trustSecret);
+
+        using var processor =
+            new WifiTrustedControlProcessor(
+                windowsPeer,
+                timeProvider: null,
+                lifecycle: lifecycle);
+
+        byte[] authResponse = processor.HandleChallenge(
+            challenger.EncodeChallenge(100),
+            endpoint,
+            _ => trustSecret.ToArray(),
+            200);
+
+        Assert.Equal(
+            TransportRuntimeState.Active,
+            lifecycle.State);
+
+        using WifiTrustedSession androidSession =
+            challenger.AcceptResponse(authResponse);
+
+        byte[] androidReady =
+            WifiControlDatagramCodec.EncodeSessionReady(
+                androidSession,
+                new SessionReadyPayload(
+                    PeerRole.AndroidController,
+                    TransportCapabilities.Wifi,
+                    androidPeer),
+                300);
+
+        using WifiTrustedControlCompletion completion =
+            processor.HandleSessionReady(
+                androidReady,
+                endpoint,
+                400);
+
+        Assert.Equal(
+            TransportRuntimeState.Active,
+            lifecycle.State);
+    }
+
+    [Fact]
     public void UnknownPeerCannotStartTrustedHandshake()
     {
         PeerId androidPeer = PeerId.CreateRandom();
