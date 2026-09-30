@@ -41,4 +41,35 @@ public sealed class WifiControlDatagramCodecTests
 
         Assert.Equal(123_456ul, echoed);
     }
+    [Fact]
+    public void SessionReadyRoundTripPreservesTrustedIdentity()
+    {
+        byte[] key = Enumerable.Range(0, WifiTrustedSession.SessionKeySize)
+            .Select(static value => (byte)value)
+            .ToArray();
+
+        using var trusted = new WifiTrustedSession(
+            SessionId.FromBytes(Enumerable.Range(1, SessionId.Size)
+                .Select(static value => (byte)value)
+                .ToArray()),
+            key);
+
+        var payload = new SessionReadyPayload(
+            PeerRole.AndroidController,
+            TransportCapabilities.Wifi | TransportCapabilities.Bluetooth,
+            PeerId.FromBytes(Enumerable.Range(20, PeerId.Size)
+                .Select(static value => (byte)value)
+                .ToArray()));
+
+        byte[] encoded = WifiControlDatagramCodec.EncodeSessionReady(
+            trusted,
+            payload,
+            123_456);
+
+        SessionReadyPayload decoded =
+            WifiControlDatagramCodec.DecodeSessionReady(encoded, trusted);
+
+        Assert.Equal(payload, decoded);
+    }
+
 }

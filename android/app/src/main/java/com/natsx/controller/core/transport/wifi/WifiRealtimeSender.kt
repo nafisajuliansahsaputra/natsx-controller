@@ -14,10 +14,18 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
+interface WifiRealtimeLink : Closeable, RealtimeStateSink {
+    val lastHeartbeatReceivedNanos: Long
+}
+
+fun interface WifiRealtimeLinkFactory {
+    fun create(endpoint: InetSocketAddress): WifiRealtimeLink
+}
+
 class WifiRealtimeSender(
     private val remoteEndpoint: InetSocketAddress,
     private val trustedSession: WifiTrustedSession,
-) : Closeable, RealtimeStateSink {
+) : WifiRealtimeLink {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "natsx-wifi-realtime").apply {
@@ -65,7 +73,7 @@ class WifiRealtimeSender(
         private set
 
     @Volatile
-    var lastHeartbeatReceivedNanos: Long = 0
+    override var lastHeartbeatReceivedNanos: Long = 0
         private set
 
     init {
