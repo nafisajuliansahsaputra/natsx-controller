@@ -271,6 +271,9 @@ ae3a44b49aa7a34878ed64efa63cfb5d3a06b041515fe3fb77a93f14377a6bb0
 Pairing key:
 8a12e9de1c2df8d5e83d7ab02effffc2d543d52af0da156fd912138dc8c791cb
 
+Pairing response proof:
+69168c6fb8ab71e31e4cabd994c045261bbba267427408bfc3ad11a9e445dc6b
+
 Six-digit SAS:
 432656
 
@@ -285,3 +288,103 @@ a1241e0b7d71918fd9e506d597a0c29a4531b94723064ea84260fb03705ed63a
 ```
 
 The ECDH shared secret in this vector is injected directly to test key derivation. A separate ECDH test must verify platform P-256 public-key parsing and shared-secret agreement.
+
+
+## 17. AUTH_CHALLENGE payload v1
+
+Payload size: **133 bytes**.
+
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 1 | Authentication mode |
+| 1 | 3 | Reserved, zero |
+| 4 | 16 | Sender Peer ID |
+| 20 | 32 | Sender nonce |
+| 52 | 16 | Proposed Session ID |
+| 68 | 65 | Ephemeral P-256 public-key field |
+
+Authentication modes:
+
+```text
+1 = FIRST_PAIRING
+2 = TRUSTED_RECONNECT
+```
+
+Rules:
+
+- Sender Peer ID must be non-zero.
+- Session ID must be non-zero.
+- FIRST_PAIRING requires a 65-byte uncompressed SEC1 P-256 public key.
+- TRUSTED_RECONNECT requires the complete 65-byte public-key field to be zero.
+- The initiator chooses the new Session ID.
+
+## 18. AUTH_RESPONSE payload v1
+
+Payload size: **165 bytes**.
+
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 1 | Authentication mode |
+| 1 | 3 | Reserved, zero |
+| 4 | 16 | Sender Peer ID |
+| 20 | 32 | Sender nonce |
+| 52 | 16 | Echoed Session ID |
+| 68 | 65 | Ephemeral P-256 public-key field |
+| 133 | 32 | Proof |
+
+Rules:
+
+- Mode must match the pending challenge.
+- Session ID must exactly match the challenge.
+- FIRST_PAIRING carries the responder ephemeral P-256 public key.
+- TRUSTED_RECONNECT zeros the full 65-byte public-key field.
+- Proof is always exactly 32 bytes.
+
+### FIRST_PAIRING response proof
+
+After computing the pairing transcript and pairing key:
+
+```text
+pairingResponseProof =
+    HMAC-SHA256(
+        pairingKey,
+        ASCII("NATSX-PAIRING-RESPONSE-V1") ||
+        pairingTranscriptHash ||
+        SessionId
+    )
+```
+
+The initiator verifies this before displaying/accepting the SAS.
+
+The initiator later proves possession of the resulting trust/session material by sending an authenticated SESSION_READY after local SAS confirmation.
+
+### TRUSTED_RECONNECT response proof
+
+For trusted reconnect:
+
+```text
+responseProof =
+    HMAC-SHA256(
+        trustSecret,
+        reconnectTranscript
+    )
+```
+
+The initiator verifies the proof, derives the fresh session key, and sends authenticated SESSION_READY.
+
+## 19. Pairing completion rule
+
+First-pair trust is not considered committed merely because ECDH succeeded.
+
+Required order:
+
+1. AUTH_CHALLENGE / AUTH_RESPONSE complete.
+2. Pairing response proof verifies.
+3. Both devices display the same six-digit SAS.
+4. User confirms the match.
+5. Both sides derive trust secret and fresh session key.
+6. Initiator sends authenticated SESSION_READY.
+7. Responder validates it and returns authenticated SESSION_READY.
+8. Only then persist/commit the trusted relationship and permit normal controller-session activation.
+
+If any step fails or is cancelled, ephemeral material is discarded and no new trust relationship is created.
