@@ -17,6 +17,9 @@ public sealed record ConnectionPolicy
     public TimeSpan WifiFailedRecoveryStability { get; init; } = TimeSpan.FromSeconds(5);
     public TimeSpan BluetoothRecoveryStability { get; init; } = TimeSpan.FromSeconds(3);
 
+    public TimeSpan WifiDegradedBeforeFailover { get; init; } = TimeSpan.FromSeconds(1.5);
+    public TimeSpan NormalCandidateAdvantageDuration { get; init; } = TimeSpan.FromSeconds(2);
+
     public TimeSpan NormalSwitchCooldown { get; init; } = TimeSpan.FromSeconds(3);
     public TimeSpan FailureSwitchCooldown { get; init; } = TimeSpan.FromSeconds(5);
     public TimeSpan RepeatedFailureSwitchCooldown { get; init; } = TimeSpan.FromSeconds(10);
@@ -27,9 +30,15 @@ public sealed record ConnectionPolicy
     public TimeSpan CircuitBreakerSecondOpen { get; init; } = TimeSpan.FromSeconds(30);
     public TimeSpan CircuitBreakerMaximumOpen { get; init; } = TimeSpan.FromSeconds(60);
 
+    public TimeSpan FailurePenaltyWindow { get; init; } = TimeSpan.FromSeconds(30);
+
     public int NormalSwitchScoreMargin { get; init; } = 15;
     public int GoodCandidateScore { get; init; } = 70;
     public int UsableCandidateScore { get; init; } = 45;
+
+    public int UsbPreferenceBonus { get; init; } = 20;
+    public int WifiPreferenceBonus { get; init; } = 10;
+    public int BluetoothPreferenceBonus { get; init; } = 0;
 
     public static ConnectionPolicy Competitive { get; } = new();
 }
