@@ -212,7 +212,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ### Policy
 
 - [x] Implement centralized `ConnectionPolicy`.
-- [ ] Implement Fast/Normal/Long health windows.
+- [x] Implement Fast/Normal/Long health windows.
 - [x] Implement transport-specific latency bands.
 - [x] Implement jitter bands.
 - [x] Implement Wi-Fi packet-loss bands.
@@ -227,7 +227,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [ ] STABILIZING.
 - [x] READY.
 - [x] ACTIVE.
-- [ ] SUSPECT.
+- [x] SUSPECT.
 - [x] DEGRADED.
 - [x] HANDOVER.
 - [x] RECOVERING.

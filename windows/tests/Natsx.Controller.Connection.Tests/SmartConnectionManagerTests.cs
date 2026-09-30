@@ -180,6 +180,128 @@ public sealed class SmartConnectionManagerTests
     }
 
     [Fact]
+    public void HealthWindows_TrackFastNormalAndLongHorizons()
+    {
+        var clock = new ManualTimeProvider();
+        var manager = new SmartConnectionManager(timeProvider: clock);
+
+        manager.Report(Snapshot(TransportKind.Wifi, 90));
+
+        clock.Advance(TimeSpan.FromMilliseconds(600));
+        manager.Report(Snapshot(
+            TransportKind.Wifi,
+            60,
+            TransportHealthGrade.Warning));
+
+        TransportHealthWindows first = manager.GetHealthWindows(TransportKind.Wifi);
+
+        Assert.Equal(60, first.Fast.AverageScore);
+        Assert.Equal(75, first.Normal.AverageScore);
+        Assert.Equal(75, first.Long.AverageScore);
+
+        clock.Advance(TimeSpan.FromMilliseconds(2500));
+        manager.Report(Snapshot(TransportKind.Wifi, 90));
+
+        TransportHealthWindows second = manager.GetHealthWindows(TransportKind.Wifi);
+
+        Assert.Equal(90, second.Fast.AverageScore);
+        Assert.Equal(75, second.Normal.AverageScore);
+        Assert.Equal(80, second.Long.AverageScore);
+    }
+
+    [Fact]
+    public void NormalWindow_CapsRecoveryScoreUntilRecentHistoryClears()
+    {
+        var clock = new ManualTimeProvider();
+        var manager = new SmartConnectionManager(timeProvider: clock);
+
+        manager.Report(Snapshot(
+            TransportKind.Wifi,
+            40,
+            TransportHealthGrade.Warning));
+
+        clock.Advance(TimeSpan.FromMilliseconds(100));
+        manager.Report(Snapshot(TransportKind.Wifi, 100));
+
+        Assert.Equal(80, manager.GetEffectiveScore(TransportKind.Wifi));
+
+        clock.Advance(TimeSpan.FromMilliseconds(3100));
+        manager.Report(Snapshot(TransportKind.Wifi, 100));
+
+        Assert.Equal(100, manager.GetEffectiveScore(TransportKind.Wifi));
+    }
+
+    [Fact]
+    public void FastWindow_KeepsRecoveredActiveTransportSuspectBriefly()
+    {
+        var clock = new ManualTimeProvider();
+        var manager = new SmartConnectionManager(timeProvider: clock);
+
+        manager.Report(Snapshot(TransportKind.Wifi, 90));
+        var initial = Assert.IsType<HandoverProposal>(manager.Evaluate());
+        manager.Commit(initial);
+
+        manager.Report(Snapshot(
+            TransportKind.Wifi,
+            65,
+            TransportHealthGrade.Warning));
+        Assert.Null(manager.Evaluate());
+        Assert.Equal(ConnectionManagerState.Suspect, manager.State);
+
+        manager.Report(Snapshot(TransportKind.Wifi, 90));
+        Assert.Null(manager.Evaluate());
+        Assert.Equal(ConnectionManagerState.Suspect, manager.State);
+
+        clock.Advance(TimeSpan.FromMilliseconds(501));
+        manager.Report(Snapshot(TransportKind.Wifi, 90));
+        Assert.Null(manager.Evaluate());
+        Assert.Equal(ConnectionManagerState.Active, manager.State);
+    }
+
+    [Fact]
+    public void LongWindow_BreaksEqualScoreTieByReliability()
+    {
+        var clock = new ManualTimeProvider();
+        var manager = new SmartConnectionManager(timeProvider: clock);
+
+        manager.Report(Snapshot(
+            TransportKind.Wifi,
+            50,
+            TransportHealthGrade.Warning));
+        manager.Report(Snapshot(TransportKind.Bluetooth, 90));
+
+        clock.Advance(TimeSpan.FromSeconds(4));
+
+        manager.Report(Snapshot(TransportKind.Wifi, 80));
+        manager.Report(Snapshot(TransportKind.Bluetooth, 90));
+
+        HandoverProposal proposal =
+            Assert.IsType<HandoverProposal>(manager.Evaluate());
+
+        Assert.Equal(TransportKind.Bluetooth, proposal.To);
+    }
+
+    [Fact]
+    public void CriticalActiveWithoutBackup_RemainsDegraded()
+    {
+        var clock = new ManualTimeProvider();
+        var manager = new SmartConnectionManager(timeProvider: clock);
+
+        manager.Report(Snapshot(TransportKind.Wifi, 90));
+        var initial = Assert.IsType<HandoverProposal>(manager.Evaluate());
+        manager.Commit(initial);
+
+        manager.Report(Snapshot(
+            TransportKind.Wifi,
+            20,
+            TransportHealthGrade.Critical,
+            TransportRuntimeState.Degraded));
+
+        Assert.Null(manager.Evaluate());
+        Assert.Equal(ConnectionManagerState.Degraded, manager.State);
+    }
+
+    [Fact]
     public void FailurePenalty_DecaysGraduallyAfterHardFailure()
     {
         var clock = new ManualTimeProvider();

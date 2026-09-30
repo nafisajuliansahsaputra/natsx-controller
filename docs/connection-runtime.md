@@ -105,6 +105,21 @@ Competitive policy evaluates transport health every 25 ms.
 
 The actual health thresholds remain centralized in `ConnectionPolicy`; this cadence is not permission to switch every 25 ms. Hysteresis, score margin, recovery stability, cooldown, and circuit breaker still govern normal handover.
 
+## Health windows
+
+The Smart Connection Manager records each transport health report into the
+central policy horizons:
+
+- `FastWindow` (500 ms) preserves a short `SUSPECT` memory after warning-level
+  instability.
+- `NormalWindow` (3 s) caps ordinary selection score with the recent average,
+  making recovery progressive rather than trusting one isolated good sample.
+- `LongWindow` (10 s) is used as the reliability tie-break when effective
+  candidate scores are equal.
+
+Critical/lost evaluation still uses the newest snapshot, so the rolling windows
+do not delay emergency failover.
+
 ## Failure-history recovery
 
 Hard failures reduce a transport's effective selection score. The penalty uses
