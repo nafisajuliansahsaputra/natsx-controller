@@ -4,4 +4,5 @@
   <Project Path="src/Natsx.Controller.Connection/Natsx.Controller.Connection.csproj" />
   <Project Path="src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj" />
   <Project Path="tests/Natsx.Controller.Protocol.Tests/Natsx.Controller.Protocol.Tests.csproj" />
+  <Project Path="tests/Natsx.Controller.Connection.Tests/Natsx.Controller.Connection.Tests.csproj" />
 </Solution>
