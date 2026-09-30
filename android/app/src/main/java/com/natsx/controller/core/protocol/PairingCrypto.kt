@@ -15,6 +15,7 @@ object PairingCrypto {
     private val pairingContext = ascii("NATSX-PAIRING-V1")
     private val pairingKeyInfo = ascii("NATSX-PAIRING-KEY-V1")
     private val sasContext = ascii("NATSX-SAS-V1")
+    private val pairingResponseContext = ascii("NATSX-PAIRING-RESPONSE-V1")
     private val trustSecretInfo = ascii("NATSX-TRUST-SECRET-V1")
     private val reconnectContext = ascii("NATSX-RECONNECT-V1")
     private val sessionKeyInfo = ascii("NATSX-SESSION-KEY-V1")
@@ -85,6 +86,27 @@ object PairingCrypto {
         } finally {
             input.fill(0)
             mac.fill(0)
+        }
+    }
+
+
+    fun computePairingResponseProof(
+        pairingKey: ByteArray,
+        pairingTranscriptHash: ByteArray,
+        sessionId: SessionId,
+    ): ByteArray {
+        validateKey(pairingKey)
+        validateHash(pairingTranscriptHash)
+
+        val input =
+            pairingResponseContext +
+                pairingTranscriptHash +
+                sessionId.toByteArray()
+
+        return try {
+            hmacSha256(pairingKey, input)
+        } finally {
+            input.fill(0)
         }
     }
 
