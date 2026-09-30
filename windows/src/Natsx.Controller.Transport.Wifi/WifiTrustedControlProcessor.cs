@@ -15,6 +15,7 @@ public sealed class WifiTrustedControlProcessor : IDisposable
     private readonly TransportCapabilities _capabilities;
     private readonly TimeProvider _timeProvider;
     private readonly TransportLifecycle? _lifecycle;
+    private readonly TrustedSessionRegistry? _sessionRegistry;
     private readonly object _gate = new();
     private readonly Dictionary<SessionId, PendingSession> _pending = new();
 
@@ -27,7 +28,8 @@ public sealed class WifiTrustedControlProcessor : IDisposable
             TransportCapabilities.Bluetooth |
             TransportCapabilities.UsbDirect,
         TimeProvider? timeProvider = null,
-        TransportLifecycle? lifecycle = null)
+        TransportLifecycle? lifecycle = null,
+        TrustedSessionRegistry? sessionRegistry = null)
     {
         if (!capabilities.HasFlag(TransportCapabilities.Wifi))
         {
@@ -40,6 +42,7 @@ public sealed class WifiTrustedControlProcessor : IDisposable
         _capabilities = capabilities;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _lifecycle = lifecycle;
+        _sessionRegistry = sessionRegistry;
     }
 
     public int PendingCount
@@ -164,6 +167,10 @@ public sealed class WifiTrustedControlProcessor : IDisposable
                     local,
                     monotonicTimestampMicros);
 
+            RegisterSession(
+                pending.RemotePeerId,
+                pending.Session);
+
             MarkStabilizing();
 
             return new WifiTrustedControlCompletion(
@@ -273,6 +280,32 @@ public sealed class WifiTrustedControlProcessor : IDisposable
             PendingSession pending = _pending[sessionId];
             _pending.Remove(sessionId);
             pending.Session.Dispose();
+        }
+    }
+
+    private void RegisterSession(
+        PeerId remotePeerId,
+        WifiTrustedSession session)
+    {
+        if (_sessionRegistry is null)
+        {
+            return;
+        }
+
+        byte[] key =
+            CopySessionKey(session);
+
+        try
+        {
+            _sessionRegistry.Replace(
+                remotePeerId,
+                session.SessionId,
+                key);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(
+                key);
         }
     }
 
