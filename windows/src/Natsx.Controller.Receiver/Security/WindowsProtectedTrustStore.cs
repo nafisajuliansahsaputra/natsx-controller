@@ -1,3 +1,5 @@
+using System.IO;
+using System.Threading;
 using System.Security.Cryptography;
 using Natsx.Controller.Connection;
 using Natsx.Controller.Protocol;
