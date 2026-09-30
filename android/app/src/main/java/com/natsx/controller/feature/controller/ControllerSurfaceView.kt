@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
@@ -13,6 +14,7 @@ import com.natsx.controller.core.gamepad.GamepadButtons
 import com.natsx.controller.core.gamepad.GamepadState
 import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.input.AnalogStickProcessor
+import kotlin.math.max
 import kotlin.math.min
 
 class ControllerSurfaceView(
@@ -47,10 +49,46 @@ class ControllerSurfaceView(
     private val controls = mutableListOf<ControlGeometry>()
     private val activePointers = mutableMapOf<Int, ControlId>()
 
+    private var safeInsetLeft = 0f
+    private var safeInsetTop = 0f
+    private var safeInsetRight = 0f
+    private var safeInsetBottom = 0f
+
     init {
         isClickable = true
         isFocusable = true
         setBackgroundColor(Color.rgb(9, 9, 11))
+
+        setOnApplyWindowInsetsListener { _, insets ->
+            @Suppress("DEPRECATION")
+            var left = insets.systemWindowInsetLeft.toFloat()
+            @Suppress("DEPRECATION")
+            var top = insets.systemWindowInsetTop.toFloat()
+            @Suppress("DEPRECATION")
+            var right = insets.systemWindowInsetRight.toFloat()
+            @Suppress("DEPRECATION")
+            var bottom = insets.systemWindowInsetBottom.toFloat()
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                insets.displayCutout?.let { cutout ->
+                    left = max(left, cutout.safeInsetLeft.toFloat())
+                    top = max(top, cutout.safeInsetTop.toFloat())
+                    right = max(right, cutout.safeInsetRight.toFloat())
+                    bottom = max(bottom, cutout.safeInsetBottom.toFloat())
+                }
+            }
+
+            safeInsetLeft = left
+            safeInsetTop = top
+            safeInsetRight = right
+            safeInsetBottom = bottom
+
+            rebuildLayout(width.toFloat(), height.toFloat())
+            invalidate()
+            insets
+        }
+
+        requestApplyInsets()
     }
 
     override fun onSizeChanged(
@@ -142,7 +180,19 @@ class ControllerSurfaceView(
                 ControlId.RIGHT_STICK,
                 -> updateStick(controlId, event.getX(index), event.getY(index))
 
-                else -> Unit
+                else -> {
+                    val x = event.getX(index)
+                    val y = event.getY(index)
+                    val geometry =
+                        controls.firstOrNull {
+                            it.id == controlId
+                        } ?: continue
+
+                    if (!geometry.containsForRelease(x, y)) {
+                        activePointers.remove(pointerId)
+                        release(controlId)
+                    }
+                }
             }
         }
     }
@@ -248,7 +298,22 @@ class ControllerSurfaceView(
             return
         }
 
-        val unit = min(width, height)
+        val usableLeft = safeInsetLeft
+        val usableTop = safeInsetTop
+        val usableWidth =
+            (width - safeInsetLeft - safeInsetRight)
+                .coerceAtLeast(1f)
+        val usableHeight =
+            (height - safeInsetTop - safeInsetBottom)
+                .coerceAtLeast(1f)
+
+        val unit = min(usableWidth, usableHeight)
+
+        fun layoutX(fraction: Float): Float =
+            usableLeft + usableWidth * fraction
+
+        fun layoutY(fraction: Float): Float =
+            usableTop + usableHeight * fraction
 
         fun circle(
             id: ControlId,
@@ -259,8 +324,8 @@ class ControllerSurfaceView(
         ) {
             controls += ControlGeometry.circle(
                 id = id,
-                centerX = width * x,
-                centerY = height * y,
+                centerX = layoutX(x),
+                centerY = layoutY(y),
                 radius = unit * radius,
                 hitRadius = unit * radius * hitScale,
             )
@@ -277,10 +342,10 @@ class ControllerSurfaceView(
             controls += ControlGeometry.rect(
                 id = id,
                 rect = RectF(
-                    width * left,
-                    height * top,
-                    width * right,
-                    height * bottom,
+                    layoutX(left),
+                    layoutY(top),
+                    layoutX(right),
+                    layoutY(bottom),
                 ),
                 hitPadding = unit * hitPadding,
             )
@@ -500,6 +565,33 @@ class ControllerSurfaceView(
                         x <= visual.right + hitPadding &&
                         y >= visual.top - hitPadding &&
                         y <= visual.bottom + hitPadding
+                }
+            }
+        }
+
+        fun containsForRelease(x: Float, y: Float): Boolean {
+            return when (shape) {
+                Shape.CIRCLE -> {
+                    val releaseRadius = hitRadius * 1.22f
+                    val dx = x - centerX
+                    val dy = y - centerY
+                    dx * dx + dy * dy <=
+                        releaseRadius * releaseRadius
+                }
+
+                Shape.RECT -> {
+                    val visual = rect ?: return false
+                    val releasePadding =
+                        hitPadding +
+                            min(
+                                visual.width(),
+                                visual.height(),
+                            ) * 0.22f
+
+                    x >= visual.left - releasePadding &&
+                        x <= visual.right + releasePadding &&
+                        y >= visual.top - releasePadding &&
+                        y <= visual.bottom + releasePadding
                 }
             }
         }
