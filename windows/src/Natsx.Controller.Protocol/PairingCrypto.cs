@@ -20,10 +20,6 @@ public static class PairingCrypto
         Encoding.ASCII.GetBytes("NATSX-PAIRING-RESPONSE-V1");
     private static readonly byte[] TrustSecretInfo =
         Encoding.ASCII.GetBytes("NATSX-TRUST-SECRET-V1");
-    private static readonly byte[] ReconnectContext =
-        Encoding.ASCII.GetBytes("NATSX-RECONNECT-V1");
-    private static readonly byte[] SessionKeyInfo =
-        Encoding.ASCII.GetBytes("NATSX-SESSION-KEY-V1");
 
     public static byte[] ComputePairingTranscriptHash(
         PeerId androidPeerId,
@@ -139,62 +135,6 @@ public static class PairingCrypto
             pairingKey,
             pairingTranscriptHash,
             TrustSecretInfo);
-    }
-
-    public static byte[] BuildReconnectTranscript(
-        PeerId androidPeerId,
-        PeerId windowsPeerId,
-        ReadOnlySpan<byte> androidNonce,
-        ReadOnlySpan<byte> windowsNonce,
-        SessionId sessionId)
-    {
-        ValidateNonce(androidNonce, nameof(androidNonce));
-        ValidateNonce(windowsNonce, nameof(windowsNonce));
-
-        byte[] transcript = new byte[
-            ReconnectContext.Length +
-            (PeerId.Size * 2) +
-            (NonceSize * 2) +
-            SessionId.Size];
-
-        int offset = 0;
-        Copy(ReconnectContext, transcript, ref offset);
-        WritePeerId(androidPeerId, transcript, ref offset);
-        WritePeerId(windowsPeerId, transcript, ref offset);
-        Copy(androidNonce, transcript, ref offset);
-        Copy(windowsNonce, transcript, ref offset);
-        sessionId.WriteBytes(transcript.AsSpan(offset, SessionId.Size));
-
-        return transcript;
-    }
-
-    public static byte[] ComputeReconnectProof(
-        ReadOnlySpan<byte> trustSecret,
-        ReadOnlySpan<byte> reconnectTranscript)
-    {
-        ValidateKey(trustSecret, nameof(trustSecret));
-        return HmacSha256(trustSecret, reconnectTranscript);
-    }
-
-    public static byte[] DeriveSessionKey(
-        ReadOnlySpan<byte> trustSecret,
-        ReadOnlySpan<byte> reconnectTranscript)
-    {
-        ValidateKey(trustSecret, nameof(trustSecret));
-
-        byte[] hash = SHA256.HashData(reconnectTranscript);
-
-        try
-        {
-            return HkdfSha256Derive32(
-                trustSecret,
-                hash,
-                SessionKeyInfo);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(hash);
-        }
     }
 
     private static byte[] HkdfSha256Derive32(
