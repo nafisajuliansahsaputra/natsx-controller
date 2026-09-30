@@ -353,7 +353,12 @@ public sealed class WifiControllerTransport : IControllerTransport
         if (timestamp <= 0 || frequency <= 0)
             return 0;
 
-        return checked((ulong)((timestamp * 1_000_000L) / frequency));
+        long seconds = timestamp / frequency;
+        long remainder = timestamp % frequency;
+
+        return checked(
+            (ulong)seconds * 1_000_000UL +
+            (ulong)((remainder * 1_000_000L) / frequency));
     }
 
     private void TrackSequenceLocked(uint sequence)
