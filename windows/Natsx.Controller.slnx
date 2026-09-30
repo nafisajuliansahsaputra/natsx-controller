@@ -11,5 +11,6 @@
   <Project Path="tests/Natsx.Controller.Connection.Tests/Natsx.Controller.Connection.Tests.csproj" />
   <Project Path="tests/Natsx.Controller.VirtualGamepad.Tests/Natsx.Controller.VirtualGamepad.Tests.csproj" />
   <Project Path="tests/Natsx.Controller.Transport.Wifi.Tests/Natsx.Controller.Transport.Wifi.Tests.csproj" />
+  <Project Path="tests/Natsx.Controller.Transport.Bluetooth.Tests/Natsx.Controller.Transport.Bluetooth.Tests.csproj" />
   <Project Path="tests/Natsx.Controller.Trust.Windows.Tests/Natsx.Controller.Trust.Windows.Tests.csproj" />
 </Solution>
