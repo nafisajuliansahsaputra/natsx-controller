@@ -18,12 +18,17 @@ Already implemented in the current development branch:
 - Smart Connection Manager selection core;
 - Android native controller surface with independent multi-touch;
 - eFootball-inspired default layout;
-- Android and Windows CI.
+- HIDMaestro Xbox 360-compatible backend adapter wired into the receiver runtime;
+- local Wi-Fi discovery and authenticated UDP controller transport;
+- automatic direct reconnect with discovery fallback;
+- RTT, jitter, packet-loss, heartbeat, and stale-input safety;
+- secure first pairing using ephemeral P-256 ECDH plus a user-confirmed six-digit SAS;
+- platform-protected trusted-peer storage on Android and Windows;
+- Android and Windows CI with downloadable development artifacts.
 
 Still under active development:
 
-- virtual Xbox 360 backend integration;
-- Wi-Fi discovery/pairing/streaming;
+- hardware validation of the complete phone -> virtual Xbox -> game path;
 - Bluetooth RFCOMM;
 - USB Direct;
 - full Smart Auto transport orchestration;
@@ -77,7 +82,7 @@ The WPF receiver project is:
 windows/src/Natsx.Controller.Receiver/
 ```
 
-The virtual Xbox backend is not yet wired into the receiver.
+The receiver runtime starts the HIDMaestro Xbox 360-compatible backend and keeps the virtual controller separate from transport recovery. Hardware/driver validation is still required before the milestone is considered complete.
 
 ## Android development
 
@@ -112,7 +117,16 @@ The current v1 realtime frame uses:
 - CRC32C;
 - optional/authenticated-session HMAC-SHA-256 tag truncated to 16 bytes.
 
-The canonical v1 test vector is defined in `protocol/messages.md` and is reproduced by both the Kotlin and C# implementations.
+The canonical v1 realtime test vector is defined in `protocol/messages.md` and is reproduced by both the Kotlin and C# implementations.
+
+Trusted reconnect, discovery, and secure first-pair contracts are documented in:
+
+- `protocol/security.md`
+- `protocol/session-runtime.md`
+- `protocol/discovery.md`
+- `protocol/pairing.md`
+
+The pairing cryptography also has matching deterministic Kotlin/C# vectors for ECDH-derived trust material, the six-digit SAS, and confirmation tags.
 
 ## Connection policy
 
