@@ -7,6 +7,12 @@ using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Transport.Wifi;
 
+public readonly record struct WifiSessionEstablishedInfo(
+    SessionId AndroidDeviceId,
+    SessionId WindowsDeviceId,
+    SessionId SessionId,
+    CapabilityFlags NegotiatedCapabilities);
+
 public sealed class WifiControllerTransport : IControllerTransport
 {
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromMilliseconds(50);
@@ -61,7 +67,7 @@ public sealed class WifiControllerTransport : IControllerTransport
 
     public event Action<ProtocolFrame, IPEndPoint>? FrameReceived;
 
-    public event Action<EstablishedTrustedSession, IPEndPoint>? SessionEstablished;
+    public event Action<WifiSessionEstablishedInfo, IPEndPoint>? SessionEstablished;
 
     public TransportKind Kind => TransportKind.Wifi;
 
@@ -399,18 +405,31 @@ public sealed class WifiControllerTransport : IControllerTransport
             newSessionKey,
             cancellationToken);
 
-        lock (_gate)
-        {
-            ActivateSessionLocked(
-                established.SessionId,
-                newSessionKey,
-                remoteEndPoint);
+        var sessionInfo = new WifiSessionEstablishedInfo(
+            established.AndroidDeviceId,
+            established.WindowsDeviceId,
+            established.SessionId,
+            established.NegotiatedCapabilities);
 
-            ClearPendingHandshakeLocked();
+        try
+        {
+            lock (_gate)
+            {
+                ActivateSessionLocked(
+                    established.SessionId,
+                    newSessionKey,
+                    remoteEndPoint);
+
+                ClearPendingHandshakeLocked();
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(newSessionKey);
         }
 
         State = TransportRuntimeState.Ready;
-        SessionEstablished?.Invoke(established, remoteEndPoint);
+        SessionEstablished?.Invoke(sessionInfo, remoteEndPoint);
     }
 
     private async Task HandleAuthenticatedDatagramAsync(
