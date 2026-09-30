@@ -18,4 +18,11 @@
     <ProjectReference Include="../../src/Natsx.Controller.Core/Natsx.Controller.Core.csproj" />
     <ProjectReference Include="../../src/Natsx.Controller.VirtualGamepad/Natsx.Controller.VirtualGamepad.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="HIDMaestro.Core">
+      <HintPath>$(MSBuildThisFileDirectory)..\..\lib\HIDMaestro\HIDMaestro.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
 </Project>
