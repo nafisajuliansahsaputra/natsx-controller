@@ -90,7 +90,11 @@ public sealed class InputSafetyEngineTests
 
         public GamepadState LastState { get; private set; } = GamepadState.Neutral;
 
-        public event EventHandler<RumbleState>? RumbleReceived;
+        public event Action<RumbleState>? RumbleReceived
+        {
+            add { }
+            remove { }
+        }
 
         public ValueTask StartAsync(CancellationToken cancellationToken = default)
         {
