@@ -10,5 +10,6 @@
     <ProjectReference Include="../Natsx.Controller.Protocol/Natsx.Controller.Protocol.csproj" />
     <ProjectReference Include="../Natsx.Controller.Connection/Natsx.Controller.Connection.csproj" />
     <ProjectReference Include="../Natsx.Controller.VirtualGamepad/Natsx.Controller.VirtualGamepad.csproj" />
+    <ProjectReference Include="../Natsx.Controller.Transport.Wifi/Natsx.Controller.Transport.Wifi.csproj" />
   </ItemGroup>
 </Project>
