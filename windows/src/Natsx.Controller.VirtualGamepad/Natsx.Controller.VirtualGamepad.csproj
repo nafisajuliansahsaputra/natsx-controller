@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <Reference Include="HIDMaestro.Core">
-      <HintPath>../../lib/HIDMaestro/HIDMaestro.Core.dll</HintPath>
+      <HintPath>$(MSBuildThisFileDirectory)..\..\lib\HIDMaestro\HIDMaestro.Core.dll</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>
