@@ -21,7 +21,7 @@ public sealed class FileTrustedPeerStoreTests : IDisposable
         var record = new TrustedPeerRecord(
             peerId,
             "NATSX Phone",
-            capabilities: 0b111,
+            Capabilities: 0b111,
             PairedAt: DateTimeOffset.UtcNow);
 
         store.Put(record, secret);
