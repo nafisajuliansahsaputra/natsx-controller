@@ -201,6 +201,45 @@ public sealed class SmartConnectionManagerTests
         Assert.Equal(TransportKind.Bluetooth, proposal.To);
     }
 
+    [Fact]
+    public void CircuitBreaker_PreservesFailurePenaltyWhileOpen()
+    {
+        var clock = new ManualTimeProvider();
+        var manager = new SmartConnectionManager(timeProvider: clock);
+
+        manager.RecordHardFailure(TransportKind.Wifi);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        manager.RecordHardFailure(TransportKind.Wifi);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        manager.RecordHardFailure(TransportKind.Wifi);
+
+        manager.Report(Snapshot(TransportKind.Wifi, 100));
+
+        Assert.True(manager.IsCircuitOpen(TransportKind.Wifi));
+        Assert.True(manager.GetEffectiveScore(TransportKind.Wifi) <= 65);
+    }
+
+    [Fact]
+    public void CircuitBreaker_DoesNotExtendOnFailuresWhileAlreadyOpen()
+    {
+        var clock = new ManualTimeProvider();
+        var manager = new SmartConnectionManager(timeProvider: clock);
+
+        manager.RecordHardFailure(TransportKind.Wifi);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        manager.RecordHardFailure(TransportKind.Wifi);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        manager.RecordHardFailure(TransportKind.Wifi);
+
+        Assert.True(manager.IsCircuitOpen(TransportKind.Wifi));
+
+        clock.Advance(TimeSpan.FromSeconds(10));
+        manager.RecordHardFailure(TransportKind.Wifi);
+
+        clock.Advance(TimeSpan.FromSeconds(5));
+        Assert.False(manager.IsCircuitOpen(TransportKind.Wifi));
+    }
+
     private static TransportHealthSnapshot Snapshot(
         TransportKind transport,
         int score,
