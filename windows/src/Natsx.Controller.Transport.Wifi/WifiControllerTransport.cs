@@ -8,15 +8,28 @@ namespace Natsx.Controller.Transport.Wifi;
 
 public sealed class WifiControllerTransport : IControllerTransport
 {
+    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromMilliseconds(250);
+
     private readonly WifiTransportOptions _options;
     private readonly TimeProvider _timeProvider;
+    private readonly TransportHealthEvaluator _healthEvaluator;
+    private readonly object _healthGate = new();
+    private readonly Dictionary<uint, long> _pendingHeartbeats = new();
+
     private UdpClient? _udp;
-    private CancellationTokenSource? _receiveCts;
+    private CancellationTokenSource? _runCts;
     private Task? _receiveTask;
+    private Task? _heartbeatTask;
+    private IPEndPoint? _remoteEndPoint;
+
     private long? _lastPacketTimestamp;
     private uint? _lastSequence;
+    private uint _nextProbeId;
     private long _receivedPackets;
     private long _lostPackets;
+    private TimeSpan _roundTripTime;
+    private TimeSpan _jitter;
+    private TimeSpan? _previousRtt;
 
     public WifiControllerTransport(
         WifiTransportOptions options,
@@ -25,6 +38,7 @@ public sealed class WifiControllerTransport : IControllerTransport
         _options = options;
         _options.Validate();
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _healthEvaluator = new TransportHealthEvaluator();
     }
 
     public event Action<ProtocolFrame, IPEndPoint>? FrameReceived;
@@ -33,37 +47,52 @@ public sealed class WifiControllerTransport : IControllerTransport
 
     public TransportRuntimeState State { get; private set; } = TransportRuntimeState.Available;
 
+    public IPEndPoint? RemoteEndPoint
+    {
+        get
+        {
+            lock (_healthGate)
+                return _remoteEndPoint;
+        }
+    }
+
     public ValueTask ConnectAsync(CancellationToken cancellationToken)
     {
         if (_udp is not null)
             return ValueTask.CompletedTask;
 
         _udp = new UdpClient(new IPEndPoint(_options.BindAddress, _options.ListenPort));
-        _receiveCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _runCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         State = TransportRuntimeState.Ready;
-        _receiveTask = ReceiveLoopAsync(_receiveCts.Token);
+        _receiveTask = ReceiveLoopAsync(_runCts.Token);
+        _heartbeatTask = HeartbeatLoopAsync(_runCts.Token);
         return ValueTask.CompletedTask;
     }
 
     public async ValueTask DisconnectAsync(CancellationToken cancellationToken)
     {
-        CancellationTokenSource? receiveCts = _receiveCts;
+        CancellationTokenSource? runCts = _runCts;
         Task? receiveTask = _receiveTask;
+        Task? heartbeatTask = _heartbeatTask;
 
-        _receiveCts = null;
+        _runCts = null;
         _receiveTask = null;
+        _heartbeatTask = null;
 
-        if (receiveCts is not null)
-            await receiveCts.CancelAsync();
+        if (runCts is not null)
+            await runCts.CancelAsync();
 
         _udp?.Dispose();
         _udp = null;
 
-        if (receiveTask is not null)
+        foreach (Task? task in new[] { receiveTask, heartbeatTask })
         {
+            if (task is null)
+                continue;
+
             try
             {
-                await receiveTask.WaitAsync(cancellationToken);
+                await task.WaitAsync(cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -73,50 +102,56 @@ public sealed class WifiControllerTransport : IControllerTransport
             }
         }
 
-        receiveCts?.Dispose();
+        runCts?.Dispose();
+
+        lock (_healthGate)
+        {
+            _remoteEndPoint = null;
+            _pendingHeartbeats.Clear();
+            _previousRtt = null;
+            _roundTripTime = TimeSpan.Zero;
+            _jitter = TimeSpan.Zero;
+        }
+
         State = TransportRuntimeState.Available;
     }
 
     public TransportHealthSnapshot GetHealthSnapshot()
     {
-        TimeSpan silence = _lastPacketTimestamp is null
-            ? TimeSpan.MaxValue
-            : _timeProvider.GetElapsedTime(_lastPacketTimestamp.Value, _timeProvider.GetTimestamp());
+        TimeSpan rtt;
+        TimeSpan jitter;
+        TimeSpan silence;
+        double loss;
 
-        double loss = _receivedPackets + _lostPackets == 0
-            ? 0
-            : _lostPackets * 100d / (_receivedPackets + _lostPackets);
-
-        TransportHealthGrade grade = silence switch
+        lock (_healthGate)
         {
-            var value when value <= TimeSpan.FromMilliseconds(25) => TransportHealthGrade.Good,
-            var value when value <= TimeSpan.FromMilliseconds(50) => TransportHealthGrade.Warning,
-            var value when value <= TimeSpan.FromMilliseconds(80) => TransportHealthGrade.Degraded,
-            var value when value <= TimeSpan.FromMilliseconds(120) => TransportHealthGrade.Critical,
-            _ => TransportHealthGrade.Lost,
-        };
+            long now = _timeProvider.GetTimestamp();
 
-        int score = grade switch
-        {
-            TransportHealthGrade.Good => 90,
-            TransportHealthGrade.Warning => 72,
-            TransportHealthGrade.Degraded => 55,
-            TransportHealthGrade.Critical => 35,
-            TransportHealthGrade.Lost => 0,
-            _ => 90,
-        };
+            silence = _lastPacketTimestamp is null
+                ? TimeSpan.MaxValue
+                : _timeProvider.GetElapsedTime(_lastPacketTimestamp.Value, now);
 
-        score = Math.Clamp(score - (int)Math.Round(Math.Min(loss, 20)), 0, 100);
+            rtt = _roundTripTime;
+            jitter = _jitter;
 
-        return new TransportHealthSnapshot(
+            long total = _receivedPackets + _lostPackets;
+            loss = total == 0
+                ? 0
+                : _lostPackets * 100d / total;
+        }
+
+        TransportRuntimeState runtimeState =
+            silence > TimeSpan.FromMilliseconds(120) && State == TransportRuntimeState.Active
+                ? TransportRuntimeState.Degraded
+                : State;
+
+        return _healthEvaluator.Evaluate(new TransportMetrics(
             TransportKind.Wifi,
-            State,
-            TimeSpan.Zero,
-            TimeSpan.Zero,
+            runtimeState,
+            rtt,
+            jitter,
             loss,
-            silence,
-            score,
-            grade);
+            silence));
     }
 
     public async ValueTask SendAsync(
@@ -127,7 +162,6 @@ public sealed class WifiControllerTransport : IControllerTransport
         UdpClient udp = _udp ?? throw new InvalidOperationException("Wi-Fi transport is not connected.");
 
         byte[] bytes = ProtocolFrameCodec.Encode(frame, _options.SessionKey);
-
         await udp.SendAsync(bytes, remoteEndPoint, cancellationToken);
     }
 
@@ -174,15 +208,155 @@ public sealed class WifiControllerTransport : IControllerTransport
             if (frame.SessionId != _options.SessionId)
                 continue;
 
-            TrackSequence(frame.Sequence);
-            _lastPacketTimestamp = _timeProvider.GetTimestamp();
+            lock (_healthGate)
+            {
+                _remoteEndPoint = result.RemoteEndPoint;
+                _lastPacketTimestamp = _timeProvider.GetTimestamp();
+
+                if (frame.MessageType == MessageType.GamepadState)
+                    TrackSequenceLocked(frame.Sequence);
+            }
+
             State = TransportRuntimeState.Active;
+
+            if (frame.MessageType == MessageType.HeartbeatAck)
+            {
+                TryHandleHeartbeatAck(frame);
+            }
+            else if (frame.MessageType == MessageType.Heartbeat)
+            {
+                await SendHeartbeatAckAsync(frame, result.RemoteEndPoint, cancellationToken);
+            }
 
             FrameReceived?.Invoke(frame, result.RemoteEndPoint);
         }
     }
 
-    private void TrackSequence(uint sequence)
+    private async Task HeartbeatLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(HeartbeatInterval, _timeProvider);
+
+        while (await timer.WaitForNextTickAsync(cancellationToken))
+        {
+            IPEndPoint? endpoint;
+
+            lock (_healthGate)
+                endpoint = _remoteEndPoint;
+
+            if (endpoint is null)
+                continue;
+
+            uint probeId;
+            long sentAt = _timeProvider.GetTimestamp();
+
+            lock (_healthGate)
+            {
+                probeId = unchecked(++_nextProbeId);
+                _pendingHeartbeats[probeId] = sentAt;
+
+                if (_pendingHeartbeats.Count > 32)
+                {
+                    foreach (uint stale in _pendingHeartbeats.Keys.Take(_pendingHeartbeats.Count - 32).ToArray())
+                        _pendingHeartbeats.Remove(stale);
+                }
+            }
+
+            var frame = new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.Heartbeat,
+                FrameFlags.Authenticated,
+                _options.SessionId,
+                0,
+                GetMonotonicMicroseconds(),
+                ControlPayloadCodec.EncodeHeartbeat(new HeartbeatPayload(probeId)));
+
+            try
+            {
+                await SendAsync(frame, endpoint, cancellationToken);
+            }
+            catch (SocketException)
+            {
+                State = TransportRuntimeState.Degraded;
+            }
+        }
+    }
+
+    private void TryHandleHeartbeatAck(ProtocolFrame frame)
+    {
+        HeartbeatPayload payload;
+
+        try
+        {
+            payload = ControlPayloadCodec.DecodeHeartbeat(frame.Payload);
+        }
+        catch (FormatException)
+        {
+            return;
+        }
+
+        lock (_healthGate)
+        {
+            if (!_pendingHeartbeats.Remove(payload.ProbeId, out long sentAt))
+                return;
+
+            long now = _timeProvider.GetTimestamp();
+            TimeSpan rtt = _timeProvider.GetElapsedTime(sentAt, now);
+
+            if (_previousRtt is TimeSpan previous)
+            {
+                double deltaMs = Math.Abs((rtt - previous).TotalMilliseconds);
+                double nextJitterMs = _jitter == TimeSpan.Zero
+                    ? deltaMs
+                    : (_jitter.TotalMilliseconds * 0.75) + (deltaMs * 0.25);
+
+                _jitter = TimeSpan.FromMilliseconds(nextJitterMs);
+            }
+
+            _previousRtt = rtt;
+            _roundTripTime = rtt;
+        }
+    }
+
+    private async Task SendHeartbeatAckAsync(
+        ProtocolFrame request,
+        IPEndPoint endpoint,
+        CancellationToken cancellationToken)
+    {
+        HeartbeatPayload payload;
+
+        try
+        {
+            payload = ControlPayloadCodec.DecodeHeartbeat(request.Payload);
+        }
+        catch (FormatException)
+        {
+            return;
+        }
+
+        var ack = new ProtocolFrame(
+            ProtocolVersion.Current,
+            MessageType.HeartbeatAck,
+            FrameFlags.Authenticated,
+            _options.SessionId,
+            0,
+            GetMonotonicMicroseconds(),
+            ControlPayloadCodec.EncodeHeartbeat(payload));
+
+        await SendAsync(ack, endpoint, cancellationToken);
+    }
+
+    private ulong GetMonotonicMicroseconds()
+    {
+        long timestamp = _timeProvider.GetTimestamp();
+        long frequency = _timeProvider.TimestampFrequency;
+
+        if (timestamp <= 0 || frequency <= 0)
+            return 0;
+
+        return checked((ulong)((timestamp * 1_000_000L) / frequency));
+    }
+
+    private void TrackSequenceLocked(uint sequence)
     {
         if (_lastSequence is uint previous && SequenceNumber.IsNewer(sequence, previous))
         {
