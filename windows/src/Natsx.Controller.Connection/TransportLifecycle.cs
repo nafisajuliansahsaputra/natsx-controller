@@ -16,22 +16,40 @@ public sealed class TransportLifecycle
         _state = (int)initialState;
     }
 
+    public event Action<TransportRuntimeState>? StateChanged;
+
     public TransportRuntimeState State =>
         (TransportRuntimeState)Volatile.Read(ref _state);
 
     public void SetState(TransportRuntimeState state)
     {
-        Volatile.Write(ref _state, (int)state);
+        TransportRuntimeState previous =
+            (TransportRuntimeState)Interlocked.Exchange(
+                ref _state,
+                (int)state);
+
+        if (previous != state)
+        {
+            StateChanged?.Invoke(state);
+        }
     }
 
     public bool TryTransition(
         TransportRuntimeState expected,
         TransportRuntimeState next)
     {
-        return Interlocked.CompareExchange(
-                   ref _state,
-                   (int)next,
-                   (int)expected) ==
-               (int)expected;
+        bool changed =
+            Interlocked.CompareExchange(
+                ref _state,
+                (int)next,
+                (int)expected) ==
+            (int)expected;
+
+        if (changed && expected != next)
+        {
+            StateChanged?.Invoke(next);
+        }
+
+        return changed;
     }
 }
