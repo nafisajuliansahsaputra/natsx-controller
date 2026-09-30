@@ -9,54 +9,51 @@ public sealed class WifiControllerTransport : IControllerTransport
     private readonly WifiRealtimeReceiver _receiver;
     private readonly IPEndPoint _bindEndPoint;
     private readonly TimeProvider _timeProvider;
+    private readonly TransportLifecycle _lifecycle;
 
     private CancellationTokenSource? _pumpCancellation;
     private Task? _pumpTask;
-    private int _state = (int)TransportRuntimeState.Unavailable;
     private bool _disposed;
 
     public WifiControllerTransport(
         WifiRealtimeReceiver receiver,
         IPEndPoint? bindEndPoint = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        TransportLifecycle? lifecycle = null)
     {
         _receiver = receiver ?? throw new ArgumentNullException(nameof(receiver));
         _bindEndPoint = bindEndPoint ??
             new IPEndPoint(IPAddress.Any, WifiRealtimeReceiver.DefaultPort);
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _lifecycle = lifecycle ?? new TransportLifecycle();
     }
 
     public event EventHandler<TransportGamepadStateEventArgs>? GamepadStateReceived;
 
     public TransportKind Kind => TransportKind.Wifi;
 
-    public TransportRuntimeState State =>
-        (TransportRuntimeState)Volatile.Read(ref _state);
+    public TransportRuntimeState State => _lifecycle.State;
 
     public void SetAuthoritative(bool authoritative)
     {
         if (authoritative)
         {
-            if (Interlocked.CompareExchange(
-                    ref _state,
-                    (int)TransportRuntimeState.Active,
-                    (int)TransportRuntimeState.Ready) ==
-                (int)TransportRuntimeState.Ready)
+            if (_lifecycle.TryTransition(
+                    TransportRuntimeState.Ready,
+                    TransportRuntimeState.Active))
             {
                 return;
             }
 
-            Interlocked.CompareExchange(
-                ref _state,
-                (int)TransportRuntimeState.Active,
-                (int)TransportRuntimeState.Degraded);
+            _lifecycle.TryTransition(
+                TransportRuntimeState.Degraded,
+                TransportRuntimeState.Active);
             return;
         }
 
-        Interlocked.CompareExchange(
-            ref _state,
-            (int)TransportRuntimeState.Ready,
-            (int)TransportRuntimeState.Active);
+        _lifecycle.TryTransition(
+            TransportRuntimeState.Active,
+            TransportRuntimeState.Ready);
     }
 
     public async ValueTask ConnectAsync(CancellationToken cancellationToken)
@@ -69,7 +66,14 @@ public sealed class WifiControllerTransport : IControllerTransport
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        SetState(TransportRuntimeState.Connecting);
+
+        if (State is
+            TransportRuntimeState.Unavailable or
+            TransportRuntimeState.Available or
+            TransportRuntimeState.Failed)
+        {
+            _lifecycle.SetState(TransportRuntimeState.Connecting);
+        }
 
         var pumpCancellation = new CancellationTokenSource();
 
@@ -81,12 +85,18 @@ public sealed class WifiControllerTransport : IControllerTransport
 
             _pumpCancellation = pumpCancellation;
             _pumpTask = PumpStatesAsync(pumpCancellation.Token);
-            SetState(TransportRuntimeState.Ready);
+
+            if (State is
+                TransportRuntimeState.Connecting or
+                TransportRuntimeState.Authenticating)
+            {
+                _lifecycle.SetState(TransportRuntimeState.Stabilizing);
+            }
         }
         catch
         {
             pumpCancellation.Dispose();
-            SetState(TransportRuntimeState.Failed);
+            _lifecycle.SetState(TransportRuntimeState.Failed);
             throw;
         }
     }
@@ -115,7 +125,7 @@ public sealed class WifiControllerTransport : IControllerTransport
         await _receiver.StopAsync().ConfigureAwait(false);
         pumpCancellation?.Dispose();
 
-        SetState(TransportRuntimeState.Unavailable);
+        _lifecycle.SetState(TransportRuntimeState.Unavailable);
     }
 
     public TransportHealthSnapshot GetHealthSnapshot()
@@ -135,6 +145,14 @@ public sealed class WifiControllerTransport : IControllerTransport
             await foreach (WifiGamepadDatagram datagram in
                 _receiver.States.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
+                if (State is
+                    TransportRuntimeState.Connecting or
+                    TransportRuntimeState.Authenticating or
+                    TransportRuntimeState.Stabilizing)
+                {
+                    _lifecycle.SetState(TransportRuntimeState.Ready);
+                }
+
                 GamepadStateReceived?.Invoke(
                     this,
                     new TransportGamepadStateEventArgs(
@@ -149,14 +167,9 @@ public sealed class WifiControllerTransport : IControllerTransport
         }
         catch
         {
-            SetState(TransportRuntimeState.Failed);
+            _lifecycle.SetState(TransportRuntimeState.Failed);
             throw;
         }
-    }
-
-    private void SetState(TransportRuntimeState state)
-    {
-        Volatile.Write(ref _state, (int)state);
     }
 
     public async ValueTask DisposeAsync()
