@@ -68,6 +68,56 @@ public sealed class TrustedSessionRegistryTests
     }
 
     [Fact]
+    public void GetBySessionId_ReturnsPeerAndIndependentMaterial()
+    {
+        using var registry =
+            new TrustedSessionRegistry();
+
+        PeerId firstPeer =
+            PeerId.CreateRandom();
+        PeerId secondPeer =
+            PeerId.CreateRandom();
+        SessionId firstSession =
+            SessionId.CreateRandom();
+        SessionId secondSession =
+            SessionId.CreateRandom();
+
+        byte[] firstKey =
+            RandomNumberGenerator.GetBytes(32);
+        byte[] secondKey =
+            RandomNumberGenerator.GetBytes(32);
+
+        registry.Replace(
+            firstPeer,
+            firstSession,
+            firstKey);
+        registry.Replace(
+            secondPeer,
+            secondSession,
+            secondKey);
+
+        using TrustedSessionRegistration registration =
+            Assert.IsType<TrustedSessionRegistration>(
+                registry.GetBySessionId(secondSession));
+
+        Assert.Equal(
+            secondPeer,
+            registration.PeerId);
+        Assert.Equal(
+            secondSession,
+            registration.Material.SessionId);
+
+        Assert.Null(
+            registry.GetBySessionId(
+                SessionId.CreateRandom()));
+
+        CryptographicOperations.ZeroMemory(
+            firstKey);
+        CryptographicOperations.ZeroMemory(
+            secondKey);
+    }
+
+    [Fact]
     public void ReplaceAndRemove_ControlCurrentSession()
     {
         using var registry =
