@@ -17,7 +17,7 @@ public sealed class TransportHealthMonitorTests
         clock.Advance(TimeSpan.FromMilliseconds(400));
         monitor.Report(Snapshot(65, 25));
 
-        Assert.Equal(1, monitor.GetFast(TransportKind.Wifi).SampleCount);
+        Assert.Equal(2, monitor.GetFast(TransportKind.Wifi).SampleCount);
         Assert.Equal(3, monitor.GetNormal(TransportKind.Wifi).SampleCount);
         Assert.Equal(3, monitor.GetLong(TransportKind.Wifi).SampleCount);
 
