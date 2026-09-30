@@ -185,18 +185,18 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M6 — Wi-Fi production transport
 
-- [ ] Define Wi-Fi transport interface implementation.
-- [ ] Implement local receiver binding.
-- [ ] Implement discovery.
+- [x] Define Wi-Fi transport interface implementation.
+- [x] Implement local receiver binding.
+- [x] Implement discovery.
 - [ ] Implement trusted peer identification.
-- [ ] Implement authentication.
-- [ ] Implement realtime UDP state flow.
+- [x] Implement authentication.
+- [x] Implement realtime UDP state flow.
 - [ ] Implement control/handshake flow.
-- [ ] Implement bounded/latest-state behavior.
-- [ ] Implement heartbeat.
-- [ ] Implement RTT measurement.
-- [ ] Implement jitter calculation.
-- [ ] Implement packet-loss estimation.
+- [x] Implement bounded/latest-state behavior.
+- [x] Implement heartbeat.
+- [x] Implement RTT measurement.
+- [x] Implement jitter calculation.
+- [x] Implement packet-loss estimation.
 - [ ] Implement stale/duplicate rejection.
 - [ ] Implement direct reconnect to last endpoint.
 - [ ] Fall back to discovery when direct reconnect fails.
