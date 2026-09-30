@@ -5,11 +5,46 @@ import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.ProtocolFrame
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
 import com.natsx.controller.core.protocol.ProtocolVersion
+import com.natsx.controller.core.protocol.SessionReadyPayload
+import com.natsx.controller.core.protocol.SessionReadyPayloadCodec
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 object WifiControlDatagramCodec {
     private const val HEARTBEAT_ACK_PAYLOAD_SIZE = 8
+
+
+    fun encodeSessionReady(
+        trustedSession: WifiTrustedSession,
+        payload: SessionReadyPayload,
+        monotonicTimestampMicros: ULong,
+    ): ByteArray {
+        return ProtocolFrameCodec.encode(
+            frame = ProtocolFrame(
+                version = ProtocolVersion.Current,
+                messageType = MessageType.SESSION_READY,
+                flags = FrameFlags.AUTHENTICATED,
+                sessionId = trustedSession.sessionId,
+                sequence = 0u,
+                monotonicTimestampMicros = monotonicTimestampMicros,
+                payload = SessionReadyPayloadCodec.encode(payload),
+            ),
+            authenticationKey = trustedSession.authenticationKey(),
+        )
+    }
+
+    fun decodeSessionReady(
+        datagram: ByteArray,
+        trustedSession: WifiTrustedSession,
+    ): SessionReadyPayload {
+        val frame = decodeAuthenticatedFrame(datagram, trustedSession)
+
+        require(frame.messageType == MessageType.SESSION_READY) {
+            "Expected SESSION_READY, received " + frame.messageType + "."
+        }
+
+        return SessionReadyPayloadCodec.decode(frame.payload)
+    }
 
     fun encodeHeartbeat(
         trustedSession: WifiTrustedSession,
