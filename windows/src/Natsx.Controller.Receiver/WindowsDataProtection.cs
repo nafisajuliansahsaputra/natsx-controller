@@ -70,7 +70,7 @@ internal static class WindowsDataProtection
 
             if (outputBlob.pbData != IntPtr.Zero)
             {
-                LocalFree(outputBlob.pbData);
+                ZeroAndLocalFree(outputBlob.pbData, outputBlob.cbData);
             }
         }
     }
@@ -84,6 +84,17 @@ internal static class WindowsDataProtection
         }
 
         Marshal.FreeHGlobal(pointer);
+    }
+
+    private static void ZeroAndLocalFree(IntPtr pointer, int length)
+    {
+        if (length > 0)
+        {
+            byte[] zeroes = new byte[length];
+            Marshal.Copy(zeroes, 0, pointer, length);
+        }
+
+        LocalFree(pointer);
     }
 
     [StructLayout(LayoutKind.Sequential)]
