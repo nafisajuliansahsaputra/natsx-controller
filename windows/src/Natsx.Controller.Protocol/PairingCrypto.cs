@@ -16,6 +16,8 @@ public static class PairingCrypto
         Encoding.ASCII.GetBytes("NATSX-PAIRING-KEY-V1");
     private static readonly byte[] SasContext =
         Encoding.ASCII.GetBytes("NATSX-SAS-V1");
+    private static readonly byte[] PairingResponseContext =
+        Encoding.ASCII.GetBytes("NATSX-PAIRING-RESPONSE-V1");
     private static readonly byte[] TrustSecretInfo =
         Encoding.ASCII.GetBytes("NATSX-TRUST-SECRET-V1");
     private static readonly byte[] ReconnectContext =
@@ -94,6 +96,35 @@ public static class PairingCrypto
         {
             CryptographicOperations.ZeroMemory(input);
             CryptographicOperations.ZeroMemory(mac);
+        }
+    }
+
+
+    public static byte[] ComputePairingResponseProof(
+        ReadOnlySpan<byte> pairingKey,
+        ReadOnlySpan<byte> pairingTranscriptHash,
+        SessionId sessionId)
+    {
+        ValidateKey(pairingKey, nameof(pairingKey));
+        ValidateHash(pairingTranscriptHash, nameof(pairingTranscriptHash));
+
+        byte[] input = new byte[
+            PairingResponseContext.Length +
+            DerivedKeySize +
+            SessionId.Size];
+
+        int offset = 0;
+        Copy(PairingResponseContext, input, ref offset);
+        Copy(pairingTranscriptHash, input, ref offset);
+        sessionId.WriteBytes(input.AsSpan(offset, SessionId.Size));
+
+        try
+        {
+            return HmacSha256(pairingKey, input);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(input);
         }
     }
 
