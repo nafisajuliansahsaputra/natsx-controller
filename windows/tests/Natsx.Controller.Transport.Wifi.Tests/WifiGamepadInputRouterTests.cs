@@ -2,6 +2,7 @@ using Natsx.Controller.Connection;
 using Natsx.Controller.Core;
 using Natsx.Controller.Protocol;
 using Natsx.Controller.Transport.Wifi;
+using Xunit;
 
 namespace Natsx.Controller.Transport.Wifi.Tests;
 
