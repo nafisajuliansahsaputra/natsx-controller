@@ -9,7 +9,7 @@ namespace Natsx.Controller.Transport.Wifi;
 
 public sealed class WifiControllerTransport : IControllerTransport
 {
-    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan PendingHandshakeLifetime = TimeSpan.FromSeconds(5);
 
     private readonly WifiTransportOptions _options;
