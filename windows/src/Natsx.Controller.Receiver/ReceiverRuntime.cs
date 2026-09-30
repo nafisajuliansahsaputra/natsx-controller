@@ -372,11 +372,11 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 HandoverProposal? proposal =
                     _smartConnection.Evaluate();
 
-                if (proposal is not null &&
-                    proposal.To == TransportKind.Wifi &&
-                    proposal.From is null)
+                if (proposal is { } selected &&
+                    selected.To == TransportKind.Wifi &&
+                    selected.From is null)
                 {
-                    _smartConnection.Commit(proposal);
+                    _smartConnection.Commit(selected);
                 }
 
                 PublishStatus(
