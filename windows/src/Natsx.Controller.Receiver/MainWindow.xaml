@@ -2,34 +2,117 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="NATSX Controller Receiver"
-        Width="720"
-        Height="440"
-        MinWidth="560"
-        MinHeight="360"
+        Width="760"
+        Height="500"
+        MinWidth="620"
+        MinHeight="420"
         WindowStartupLocation="CenterScreen">
     <Grid Margin="32">
-        <StackPanel>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="24" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="20" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
             <TextBlock FontSize="28"
                        FontWeight="SemiBold"
                        Text="NATSX Controller" />
-            <TextBlock Margin="0,6,0,28"
+            <TextBlock Margin="0,6,0,0"
                        Opacity="0.7"
                        Text="Windows Receiver" />
+        </StackPanel>
 
-            <Border Padding="20"
-                    BorderBrush="#33000000"
+        <Border Grid.Row="2"
+                Padding="20"
+                BorderBrush="#33000000"
+                BorderThickness="1"
+                CornerRadius="14">
+            <StackPanel>
+                <TextBlock FontSize="18"
+                           FontWeight="SemiBold"
+                           Text="Receiver status" />
+                <TextBlock x:Name="StatusText"
+                           Margin="0,8,0,0"
+                           TextWrapping="Wrap"
+                           Opacity="0.78"
+                           Text="Starting receiver…" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Padding="16"
+                    BorderBrush="#22000000"
                     BorderThickness="1"
-                    CornerRadius="14">
+                    CornerRadius="12">
                 <StackPanel>
-                    <TextBlock FontSize="18"
-                               FontWeight="SemiBold"
-                               Text="Foundation ready" />
-                    <TextBlock Margin="0,8,0,0"
-                               TextWrapping="Wrap"
+                    <TextBlock FontWeight="SemiBold"
+                               Text="Virtual Xbox" />
+                    <TextBlock x:Name="VirtualControllerText"
+                               Margin="0,6,0,0"
                                Opacity="0.72"
-                               Text="Transport, pairing, virtual-controller, and Smart Auto services attach behind this UI. The UI does not own the realtime controller engine." />
+                               Text="Starting…" />
                 </StackPanel>
             </Border>
-        </StackPanel>
+
+            <Border Grid.Column="2"
+                    Padding="16"
+                    BorderBrush="#22000000"
+                    BorderThickness="1"
+                    CornerRadius="12">
+                <StackPanel>
+                    <TextBlock FontWeight="SemiBold"
+                               Text="Wi-Fi receiver" />
+                    <TextBlock x:Name="WifiText"
+                               Margin="0,6,0,0"
+                               Opacity="0.72"
+                               Text="Starting…" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="4"
+                    Padding="16"
+                    BorderBrush="#22000000"
+                    BorderThickness="1"
+                    CornerRadius="12">
+                <StackPanel>
+                    <TextBlock FontWeight="SemiBold"
+                               Text="Controller session" />
+                    <TextBlock x:Name="SessionText"
+                               Margin="0,6,0,0"
+                               Opacity="0.72"
+                               Text="Waiting…" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="5"
+                Margin="0,20,0,0"
+                Padding="16"
+                VerticalAlignment="Top"
+                BorderBrush="#22000000"
+                BorderThickness="1"
+                CornerRadius="12">
+            <StackPanel>
+                <TextBlock FontWeight="SemiBold"
+                           Text="Connection diagnostics" />
+                <TextBlock x:Name="DiagnosticsText"
+                           Margin="0,8,0,0"
+                           Opacity="0.72"
+                           Text="RTT --   Jitter --   Loss --   Health --" />
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>
