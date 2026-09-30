@@ -269,7 +269,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M8 — Bluetooth transport
 
-- [ ] Implement Bluetooth permissions/setup.
+- [x] Implement Bluetooth permissions/setup.
 - [ ] Implement first-time OS pairing flow.
 - [ ] Implement RFCOMM transport.
 - [ ] Implement trusted auto-reconnect.
