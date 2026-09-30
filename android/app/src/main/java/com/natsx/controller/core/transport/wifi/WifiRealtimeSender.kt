@@ -2,6 +2,7 @@ package com.natsx.controller.core.transport.wifi
 
 import android.os.SystemClock
 import com.natsx.controller.core.gamepad.GamepadState
+import com.natsx.controller.core.session.SessionSequence
 import java.io.Closeable
 import java.io.IOException
 import java.net.DatagramPacket
@@ -12,12 +13,12 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class WifiRealtimeSender(
     private val remoteEndpoint: InetSocketAddress,
     private val trustedSession: WifiTrustedSession,
+    private val sequenceSource: SessionSequence,
     private val keepAliveIntervalMillis: Long = DEFAULT_KEEPALIVE_MILLIS,
 ) : Closeable {
     private val executor: ScheduledExecutorService =
@@ -41,7 +42,6 @@ class WifiRealtimeSender(
     private val latestState = AtomicReference(GamepadState.Neutral)
     private val pendingState = AtomicReference<GamepadState?>(null)
     private val drainScheduled = AtomicBoolean(false)
-    private val sequence = AtomicInteger(0)
     private val closed = AtomicBoolean(false)
 
     @Volatile
@@ -160,7 +160,7 @@ class WifiRealtimeSender(
 
     private fun send(state: GamepadState) {
         try {
-            val nextSequence = sequence.getAndIncrement().toUInt()
+            val nextSequence = sequenceSource.next()
             val timestampMicros = monotonicMicroseconds()
 
             val bytes = WifiRealtimeDatagramEncoder.encodeGamepadState(

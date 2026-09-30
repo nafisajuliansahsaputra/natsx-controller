@@ -1,0 +1,249 @@
+using Natsx.Controller.Core;
+
+namespace Natsx.Controller.Connection.Tests;
+
+public sealed class ControllerTransportRuntimeTests
+{
+    [Fact]
+    public async Task InitialSelection_SubmitsFreshCandidateAndSetsAuthority()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new FakeBackend();
+        var session = new ControllerSession();
+        var policy = ConnectionPolicy.Competitive;
+        var safety = new InputSafetyEngine(session, backend, policy, clock);
+        var manager = new SmartConnectionManager(policy, clock);
+        var wifi = new FakeTransport(TransportKind.Wifi, clock)
+        {
+            Snapshot = Healthy(TransportKind.Wifi, 95),
+        };
+
+        await using var runtime = new ControllerTransportRuntime(
+            session,
+            safety,
+            manager,
+            new[] { wifi },
+            policy,
+            clock);
+
+        GamepadState state = GamepadState.Neutral with
+        {
+            Buttons = GamepadButtons.A,
+            LeftX = 1234,
+        };
+
+        wifi.Publish(10, state);
+        runtime.EvaluateOnce();
+
+        Assert.Equal(TransportKind.Wifi, runtime.ActiveTransport);
+        Assert.Equal(TransportKind.Wifi, session.AuthoritativeTransport);
+        Assert.Equal((uint)10, session.LastAcceptedSequence);
+        Assert.Equal(state, backend.LastState);
+    }
+
+    [Fact]
+    public async Task Handover_RejectsStaleCandidateThenAcceptsNewerState()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new FakeBackend();
+        var session = new ControllerSession();
+        var policy = ConnectionPolicy.Competitive;
+        var safety = new InputSafetyEngine(session, backend, policy, clock);
+        var manager = new SmartConnectionManager(policy, clock);
+
+        var wifi = new FakeTransport(TransportKind.Wifi, clock)
+        {
+            Snapshot = Healthy(TransportKind.Wifi, 95),
+        };
+        var bluetooth = new FakeTransport(TransportKind.Bluetooth, clock)
+        {
+            Snapshot = Healthy(TransportKind.Bluetooth, 90),
+        };
+
+        await using var runtime = new ControllerTransportRuntime(
+            session,
+            safety,
+            manager,
+            new IControllerTransport[] { wifi, bluetooth },
+            policy,
+            clock);
+
+        GamepadState wifiState = GamepadState.Neutral with
+        {
+            Buttons = GamepadButtons.X,
+        };
+
+        wifi.Publish(10, wifiState);
+        runtime.EvaluateOnce();
+
+        Assert.Equal(TransportKind.Wifi, runtime.ActiveTransport);
+
+        wifi.Snapshot = Critical(TransportKind.Wifi);
+        bluetooth.Publish(9, GamepadState.Neutral with
+        {
+            Buttons = GamepadButtons.B,
+        });
+
+        runtime.EvaluateOnce();
+
+        Assert.Equal(TransportKind.Wifi, runtime.ActiveTransport);
+        Assert.Equal((uint)10, session.LastAcceptedSequence);
+        Assert.Equal(wifiState, backend.LastState);
+
+        GamepadState bluetoothState = GamepadState.Neutral with
+        {
+            Buttons = GamepadButtons.B,
+        };
+
+        bluetooth.Publish(11, bluetoothState);
+        runtime.EvaluateOnce();
+
+        Assert.Equal(TransportKind.Bluetooth, runtime.ActiveTransport);
+        Assert.Equal(TransportKind.Bluetooth, session.AuthoritativeTransport);
+        Assert.Equal((uint)11, session.LastAcceptedSequence);
+        Assert.Equal(bluetoothState, backend.LastState);
+    }
+
+    [Fact]
+    public async Task NonAuthoritativeRealtimeState_DoesNotReachBackend()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new FakeBackend();
+        var session = new ControllerSession();
+        var policy = ConnectionPolicy.Competitive;
+        var safety = new InputSafetyEngine(session, backend, policy, clock);
+        var manager = new SmartConnectionManager(policy, clock);
+
+        var wifi = new FakeTransport(TransportKind.Wifi, clock)
+        {
+            Snapshot = Healthy(TransportKind.Wifi, 95),
+        };
+        var bluetooth = new FakeTransport(TransportKind.Bluetooth, clock)
+        {
+            Snapshot = Healthy(TransportKind.Bluetooth, 80),
+        };
+
+        await using var runtime = new ControllerTransportRuntime(
+            session,
+            safety,
+            manager,
+            new IControllerTransport[] { wifi, bluetooth },
+            policy,
+            clock);
+
+        wifi.Publish(1, GamepadState.Neutral with { Buttons = GamepadButtons.A });
+        runtime.EvaluateOnce();
+
+        GamepadState accepted = Assert.IsType<GamepadState>(backend.LastState);
+
+        bluetooth.Publish(2, GamepadState.Neutral with { Buttons = GamepadButtons.Y });
+
+        Assert.Equal(accepted, backend.LastState);
+        Assert.Equal((uint)1, session.LastAcceptedSequence);
+    }
+
+    private static TransportHealthSnapshot Healthy(
+        TransportKind kind,
+        int score) =>
+        new(
+            kind,
+            TransportRuntimeState.Ready,
+            TimeSpan.FromMilliseconds(5),
+            TimeSpan.FromMilliseconds(1),
+            0,
+            TimeSpan.Zero,
+            score,
+            TransportHealthGrade.Good);
+
+    private static TransportHealthSnapshot Critical(TransportKind kind) =>
+        new(
+            kind,
+            TransportRuntimeState.Degraded,
+            TimeSpan.FromMilliseconds(100),
+            TimeSpan.FromMilliseconds(30),
+            10,
+            TimeSpan.FromMilliseconds(90),
+            20,
+            TransportHealthGrade.Critical);
+
+    private sealed class FakeTransport : IControllerTransport
+    {
+        private readonly TimeProvider _clock;
+
+        public FakeTransport(TransportKind kind, TimeProvider clock)
+        {
+            Kind = kind;
+            _clock = clock;
+            Snapshot = Healthy(kind, 80);
+        }
+
+        public event EventHandler<TransportGamepadStateEventArgs>? GamepadStateReceived;
+
+        public TransportKind Kind { get; }
+
+        public TransportRuntimeState State => Snapshot.State;
+
+        public TransportHealthSnapshot Snapshot { get; set; }
+
+        public ValueTask ConnectAsync(CancellationToken cancellationToken) =>
+            ValueTask.CompletedTask;
+
+        public ValueTask DisconnectAsync(CancellationToken cancellationToken) =>
+            ValueTask.CompletedTask;
+
+        public TransportHealthSnapshot GetHealthSnapshot() => Snapshot;
+
+        public void Publish(uint sequence, GamepadState state)
+        {
+            GamepadStateReceived?.Invoke(
+                this,
+                new TransportGamepadStateEventArgs(
+                    Kind,
+                    sequence,
+                    state,
+                    _clock.GetTimestamp()));
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class FakeBackend : IVirtualGamepadBackend
+    {
+        public bool IsStarted => true;
+
+        public event Action<RumbleState>? RumbleReceived
+        {
+            add { }
+            remove { }
+        }
+
+        public GamepadState? LastState { get; private set; }
+
+        public ValueTask StartAsync(CancellationToken cancellationToken = default) =>
+            ValueTask.CompletedTask;
+
+        public ValueTask StopAsync(CancellationToken cancellationToken = default) =>
+            ValueTask.CompletedTask;
+
+        public void Submit(GamepadState state)
+        {
+            LastState = state;
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private long _timestamp;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => _timestamp;
+
+        public void Advance(TimeSpan delta)
+        {
+            _timestamp += delta.Ticks;
+        }
+    }
+}
