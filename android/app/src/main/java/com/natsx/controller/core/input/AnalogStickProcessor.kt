@@ -1,6 +1,7 @@
 package com.natsx.controller.core.input
 
 import com.natsx.controller.core.gamepad.GamepadState
+import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
@@ -11,9 +12,13 @@ data class StickOutput(
 
 class AnalogStickProcessor(
     private val deadzone: Float = 0.05f,
+    private val jitterThreshold: Int = 96,
 ) {
+    private var lastOutput = StickOutput(0, 0)
+
     init {
         require(deadzone in 0f..<1f)
+        require(jitterThreshold >= 0)
     }
 
     fun process(
@@ -30,7 +35,8 @@ class AnalogStickProcessor(
         val magnitude = hypot(rawX, rawY)
 
         if (magnitude <= deadzone) {
-            return StickOutput(0, 0)
+            lastOutput = StickOutput(0, 0)
+            return lastOutput
         }
 
         val clampedMagnitude = magnitude.coerceAtMost(1f)
@@ -40,10 +46,24 @@ class AnalogStickProcessor(
         val unitX = rawX / magnitude
         val unitY = rawY / magnitude
 
-        return StickOutput(
+        val candidate = StickOutput(
             x = toStickRange(unitX * scaledMagnitude),
             y = toStickRange(unitY * scaledMagnitude),
         )
+
+        if (
+            abs(candidate.x - lastOutput.x) <= jitterThreshold &&
+            abs(candidate.y - lastOutput.y) <= jitterThreshold
+        ) {
+            return lastOutput
+        }
+
+        lastOutput = candidate
+        return candidate
+    }
+
+    fun reset() {
+        lastOutput = StickOutput(0, 0)
     }
 
     private fun toStickRange(value: Float): Int {
