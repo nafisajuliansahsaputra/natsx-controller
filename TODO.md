@@ -64,23 +64,23 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ## M2 — Protocol v1
 
 - [x] Define protocol version negotiation.
-- [ ] Define peer/device identity fields.
+- [x] Define peer/device identity fields.
 - [x] Define session ID.
 - [x] Define global realtime sequence format.
 - [x] Define monotonic timestamp representation.
 - [x] Define `GamepadState` bit layout.
 - [x] Define D-pad encoding.
 - [x] Define analog encoding.
-- [ ] Define handshake messages.
-- [ ] Define capability messages.
-- [ ] Define heartbeat/health messages.
+- [x] Define handshake messages.
+- [x] Define capability messages.
+- [x] Define heartbeat/health messages.
 - [x] Define realtime state message.
-- [ ] Define state-sync/handover messages.
-- [ ] Define output/rumble message.
-- [ ] Define disconnect/recovery semantics.
+- [x] Define state-sync/handover messages.
+- [x] Define output/rumble message.
+- [x] Define disconnect/recovery semantics.
 - [x] Define invalid/stale packet handling.
 - [x] Define sequence wrap behavior.
-- [ ] Define authentication/integrity strategy.
+- [x] Define authentication/integrity strategy.
 - [x] Add protocol test vectors.
 - [x] Add Android encoder/decoder.
 - [x] Add C# encoder/decoder.

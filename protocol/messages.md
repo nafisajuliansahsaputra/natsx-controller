@@ -191,9 +191,110 @@ Advertises:
 
 ### AUTH_CHALLENGE / AUTH_RESPONSE
 
-Proves possession of trust material and establishes/binds the current connection to the session.
+These messages authenticate a reconnect for peers that already share a 32-byte long-term trust key.
 
-The exact pairing/session-key establishment design must use established cryptographic primitives and is not frozen by this frame document.
+They do **not** define first-time pairing. First-time pairing provisions the trust key separately.
+
+#### AUTH_CHALLENGE
+
+The common frame header carries a newly generated non-zero Session ID.
+
+The frame itself is not yet authenticated because the per-session key has not been derived.
+
+Payload length: **64 bytes**.
+
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 16 | Challenger Peer ID |
+| 16 | 16 | Target Peer ID |
+| 32 | 32 | Cryptographically random challenge nonce |
+
+For the normal Android-to-Windows reconnect, the Windows receiver is the challenger and the Android controller is the target.
+
+#### AUTH_RESPONSE
+
+The response uses the same Session ID in the common header.
+
+Payload length: **64 bytes**.
+
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 16 | Responder Peer ID |
+| 16 | 16 | Challenger Peer ID |
+| 32 | 32 | HMAC-SHA-256 proof |
+
+The proof is:
+
+```text
+HMAC-SHA-256(
+    trustKey,
+    ASCII("NATSX-AUTH-V1") ||
+    sessionId ||
+    challengeNonce ||
+    challengerPeerId ||
+    responderPeerId
+)
+```
+
+The proof is compared in constant time.
+
+A proof is bound to:
+
+- the newly generated session;
+- the fresh challenge;
+- the challenger identity;
+- the responder identity.
+
+A replay from a previous session therefore does not authenticate a new session.
+
+#### Session-key derivation
+
+After the proof is verified, both peers derive a 32-byte session key using HKDF-SHA-256 (RFC 5869).
+
+```text
+IKM  = trustKey
+salt = challengeNonce || sessionId
+info = ASCII("NATSX-SESSION-V1") ||
+       challengerPeerId ||
+       responderPeerId
+
+sessionKey = HKDF-SHA-256(IKM, salt, info, 32)
+```
+
+The current implementations use standard HMAC-SHA-256 extract/expand semantics.
+
+The derived session key authenticates post-trust frames using the common-frame truncated HMAC tag already defined above.
+
+#### Canonical reconnect vector
+
+```text
+trustKey =
+000102030405060708090a0b0c0d0e0f
+101112131415161718191a1b1c1d1e1f
+
+sessionId =
+00112233445566778899aabbccddeeff
+
+challenge =
+202122232425262728292a2b2c2d2e2f
+303132333435363738393a3b3c3d3e3f
+
+challengerPeerId =
+404142434445464748494a4b4c4d4e4f
+
+responderPeerId =
+505152535455565758595a5b5c5d5e5f
+
+proof =
+7c1d330d72acdce1dd6cdcb2d43d3238
+b45ed559b8b70c5f80126e984156fa4b
+
+sessionKey =
+7f71083bd8b16f7e75f276bb9ebb7551
+060bf5128c5c343b2634584f5a3200f2
+```
+
+Kotlin and C# tests must reproduce these values exactly.
 
 ### SESSION_READY
 
@@ -256,23 +357,71 @@ Provides:
 
 ### TRANSPORT_READY
 
-Marks an authenticated secondary transport eligible for stabilization and candidate selection.
+Authenticated payload length: **4 bytes**.
 
-### HANDOVER_PREPARE
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 1 | Transport kind |
+| 1 | 3 | Reserved, zero |
 
-Coordinates state synchronization toward a candidate transport.
+Transport kind values:
 
-### HANDOVER_COMMIT
+| Value | Transport |
+|---:|---|
+| 1 | Wi-Fi |
+| 2 | Bluetooth |
+| 3 | USB Direct |
 
-Confirms authoritative transport transfer after a valid newer synchronized state has been observed.
+It marks an authenticated secondary transport eligible for stabilization and candidate selection.
+
+### HANDOVER_PREPARE / HANDOVER_COMMIT
+
+Both messages use the same authenticated 8-byte payload.
+
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 1 | Candidate/committed transport kind |
+| 1 | 3 | Reserved, zero |
+| 4 | 4 | Global GamepadState sequence |
+
+`HANDOVER_PREPARE` identifies the candidate and the synchronization sequence expected on it.
+
+`HANDOVER_COMMIT` records the transport and state sequence used for the authoritative switch.
+
+The state sequence is part of the same global controller-session sequence space used by `GAMEPAD_STATE`.
 
 ### RUMBLE
 
-Carries virtual-controller output toward Android.
+Authenticated payload length: **4 bytes**.
+
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 1 | Low-frequency motor, 0..255 |
+| 1 | 1 | High-frequency motor, 0..255 |
+| 2 | 2 | Reserved, zero |
+
+A later RUMBLE frame supersedes the previous motor state. Zero values stop the corresponding motor.
 
 ### DISCONNECT
 
-Provides graceful shutdown. Absence of this message does not prevent timeout-based failure detection.
+Authenticated payload length: **4 bytes** after a trusted session exists.
+
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 1 | Reason |
+| 1 | 3 | Reserved, zero |
+
+Reason values:
+
+| Value | Reason |
+|---:|---|
+| 0 | Normal |
+| 1 | App stopping |
+| 2 | Transport closing |
+| 3 | Protocol error |
+| 4 | Authentication failed |
+
+Absence of a DISCONNECT message does not prevent timeout-based failure detection.
 
 ---
 

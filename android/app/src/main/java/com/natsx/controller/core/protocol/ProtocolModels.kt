@@ -62,6 +62,12 @@ class SessionId private constructor(
             require(bytes.size == SIZE)
             return SessionId(bytes.copyOf())
         }
+
+        fun createRandom(): SessionId {
+            val bytes = ByteArray(SIZE)
+            java.security.SecureRandom().nextBytes(bytes)
+            return SessionId(bytes)
+        }
     }
 }
 
