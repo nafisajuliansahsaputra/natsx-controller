@@ -104,12 +104,19 @@ public sealed class TrustedReconnectServerHandshake
 
         _sessionId = CreateNonZeroSessionId();
 
-        _sessionKey = TrustedSessionCrypto.DeriveSessionKey(
-            trust.PairingRootKey,
-            _challenge,
-            androidHello.DeviceId,
-            _windowsDeviceId,
-            _sessionId);
+        try
+        {
+            _sessionKey = TrustedSessionCrypto.DeriveSessionKey(
+                trust.PairingRootKey,
+                _challenge,
+                androidHello.DeviceId,
+                _windowsDeviceId,
+                _sessionId);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(trust.PairingRootKey);
+        }
 
         CapabilityFlags negotiated =
             androidHello.Capabilities & _windowsHello.Capabilities;
