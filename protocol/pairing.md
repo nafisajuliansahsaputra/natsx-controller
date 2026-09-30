@@ -1,8 +1,15 @@
-# Pairing, trust, and session establishment v1
+# First pairing and trust provisioning v1
 
-This document defines the security model for NATSX Controller.
+This document defines first-time trust provisioning for NATSX Controller.
 
-The exact binary payloads for AUTH_CHALLENGE and AUTH_RESPONSE will be frozen alongside cross-language test vectors before the handshake implementation is marked complete.
+Trusted reconnect is already defined in `protocol/messages.md` under
+`AUTH_CHALLENGE / AUTH_RESPONSE`. First pairing must not redefine or overload
+that established reconnect payload.
+
+The first-pair wire messages themselves are **not frozen yet**. The
+cryptographic transcript and key derivation below are frozen so Android and
+Windows can build/test the same security foundation before pairing UI and
+message orchestration are added.
 
 ## 1. Identities
 
@@ -10,59 +17,49 @@ Each installation owns a stable 16-byte opaque Peer ID.
 
 Peer IDs are public identifiers. They are not credentials.
 
-A trusted relationship is keyed by the tuple:
+A trusted relationship is scoped to:
 
 ```text
-(localPeerId, remotePeerId)
+AndroidPeerId + WindowsPeerId
 ```
 
 ## 2. Required primitives
 
-- CSPRNG
-- ECDH P-256 / secp256r1
-- SHA-256
-- HMAC-SHA-256
-- HKDF-SHA-256 (RFC 5869)
+Use standard platform cryptography:
 
-Wire public keys use the 65-byte uncompressed SEC1 representation:
+- CSPRNG;
+- ECDH P-256 / secp256r1;
+- SHA-256;
+- HMAC-SHA-256;
+- HKDF-SHA-256 (RFC 5869).
+
+Wire public keys for first pairing use the 65-byte uncompressed SEC1 form:
 
 ```text
 0x04 || X[32] || Y[32]
 ```
 
-Coordinates are unsigned big-endian as required by SEC1.
+Coordinates are unsigned big-endian.
 
-## 3. Canonical transcript encoding
-
-Cryptographic derivation never concatenates ambiguous variable-length text.
-
-Every transcript begins with an ASCII context label followed by fixed-width fields.
-
-Peer ordering is role-defined:
-
-```text
-AndroidPeerId || WindowsPeerId
-AndroidNonce  || WindowsNonce
-AndroidPubKey || WindowsPubKey
-```
-
-The Android controller is always first regardless of which network packet arrived first.
-
-## 4. First-pair nonces
+## 3. First-pair nonces
 
 Each peer generates an independent 32-byte cryptographically secure nonce.
 
-Nonces must not be reused intentionally.
+Nonces must not be intentionally reused.
 
-## 5. ECDH shared secret
+## 4. Ephemeral ECDH
 
-Both peers generate an ephemeral P-256 keypair.
+Each peer creates a fresh P-256 key pair.
 
-After validating the received public key as a valid P-256 point, both derive the ECDH shared secret using platform cryptography.
+After validating the received P-256 public key, each side derives the same
+32-byte raw ECDH shared secret using platform cryptography.
 
-Ephemeral private keys are never persisted.
+Ephemeral private keys and the raw shared secret are memory-only and are
+discarded after pairing completes or fails.
 
-## 6. Pairing transcript hash
+## 5. Canonical pairing transcript
+
+Role order is fixed and never depends on packet arrival order:
 
 ```text
 pairingTranscript =
@@ -77,7 +74,7 @@ pairingTranscript =
 pairingTranscriptHash = SHA256(pairingTranscript)
 ```
 
-## 7. Pairing key
+## 6. Pairing key
 
 ```text
 pairingKey =
@@ -89,13 +86,16 @@ pairingKey =
     )
 ```
 
-## 8. Short Authentication String (SAS)
+The pairing key is temporary and is never persisted.
+
+## 7. Short Authentication String (SAS)
 
 ```text
 sasMac =
     HMAC-SHA256(
         pairingKey,
-        ASCII("NATSX-SAS-V1") || pairingTranscriptHash
+        ASCII("NATSX-SAS-V1") ||
+        pairingTranscriptHash
     )
 
 sasValue =
@@ -107,13 +107,36 @@ display =
 
 Both devices display the six-digit value.
 
-The user must confirm that both values match before trust is persisted.
+The user must confirm that the two displayed values match. A mismatch aborts
+pairing and no trust record is written.
 
-A mismatch aborts pairing and discards all temporary material.
+The SAS is a human verification value. It is **not** an encryption key and is
+never stored as the trust secret.
+
+## 8. Optional first-pair responder proof primitive
+
+The implementation provides a first-pair response-proof primitive that future
+pairing wire orchestration can use:
+
+```text
+pairingResponseProof =
+    HMAC-SHA256(
+        pairingKey,
+        ASCII("NATSX-PAIRING-RESPONSE-V1") ||
+        pairingTranscriptHash ||
+        SessionId
+    )
+```
+
+This proves possession of the temporary pairing key and binds the response to a
+proposed Session ID.
+
+The exact first-pair message carrying this proof remains intentionally
+unassigned until the first-pair wire exchange is frozen.
 
 ## 9. Long-term trust secret
 
-After successful SAS confirmation:
+After successful human SAS confirmation:
 
 ```text
 trustSecret =
@@ -125,114 +148,85 @@ trustSecret =
     )
 ```
 
-Only `trustSecret` is persisted as secret pairing material.
+Only this 32-byte trust secret is persisted as secret trust material.
 
-The pairing key, ECDH private keys, and ECDH shared secret are discarded.
+The trust record also stores non-secret metadata such as:
 
-## 10. Trusted reconnect
+- remote Peer ID;
+- optional display name;
+- capability metadata;
+- pairing version/time.
 
-A reconnect uses:
+## 10. Protected local storage
 
-- trusted Android Peer ID;
-- trusted Windows Peer ID;
-- fresh Android reconnect nonce (32 bytes);
-- fresh Windows reconnect nonce (32 bytes);
-- new random 16-byte Session ID.
+### Android
 
-Canonical reconnect transcript:
+The trust secret is encrypted with AES-256-GCM using a non-exportable Android
+Keystore key.
 
-```text
-reconnectTranscript =
-    ASCII("NATSX-RECONNECT-V1") ||
-    AndroidPeerId[16] ||
-    WindowsPeerId[16] ||
-    AndroidNonce[32] ||
-    WindowsNonce[32] ||
-    SessionId[16]
-```
+Persistent preferences contain ciphertext, IV, and non-secret metadata only.
 
-Proof:
+### Windows
 
-```text
-proof =
-    HMAC-SHA256(
-        trustSecret,
-        reconnectTranscript
-    )
-```
+The trust secret is protected with Windows DPAPI using
+`DataProtectionScope.CurrentUser`.
 
-Where a payload carries a proof, v1 uses all 32 bytes unless a later frozen payload explicitly defines a safe truncation.
+The trust document contains the DPAPI-protected blob and non-secret metadata.
 
-## 11. Session key derivation
+## 11. Trusted reconnect after pairing
+
+After a trust relationship exists, use the existing reconnect contract in
+`protocol/messages.md`:
 
 ```text
-reconnectTranscriptHash = SHA256(reconnectTranscript)
-
-sessionKey =
-    HKDF-SHA256(
-        ikm  = trustSecret,
-        salt = reconnectTranscriptHash,
-        info = ASCII("NATSX-SESSION-KEY-V1"),
-        len  = 32
-    )
+AUTH_CHALLENGE
+    -> AUTH_RESPONSE
+    -> derive fresh session key
+    -> authenticated SESSION_READY
 ```
 
-The session key is memory-only.
+That contract uses:
 
-After derivation, both peers exchange authenticated SESSION_READY frames using the new Session ID and session key.
+- a fresh 32-byte challenge nonce;
+- a new non-zero Session ID in the common frame header;
+- HMAC-SHA-256 proof with the persisted 32-byte trust secret;
+- HKDF-SHA-256 to derive a fresh 32-byte session key.
 
-Realtime GAMEPAD_STATE traffic is not authoritative until session readiness succeeds.
+Do **not** create a second reconnect derivation inside the first-pair protocol.
 
 ## 12. Secondary transport join
 
 Wi-Fi, Bluetooth, and USB do not establish independent trust relationships.
 
-A secondary transport joins an existing logical session by proving knowledge of the current session key and matching:
+A secondary transport joins the already authenticated logical session by
+proving knowledge of the current session key and matching the Session ID /
+trusted Peer identities.
 
-- Session ID;
-- Android Peer ID;
-- Windows Peer ID.
+Transport handover therefore does not reset the global controller-state
+sequence or recreate the virtual controller.
 
-Transport handover does not reset the global controller-state sequence.
+## 13. Secret lifetime
 
-## 13. Replay rules
+- P-256 ephemeral private key: memory only.
+- Raw ECDH shared secret: memory only.
+- Pairing key: memory only.
+- Long-term trust secret: protected persistent storage until Forget/Reset.
+- Per-session key: memory only for one logical controller session.
 
-A stale authentication flow must not revive an old session.
+## 14. Forget/reset
 
-Implementations reject:
+Forget device must eventually:
 
-- unexpected Session IDs;
-- reused/expired pending challenge identifiers;
-- invalid proofs;
-- SESSION_READY frames for inactive negotiation;
-- stale realtime sequence values.
-
-## 14. Local storage
-
-### Android
-
-Trust secret encrypted using an Android Keystore AES-256-GCM key.
-
-### Windows
-
-Trust secret protected using current-user Windows DPAPI.
-
-Storage records may contain non-secret metadata in plaintext, including Peer ID and friendly name.
-
-## 15. Forget/reset
-
-“Forget device” must:
-
-1. remove protected trust secret;
-2. remove peer metadata;
-3. remove cached transport endpoints;
-4. terminate active sessions for that peer;
+1. terminate active sessions for that peer;
+2. remove the protected trust secret;
+3. remove peer metadata;
+4. remove cached transport endpoints;
 5. require first pairing again before accepting controller state.
 
+## 15. Canonical first-pair derivation vector
 
-## 16. Canonical derivation test vector
-
-This vector verifies cross-language transcript ordering, HKDF, SAS, reconnect proof, and session-key derivation.
+This vector verifies cross-language transcript ordering, HKDF, SAS, trust-secret
+derivation, and first-pair response proof.
 
 Inputs:
 
@@ -255,14 +249,14 @@ Android public key:
 Windows public key:
 04 || bytes a0..df
 
-ECDH test shared secret:
+Injected ECDH test shared secret:
 c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf
 
-Session ID:
+Proposed Session ID for response-proof test:
 e0e1e2e3e4e5e6e7e8e9eaebecedeeef
 ```
 
-Expected outputs:
+Expected:
 
 ```text
 Pairing transcript SHA-256:
@@ -279,112 +273,8 @@ Six-digit SAS:
 
 Trust secret:
 014850a457b18a4a55758249ade00423852dfb44a6c4a9a8bc422a28379ede4f
-
-Reconnect proof:
-f7a5e3ff77584a64cd92a239ae2d75293a77c8b81c66a91a54095654976230de
-
-Session key:
-a1241e0b7d71918fd9e506d597a0c29a4531b94723064ea84260fb03705ed63a
 ```
 
-The ECDH shared secret in this vector is injected directly to test key derivation. A separate ECDH test must verify platform P-256 public-key parsing and shared-secret agreement.
-
-
-## 17. AUTH_CHALLENGE payload v1
-
-Payload size: **133 bytes**.
-
-| Offset | Size | Field |
-|---:|---:|---|
-| 0 | 1 | Authentication mode |
-| 1 | 3 | Reserved, zero |
-| 4 | 16 | Sender Peer ID |
-| 20 | 32 | Sender nonce |
-| 52 | 16 | Proposed Session ID |
-| 68 | 65 | Ephemeral P-256 public-key field |
-
-Authentication modes:
-
-```text
-1 = FIRST_PAIRING
-2 = TRUSTED_RECONNECT
-```
-
-Rules:
-
-- Sender Peer ID must be non-zero.
-- Session ID must be non-zero.
-- FIRST_PAIRING requires a 65-byte uncompressed SEC1 P-256 public key.
-- TRUSTED_RECONNECT requires the complete 65-byte public-key field to be zero.
-- The initiator chooses the new Session ID.
-
-## 18. AUTH_RESPONSE payload v1
-
-Payload size: **165 bytes**.
-
-| Offset | Size | Field |
-|---:|---:|---|
-| 0 | 1 | Authentication mode |
-| 1 | 3 | Reserved, zero |
-| 4 | 16 | Sender Peer ID |
-| 20 | 32 | Sender nonce |
-| 52 | 16 | Echoed Session ID |
-| 68 | 65 | Ephemeral P-256 public-key field |
-| 133 | 32 | Proof |
-
-Rules:
-
-- Mode must match the pending challenge.
-- Session ID must exactly match the challenge.
-- FIRST_PAIRING carries the responder ephemeral P-256 public key.
-- TRUSTED_RECONNECT zeros the full 65-byte public-key field.
-- Proof is always exactly 32 bytes.
-
-### FIRST_PAIRING response proof
-
-After computing the pairing transcript and pairing key:
-
-```text
-pairingResponseProof =
-    HMAC-SHA256(
-        pairingKey,
-        ASCII("NATSX-PAIRING-RESPONSE-V1") ||
-        pairingTranscriptHash ||
-        SessionId
-    )
-```
-
-The initiator verifies this before displaying/accepting the SAS.
-
-The initiator later proves possession of the resulting trust/session material by sending an authenticated SESSION_READY after local SAS confirmation.
-
-### TRUSTED_RECONNECT response proof
-
-For trusted reconnect:
-
-```text
-responseProof =
-    HMAC-SHA256(
-        trustSecret,
-        reconnectTranscript
-    )
-```
-
-The initiator verifies the proof, derives the fresh session key, and sends authenticated SESSION_READY.
-
-## 19. Pairing completion rule
-
-First-pair trust is not considered committed merely because ECDH succeeded.
-
-Required order:
-
-1. AUTH_CHALLENGE / AUTH_RESPONSE complete.
-2. Pairing response proof verifies.
-3. Both devices display the same six-digit SAS.
-4. User confirms the match.
-5. Both sides derive trust secret and fresh session key.
-6. Initiator sends authenticated SESSION_READY.
-7. Responder validates it and returns authenticated SESSION_READY.
-8. Only then persist/commit the trusted relationship and permit normal controller-session activation.
-
-If any step fails or is cancelled, ephemeral material is discarded and no new trust relationship is created.
+The ECDH shared secret above is injected only for deterministic derivation
+testing. Separate tests verify that platform P-256 implementations derive the
+same raw shared secret from generated key pairs.
