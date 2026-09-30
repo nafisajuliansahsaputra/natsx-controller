@@ -53,7 +53,16 @@ class AndroidTrustedReceiverStore(
 
         val prefix = keyPrefix(windowsDeviceId)
 
+        val trustedIds =
+            preferences.getStringSet(KEY_TRUSTED_IDS, emptySet())
+                .orEmpty()
+                .toMutableSet()
+                .apply {
+                    add(windowsDeviceId.toString())
+                }
+
         preferences.edit()
+            .putStringSet(KEY_TRUSTED_IDS, trustedIds)
             .putString(
                 prefix + KEY_SECRET_SUFFIX,
                 Base64.encodeToString(packed, Base64.NO_WRAP),
@@ -138,6 +147,17 @@ class AndroidTrustedReceiverStore(
             .apply()
     }
 
+    fun listTrustedDeviceIds(): List<SessionId> {
+        return preferences
+            .getStringSet(KEY_TRUSTED_IDS, emptySet())
+            .orEmpty()
+            .mapNotNull { encoded ->
+                runCatching {
+                    SessionId.fromBytes(hexToBytes(encoded))
+                }.getOrNull()
+            }
+    }
+
     fun forget(windowsDeviceId: SessionId): Boolean {
         val prefix = keyPrefix(windowsDeviceId)
         val secretKey = prefix + KEY_SECRET_SUFFIX
@@ -146,7 +166,16 @@ class AndroidTrustedReceiverStore(
             return false
         }
 
+        val trustedIds =
+            preferences.getStringSet(KEY_TRUSTED_IDS, emptySet())
+                .orEmpty()
+                .toMutableSet()
+                .apply {
+                    remove(windowsDeviceId.toString())
+                }
+
         preferences.edit()
+            .putStringSet(KEY_TRUSTED_IDS, trustedIds)
             .remove(secretKey)
             .remove(prefix + KEY_NAME_SUFFIX)
             .remove(prefix + KEY_HOST_SUFFIX)
@@ -191,6 +220,16 @@ class AndroidTrustedReceiverStore(
     private fun keyPrefix(deviceId: SessionId): String =
         "peer_" + deviceId.toString() + "_"
 
+    private fun hexToBytes(value: String): ByteArray {
+        require(value.length == SessionId.SIZE * 2)
+
+        return ByteArray(SessionId.SIZE) { index ->
+            value.substring(index * 2, index * 2 + 2)
+                .toInt(16)
+                .toByte()
+        }
+    }
+
     private companion object {
         const val PREFERENCES_NAME = "natsx_trusted_receivers"
         const val ANDROID_KEY_STORE = "AndroidKeyStore"
@@ -199,6 +238,7 @@ class AndroidTrustedReceiverStore(
         const val GCM_TAG_BITS = 128
         const val DEFAULT_CONTROLLER_PORT = 37074
 
+        const val KEY_TRUSTED_IDS = "trusted_ids"
         const val KEY_SECRET_SUFFIX = "secret"
         const val KEY_NAME_SUFFIX = "name"
         const val KEY_HOST_SUFFIX = "host"
