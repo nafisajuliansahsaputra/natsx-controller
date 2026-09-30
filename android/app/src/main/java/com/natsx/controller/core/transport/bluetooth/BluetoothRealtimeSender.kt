@@ -18,7 +18,7 @@ class BluetoothRealtimeSender(
     private val inputStream: InputStream? = null,
     private val nowNanos: () -> Long =
         SystemClock::elapsedRealtimeNanos,
-) : RealtimeStateSink, Closeable {
+) : BluetoothRealtimeLink {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
             Thread(
@@ -74,7 +74,7 @@ class BluetoothRealtimeSender(
         private set
 
     @Volatile
-    var lastHeartbeatReceivedNanos: Long = 0
+    override var lastHeartbeatReceivedNanos: Long = 0
         private set
 
     init {
