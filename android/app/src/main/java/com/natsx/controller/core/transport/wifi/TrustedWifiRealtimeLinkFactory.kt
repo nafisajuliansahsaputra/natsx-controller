@@ -1,6 +1,7 @@
 package com.natsx.controller.core.transport.wifi
 
 import com.natsx.controller.core.protocol.PeerId
+import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.trust.TrustedPeerStore
 import java.net.InetSocketAddress
@@ -11,6 +12,7 @@ class TrustedWifiRealtimeLinkFactory(
     private val trustedPeerStore: TrustedPeerStore,
     private val reconnectClient: WifiTrustedReconnectClient =
         WifiTrustedReconnectClient(localPeerId),
+    private val sessionRegistry: TrustedSessionRegistry? = null,
 ) : WifiRealtimeLinkFactory {
     override fun create(endpoint: InetSocketAddress): WifiRealtimeLink {
         val material =
@@ -32,6 +34,12 @@ class TrustedWifiRealtimeLinkFactory(
                 )
 
                 try {
+                    sessionRegistry?.replace(
+                        peerId = receiverPeerId,
+                        sessionId = session.sessionId,
+                        sessionKey = session.authenticationKey(),
+                    )
+
                     return OwnedWifiRealtimeLink(
                         delegate = WifiRealtimeSender(
                             remoteEndpoint = endpoint,
