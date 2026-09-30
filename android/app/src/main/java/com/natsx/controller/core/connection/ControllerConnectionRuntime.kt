@@ -616,9 +616,7 @@ class ControllerConnectionRuntime(
             standbyBluetoothPublisher =
                 publisher
 
-            publisher.start(
-                sendInitialState = true,
-            )
+            publisher.start()
 
             if (activeWifiTransport == null) {
                 updateStatus(
