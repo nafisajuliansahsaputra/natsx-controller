@@ -214,9 +214,14 @@ public sealed class SmartConnectionManager
             return betterProposal;
         }
 
-        State = activeSnapshot.Value.Grade == TransportHealthGrade.Degraded
-            ? ConnectionManagerState.Degraded
-            : ConnectionManagerState.Active;
+        State = activeSnapshot.Value.State == TransportRuntimeState.Suspect ||
+                activeSnapshot.Value.Grade == TransportHealthGrade.Warning
+            ? ConnectionManagerState.Suspect
+            : activeSnapshot.Value.Grade is
+                TransportHealthGrade.Degraded or
+                TransportHealthGrade.Critical
+                ? ConnectionManagerState.Degraded
+                : ConnectionManagerState.Active;
 
         return null;
     }
@@ -477,28 +482,76 @@ public sealed class SmartConnectionManager
             _ => 0,
         };
 
-        int failures = RecentFailureCount(candidate, now);
-        int failurePenalty = failures switch
-        {
-            0 => 0,
-            1 => 10,
-            2 => 20,
-            3 => 35,
-            _ => 50,
-        };
+        int failurePenalty =
+            FailurePenaltyPoints(candidate, now);
 
-        int preferredScore = Math.Clamp(snapshot.Score + preferenceBonus, 0, 100);
+        int preferredScore =
+            Math.Clamp(
+                snapshot.Score + preferenceBonus,
+                0,
+                100);
 
-        // Preference is a tie-break/transport bias, not a way to erase
-        // reliability history. Apply the failure penalty after capping the
-        // quality+preference score so repeated failures always reduce trust.
-        return Math.Clamp(preferredScore - failurePenalty, 0, 100);
+        // Failure history decays continuously over the configured long
+        // reliability horizon instead of disappearing in one abrupt step.
+        return Math.Clamp(
+            preferredScore - failurePenalty,
+            0,
+            100);
     }
 
-    private int RecentFailureCount(CandidateState candidate, long now)
+    private int RecentFailureCount(
+        CandidateState candidate,
+        long now)
     {
-        TrimFailures(candidate, _policy.FailurePenaltyWindow, now);
+        TrimFailures(
+            candidate,
+            _policy.FailurePenaltyWindow,
+            now);
+
         return candidate.Failures.Count;
+    }
+
+    private int FailurePenaltyPoints(
+        CandidateState candidate,
+        long now)
+    {
+        TrimFailures(
+            candidate,
+            _policy.FailurePenaltyWindow,
+            now);
+
+        if (candidate.Failures.Count == 0)
+            return 0;
+
+        double windowMs =
+            _policy.FailurePenaltyWindow.TotalMilliseconds;
+
+        if (windowMs <= 0)
+            return 0;
+
+        double penalty = 0;
+
+        foreach (long failureAt in candidate.Failures)
+        {
+            double ageMs =
+                Elapsed(
+                    failureAt,
+                    now)
+                .TotalMilliseconds;
+
+            double remaining =
+                Math.Clamp(
+                    1d - (ageMs / windowMs),
+                    0d,
+                    1d);
+
+            penalty += 12d * remaining;
+        }
+
+        return Math.Clamp(
+            (int)Math.Round(penalty),
+            0,
+            50);
     }
 
     private bool HadRecentHardFailure(CandidateState candidate, long now)
@@ -560,12 +613,59 @@ public sealed class SmartConnectionManager
 
     private void RefreshManagerState()
     {
-        if (ActiveTransport is null)
+        if (ActiveTransport is not null)
+            return;
+
+        TransportHealthSnapshot[] snapshots =
+            _candidates.Values
+                .Where(candidate =>
+                    candidate.Snapshot is not null)
+                .Select(candidate =>
+                    candidate.Snapshot!.Value)
+                .ToArray();
+
+        if (snapshots.Length == 0)
         {
-            State = _candidates.Values.Any(candidate => candidate.Snapshot is not null)
-                ? ConnectionManagerState.Discovering
-                : ConnectionManagerState.Disconnected;
+            State = ConnectionManagerState.Disconnected;
+            return;
         }
+
+        if (snapshots.Any(snapshot =>
+                snapshot.State ==
+                TransportRuntimeState.Authenticating))
+        {
+            State = ConnectionManagerState.Authenticating;
+            return;
+        }
+
+        if (snapshots.Any(snapshot =>
+                snapshot.State ==
+                TransportRuntimeState.Connecting))
+        {
+            State = ConnectionManagerState.Connecting;
+            return;
+        }
+
+        if (snapshots.Any(snapshot =>
+                snapshot.State ==
+                TransportRuntimeState.Stabilizing))
+        {
+            State = ConnectionManagerState.Stabilizing;
+            return;
+        }
+
+        if (snapshots.Any(snapshot =>
+                snapshot.State is
+                    TransportRuntimeState.Ready or
+                    TransportRuntimeState.Active or
+                    TransportRuntimeState.Suspect or
+                    TransportRuntimeState.Degraded))
+        {
+            State = ConnectionManagerState.Ready;
+            return;
+        }
+
+        State = ConnectionManagerState.Discovering;
     }
 
     private static bool IsEligibleState(TransportRuntimeState state)
