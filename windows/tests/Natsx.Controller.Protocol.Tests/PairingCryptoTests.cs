@@ -44,6 +44,16 @@ public sealed class PairingCryptoTests
                 pairingKey,
                 transcriptHash));
 
+        byte[] pairingResponseProof =
+            PairingCrypto.ComputePairingResponseProof(
+                pairingKey,
+                transcriptHash,
+                sessionId);
+
+        Assert.Equal(
+            "69168c6fb8ab71e31e4cabd994c045261bbba267427408bfc3ad11a9e445dc6b",
+            Convert.ToHexString(pairingResponseProof).ToLowerInvariant());
+
         byte[] trustSecret =
             PairingCrypto.DeriveTrustSecret(
                 pairingKey,
