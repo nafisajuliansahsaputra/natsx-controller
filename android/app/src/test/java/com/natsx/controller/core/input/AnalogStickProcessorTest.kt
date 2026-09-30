@@ -50,6 +50,61 @@ class AnalogStickProcessorTest {
     }
 
     @Test
+    fun tinyMovementInsideJitterThresholdKeepsPreviousOutput() {
+        val processor = AnalogStickProcessor(
+            deadzone = 0.05f,
+            jitterThreshold = 150,
+        )
+
+        val first = processor.process(
+            pointerX = 125f,
+            pointerY = 100f,
+            centerX = 100f,
+            centerY = 100f,
+            radius = 50f,
+        )
+
+        val second = processor.process(
+            pointerX = 125.1f,
+            pointerY = 100f,
+            centerX = 100f,
+            centerY = 100f,
+            radius = 50f,
+        )
+
+        assertEquals(first, second)
+    }
+
+    @Test
+    fun resetRemovesPreviousJitterAnchor() {
+        val processor = AnalogStickProcessor(
+            deadzone = 0.05f,
+            jitterThreshold = 500,
+        )
+
+        processor.process(
+            pointerX = 125f,
+            pointerY = 100f,
+            centerX = 100f,
+            centerY = 100f,
+            radius = 50f,
+        )
+
+        processor.reset()
+
+        val output = processor.process(
+            pointerX = 100f,
+            pointerY = 100f,
+            centerX = 100f,
+            centerY = 100f,
+            radius = 50f,
+        )
+
+        assertEquals(0, output.x)
+        assertEquals(0, output.y)
+    }
+
+    @Test
     fun diagonalIsRadiallyClamped() {
         val output = processor.process(
             pointerX = 200f,
