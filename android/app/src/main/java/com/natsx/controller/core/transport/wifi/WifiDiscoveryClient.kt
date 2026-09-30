@@ -32,12 +32,12 @@ data class WifiDiscoveredReceiver(
 class WifiDiscoveryClient(
     private val localPeerId: PeerId,
     private val timeoutMillis: Int = DEFAULT_DISCOVERY_TIMEOUT_MILLIS,
-) {
+) : WifiReceiverDiscovery {
     init {
         require(timeoutMillis in 100..10_000)
     }
 
-    fun discover(
+    override fun discover(
         expectedReceiverPeerId: PeerId? = null,
     ): WifiDiscoveredReceiver? {
         val nonce = SecureRandom().nextInt().toUInt()
