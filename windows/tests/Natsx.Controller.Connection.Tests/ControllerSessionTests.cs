@@ -33,6 +33,20 @@ public sealed class ControllerSessionTests
     }
 
     [Fact]
+    public void BeginNewSession_ResetsSequenceHistory()
+    {
+        var session = new ControllerSession();
+        session.BeginNewSession(TransportKind.Wifi);
+
+        Assert.True(session.TryAccept(TransportKind.Wifi, 500, GamepadState.Neutral));
+
+        session.BeginNewSession(TransportKind.Wifi);
+
+        Assert.Null(session.LastAcceptedSequence);
+        Assert.True(session.TryAccept(TransportKind.Wifi, 1, GamepadState.Neutral));
+    }
+
+    [Fact]
     public void TryAccept_PreservesGlobalSequenceAcrossTransportSwitch()
     {
         var session = new ControllerSession();
