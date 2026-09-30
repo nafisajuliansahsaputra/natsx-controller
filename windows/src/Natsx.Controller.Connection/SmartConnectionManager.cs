@@ -36,9 +36,13 @@ public sealed class SmartConnectionManager
         TransportHealthSnapshot? previous = candidate.Snapshot;
 
         candidate.Snapshot = snapshot;
-        candidate.HealthHistory.Record(now, snapshot, _policy.LongWindow);
-        candidate.HealthWindows =
-            candidate.HealthHistory.Snapshot(now, _policy);
+
+        if (IsEligibleState(snapshot.State))
+        {
+            candidate.HealthHistory.Record(now, snapshot, _policy.LongWindow);
+            candidate.HealthWindows =
+                candidate.HealthHistory.Snapshot(now, _policy);
+        }
 
         bool good =
             snapshot.State is TransportRuntimeState.Ready or TransportRuntimeState.Active &&
@@ -65,12 +69,14 @@ public sealed class SmartConnectionManager
 
         bool hardFailureNow =
             snapshot.State is TransportRuntimeState.Failed or TransportRuntimeState.Unavailable ||
-            snapshot.Grade == TransportHealthGrade.Lost;
+            (IsEligibleState(snapshot.State) &&
+             snapshot.Grade == TransportHealthGrade.Lost);
 
         bool hardFailureBefore =
             previous is not null &&
             (previous.Value.State is TransportRuntimeState.Failed or TransportRuntimeState.Unavailable ||
-             previous.Value.Grade == TransportHealthGrade.Lost);
+             (IsEligibleState(previous.Value.State) &&
+              previous.Value.Grade == TransportHealthGrade.Lost));
 
         if (hardFailureNow && !hardFailureBefore)
         {
@@ -122,7 +128,7 @@ public sealed class SmartConnectionManager
 
             if (initial is null)
             {
-                State = ConnectionManagerState.Disconnected;
+                State = DeterminePreActiveState();
                 return null;
             }
 
@@ -637,10 +643,50 @@ public sealed class SmartConnectionManager
     {
         if (ActiveTransport is null)
         {
-            State = _candidates.Values.Any(candidate => candidate.Snapshot is not null)
-                ? ConnectionManagerState.Discovering
-                : ConnectionManagerState.Disconnected;
+            State = DeterminePreActiveState();
         }
+    }
+
+    private ConnectionManagerState DeterminePreActiveState()
+    {
+        TransportRuntimeState[] states = _candidates.Values
+            .Where(candidate => candidate.Snapshot is not null)
+            .Select(candidate => candidate.Snapshot!.Value.State)
+            .ToArray();
+
+        if (states.Length == 0)
+        {
+            return ConnectionManagerState.Disconnected;
+        }
+
+        if (states.Contains(TransportRuntimeState.Stabilizing))
+        {
+            return ConnectionManagerState.Stabilizing;
+        }
+
+        if (states.Contains(TransportRuntimeState.Authenticating))
+        {
+            return ConnectionManagerState.Authenticating;
+        }
+
+        if (states.Contains(TransportRuntimeState.Connecting))
+        {
+            return ConnectionManagerState.Connecting;
+        }
+
+        if (states.Contains(TransportRuntimeState.Ready))
+        {
+            return ConnectionManagerState.Ready;
+        }
+
+        if (states.Contains(TransportRuntimeState.Available))
+        {
+            return ConnectionManagerState.Discovering;
+        }
+
+        return states.Any(state => state == TransportRuntimeState.Failed)
+            ? ConnectionManagerState.Recovering
+            : ConnectionManagerState.Disconnected;
     }
 
     private static bool IsEligibleState(TransportRuntimeState state)
