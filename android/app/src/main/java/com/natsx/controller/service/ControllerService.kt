@@ -8,9 +8,13 @@ import android.content.Intent
 import android.os.IBinder
 import com.natsx.controller.NatsxControllerApplication
 import com.natsx.controller.core.session.ControllerRealtimePublisher
+import com.natsx.controller.core.transport.bluetooth.BluetoothAutoReconnectRuntime
+import com.natsx.controller.core.transport.bluetooth.BondedBluetoothRfcommCandidateProvider
+import com.natsx.controller.core.transport.bluetooth.TrustedBluetoothRealtimeLinkFactory
 
 class ControllerService : Service() {
     private lateinit var realtimePublisher: ControllerRealtimePublisher
+    private var bluetoothReconnectRuntime: BluetoothAutoReconnectRuntime? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -21,6 +25,7 @@ class ControllerService : Service() {
             broadcaster = app.realtimeBroadcaster,
         )
         realtimePublisher.start()
+        startBluetoothRuntimeIfUnambiguous(app)
 
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.createNotificationChannel(
@@ -46,11 +51,52 @@ class ControllerService : Service() {
     }
 
     override fun onDestroy() {
+        bluetoothReconnectRuntime?.close()
+        bluetoothReconnectRuntime = null
+
         if (::realtimePublisher.isInitialized) {
             realtimePublisher.close()
         }
 
         super.onDestroy()
+    }
+
+    private fun startBluetoothRuntimeIfUnambiguous(
+        app: NatsxControllerApplication,
+    ) {
+        val trustedPeers =
+            app.trustedPeerStore.list()
+
+        if (trustedPeers.size != 1) {
+            return
+        }
+
+        val receiverPeerId =
+            trustedPeers.single().peerId
+
+        val linkFactory =
+            TrustedBluetoothRealtimeLinkFactory(
+                localPeerId = app.localPeerId,
+                receiverPeerId = receiverPeerId,
+                trustedPeerStore =
+                    app.trustedPeerStore,
+                sessionRegistry =
+                    app.trustedSessionRegistry,
+                candidateProvider =
+                    BondedBluetoothRfcommCandidateProvider(
+                        this,
+                    ),
+            )
+
+        bluetoothReconnectRuntime =
+            BluetoothAutoReconnectRuntime(
+                broadcaster =
+                    app.realtimeBroadcaster,
+                linkFactory =
+                    linkFactory,
+            ).also {
+                it.start()
+            }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
