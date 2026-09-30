@@ -49,6 +49,18 @@ class PairingCryptoTest {
             ),
         )
 
+        val pairingResponseProof =
+            PairingCrypto.computePairingResponseProof(
+                pairingKey = pairingKey,
+                pairingTranscriptHash = transcriptHash,
+                sessionId = sessionId,
+            )
+
+        assertEquals(
+            "69168c6fb8ab71e31e4cabd994c045261bbba267427408bfc3ad11a9e445dc6b",
+            pairingResponseProof.hex(),
+        )
+
         val trustSecret =
             PairingCrypto.deriveTrustSecret(
                 pairingKey = pairingKey,
