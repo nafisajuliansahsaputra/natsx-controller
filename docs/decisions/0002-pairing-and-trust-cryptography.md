@@ -62,16 +62,19 @@ The trust secret is never logged and never written to plaintext storage.
 
 ### Reconnect authentication
 
-A trusted reconnect uses fresh random challenge nonces and the stored trust secret.
+Trusted reconnect uses the already-frozen `AUTH_CHALLENGE / AUTH_RESPONSE`
+contract in `protocol/messages.md`.
 
-The handshake:
+The Windows receiver issues a fresh 32-byte challenge under a new random
+Session ID. The Android controller proves possession of the stored trust secret
+with HMAC-SHA-256, then both peers derive a fresh 32-byte session key with the
+existing HKDF-SHA-256 reconnect derivation.
 
-1. proves possession of the trust secret using HMAC-SHA-256 over a canonical transcript;
-2. derives a fresh 32-byte session key using HKDF-SHA-256;
-3. establishes a new random Session ID;
-4. exchanges authenticated SESSION_READY frames before realtime input is authoritative.
+Authenticated `SESSION_READY` completes session establishment before realtime
+input becomes authoritative.
 
-A new session key is derived for every logical controller session.
+A new session key is derived for every logical controller session. First-pair
+cryptography does not define a competing reconnect derivation.
 
 ### Transport addition / failover
 
