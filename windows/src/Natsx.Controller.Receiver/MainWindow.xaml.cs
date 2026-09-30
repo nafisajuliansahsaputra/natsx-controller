@@ -178,18 +178,39 @@ public partial class MainWindow : Window
         SessionText.Text =
             status.SessionActive ? "Active" : "Waiting";
 
-        if (status.WifiHealth is { } health)
+        ActiveTransportText.Text =
+            "Active transport: " +
+            (status.ActiveTransport?.ToString() ?? "--");
+
+        if (status.WifiHealth is { } wifi)
         {
             DiagnosticsText.Text =
-                "RTT " + FormatMilliseconds(health.RoundTripTime) +
-                "   Jitter " + FormatMilliseconds(health.Jitter) +
-                "   Loss " + health.PacketLossPercent.ToString("0.0") + "%" +
-                "   Health " + health.Grade;
+                "Wi-Fi  RTT " + FormatMilliseconds(wifi.RoundTripTime) +
+                "   Jitter " + FormatMilliseconds(wifi.Jitter) +
+                "   Loss " + wifi.PacketLossPercent.ToString("0.0") + "%" +
+                "   Health " + wifi.Grade;
         }
         else
         {
             DiagnosticsText.Text =
-                "RTT --   Jitter --   Loss --   Health --";
+                "Wi-Fi  RTT --   Jitter --   Loss --   Health --";
+        }
+
+        if (status.BluetoothHealth is { } bluetooth)
+        {
+            BluetoothText.Text =
+                "Bluetooth  " +
+                (status.BluetoothReady ? "Ready" : "Searching") +
+                "   RTT " + FormatMilliseconds(bluetooth.RoundTripTime) +
+                "   Jitter " + FormatMilliseconds(bluetooth.Jitter) +
+                "   Health " + bluetooth.Grade;
+        }
+        else
+        {
+            BluetoothText.Text =
+                "Bluetooth  " +
+                (status.BluetoothReady ? "Ready" : "Waiting") +
+                "   RTT --   Jitter --   Health --";
         }
     }
 
