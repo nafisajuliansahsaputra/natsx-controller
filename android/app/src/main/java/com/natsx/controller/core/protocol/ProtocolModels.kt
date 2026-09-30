@@ -21,7 +21,9 @@ enum class MessageType(val wireValue: Int) {
     HANDOVER_PREPARE(9),
     HANDOVER_COMMIT(10),
     RUMBLE(11),
-    DISCONNECT(12);
+    DISCONNECT(12),
+    PAIR_REQUEST(13),
+    PAIR_RESPONSE(14);
 
     companion object {
         fun fromWireValue(value: Int): MessageType? =
