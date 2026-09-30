@@ -209,6 +209,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         WifiControllerTransport? oldTransport = null;
         WifiRealtimeReceiver? oldReceiver = null;
         WifiTrustedSession? oldSession = null;
+        bool replacementSucceeded = false;
 
         try
         {
@@ -250,6 +251,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
             _controllerSession.SetAuthoritativeTransport(
                 TransportKind.Wifi);
+            replacementSucceeded = true;
 
             PublishStatus(
                 Status with
@@ -278,22 +280,24 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             _wifiSessionGate.Release();
         }
 
-        if (oldTransport is not null)
+        if (replacementSucceeded)
         {
-            oldTransport.GamepadStateReceived -=
-                OnWifiGamepadStateReceived;
+            if (oldTransport is not null)
+            {
+                oldTransport.GamepadStateReceived -=
+                    OnWifiGamepadStateReceived;
 
-            await SafeDisposeAsync(oldTransport)
-                .ConfigureAwait(false);
+                await SafeDisposeAsync(oldTransport)
+                    .ConfigureAwait(false);
+            }
+            else if (oldReceiver is not null)
+            {
+                await SafeDisposeAsync(oldReceiver)
+                    .ConfigureAwait(false);
+            }
+
+            oldSession?.Dispose();
         }
-
-        if (oldReceiver is not null)
-        {
-            await SafeDisposeAsync(oldReceiver)
-                .ConfigureAwait(false);
-        }
-
-        oldSession?.Dispose();
     }
 
     private void OnWifiGamepadStateReceived(
