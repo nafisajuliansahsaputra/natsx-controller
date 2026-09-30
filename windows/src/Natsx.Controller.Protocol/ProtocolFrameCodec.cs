@@ -122,7 +122,7 @@ public static class ProtocolFrameCodec
 
             using var hmac = new HMACSHA256(authenticationKey.ToArray());
             byte[] hash = hmac.ComputeHash(frameBytes[..authenticatedLength].ToArray());
-            hash.CopyTo(expectedTag);
+            hash.AsSpan().CopyTo(expectedTag);
             CryptographicOperations.ZeroMemory(hash);
 
             if (!CryptographicOperations.FixedTimeEquals(
