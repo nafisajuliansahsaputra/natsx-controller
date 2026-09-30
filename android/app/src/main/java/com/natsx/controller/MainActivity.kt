@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
 import com.natsx.controller.core.gamepad.GamepadStateStore
+import com.natsx.controller.core.transport.bluetooth.BluetoothPermissionGate
 import com.natsx.controller.feature.controller.ControllerSurfaceView
 import com.natsx.controller.service.ControllerService
 
@@ -34,7 +35,22 @@ class MainActivity : Activity() {
         controllerView = ControllerSurfaceView(this, stateStore)
         setContentView(controllerView)
 
+        requestBluetoothPermissionsIfNeeded()
+
         startForegroundService(Intent(this, ControllerService::class.java))
+    }
+
+    private fun requestBluetoothPermissionsIfNeeded() {
+        val missingPermissions =
+            BluetoothPermissionGate(this)
+                .missingRuntimePermissions()
+
+        if (missingPermissions.isNotEmpty()) {
+            requestPermissions(
+                missingPermissions.toTypedArray(),
+                REQUEST_BLUETOOTH_PERMISSIONS,
+            )
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -60,5 +76,9 @@ class MainActivity : Activity() {
         }
 
         super.onStop()
+    }
+
+    private companion object {
+        const val REQUEST_BLUETOOTH_PERMISSIONS = 2001
     }
 }
