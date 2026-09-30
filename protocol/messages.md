@@ -197,12 +197,31 @@ The exact pairing/session-key establishment design must use established cryptogr
 
 ### SESSION_READY
 
-Confirms:
+`SESSION_READY` is an authenticated post-trust control message.
 
-- negotiated version;
-- current session ID;
-- negotiated capabilities;
-- authenticated session readiness.
+Its common frame header uses the active non-zero `SessionId`.
+
+Payload length: **20 bytes**.
+
+| Offset | Size | Field |
+|---:|---:|---|
+| 0 | 1 | Sender peer role |
+| 1 | 1 | Transport capability flags |
+| 2 | 2 | Reserved, zero |
+| 4 | 16 | Sender Peer ID |
+
+The peer role and capability values use the same assignments as `HELLO`.
+
+`SESSION_READY` confirms:
+
+- the sender can authenticate traffic for the active session;
+- the sender identity associated with that trusted relationship;
+- the sender's currently advertised transport capabilities;
+- readiness to continue post-trust control traffic on this endpoint.
+
+A cached IP/port is **not** sufficient to establish readiness. Reconnect logic must revalidate the endpoint using authenticated session traffic before treating it as the trusted receiver.
+
+For Wi-Fi reconnect, a valid authenticated `HEARTBEAT_ACK` for the current session may be used as the fast-path proof that a cached endpoint is still owned by the trusted receiver. If that direct probe fails, discovery may locate the trusted Peer ID again.
 
 ### HEARTBEAT / HEARTBEAT_ACK
 
