@@ -76,12 +76,16 @@ public sealed class BluetoothTrustedHandshakeTests
             new TransportLifecycle(
                 TransportRuntimeState.Connecting);
 
+        using var registry =
+            new TrustedSessionRegistry();
+
         var server =
             new BluetoothTrustedHandshakeServer(
                 windowsPeer,
                 timeProvider:
                     new ManualTimeProvider(),
-                lifecycle: lifecycle);
+                lifecycle: lifecycle,
+                sessionRegistry: registry);
 
         using BluetoothTrustedHandshakeCompletion completion =
             await server.AuthenticateAsync(
@@ -101,6 +105,24 @@ public sealed class BluetoothTrustedHandshakeTests
         Assert.Equal(
             TransportRuntimeState.Stabilizing,
             lifecycle.State);
+
+        using TrustedSessionMaterial registered =
+            Assert.IsType<TrustedSessionMaterial>(
+                registry.Get(androidPeer));
+
+        Assert.Equal(
+            sessionId,
+            registered.SessionId);
+
+        byte[] registeredKey =
+            registered.CopySessionKey();
+
+        Assert.Equal(
+            sessionKey,
+            registeredKey);
+
+        CryptographicOperations.ZeroMemory(
+            registeredKey);
 
         output.Position = 0;
 

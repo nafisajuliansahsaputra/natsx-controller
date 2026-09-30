@@ -22,12 +22,15 @@ public sealed class WifiTrustedControlProcessorTests
 
         var lifecycle = new TransportLifecycle(
             TransportRuntimeState.Available);
+        using var registry =
+            new TrustedSessionRegistry();
 
         using var processor =
             new WifiTrustedControlProcessor(
                 windowsPeer,
                 timeProvider: null,
-                lifecycle: lifecycle);
+                lifecycle: lifecycle,
+                sessionRegistry: registry);
 
         byte[] authResponse = processor.HandleChallenge(
             challenger.EncodeChallenge(100),
@@ -65,6 +68,14 @@ public sealed class WifiTrustedControlProcessorTests
         Assert.Equal(
             TransportRuntimeState.Stabilizing,
             lifecycle.State);
+
+        using TrustedSessionMaterial registered =
+            Assert.IsType<TrustedSessionMaterial>(
+                registry.Get(androidPeer));
+
+        Assert.Equal(
+            androidSession.SessionId,
+            registered.SessionId);
 
         SessionReadyPayload windowsReady =
             WifiControlDatagramCodec.DecodeSessionReady(
