@@ -16,6 +16,8 @@ public sealed class WifiDiscoveryResponder : IAsyncDisposable
     private readonly ushort _realtimePort;
     private readonly TransportCapabilities _capabilities;
     private readonly TimeProvider _timeProvider;
+    private readonly WifiTrustedControlProcessor? _trustedControlProcessor;
+    private readonly Func<PeerId, byte[]?>? _trustSecretResolver;
 
     private UdpClient? _udpClient;
     private CancellationTokenSource? _cancellation;
@@ -31,7 +33,9 @@ public sealed class WifiDiscoveryResponder : IAsyncDisposable
             TransportCapabilities.Wifi |
             TransportCapabilities.Bluetooth |
             TransportCapabilities.UsbDirect,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        WifiTrustedControlProcessor? trustedControlProcessor = null,
+        Func<PeerId, byte[]?>? trustSecretResolver = null)
     {
         if (!capabilities.HasFlag(TransportCapabilities.Wifi))
         {
@@ -47,9 +51,20 @@ public sealed class WifiDiscoveryResponder : IAsyncDisposable
 
         _receiverPeerId = receiverPeerId;
         _realtimePort = realtimePort;
+        if ((trustedControlProcessor is null) != (trustSecretResolver is null))
+        {
+            throw new ArgumentException(
+                "Trusted control processor and trust resolver must be configured together.");
+        }
+
         _capabilities = capabilities;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _trustedControlProcessor = trustedControlProcessor;
+        _trustSecretResolver = trustSecretResolver;
     }
+
+    public event EventHandler<WifiTrustedSessionEstablishedEventArgs>?
+        TrustedSessionEstablished;
 
     public long RequestsAccepted => Interlocked.Read(ref _requestsAccepted);
 
@@ -140,52 +155,178 @@ public sealed class WifiDiscoveryResponder : IAsyncDisposable
 
             try
             {
-                ProtocolFrame request = ProtocolFrameCodec.Decode(result.Buffer);
-
-                if (request.MessageType != MessageType.Hello ||
-                    request.Flags != FrameFlags.None ||
-                    request.SessionId != SessionId.Zero)
+                if (result.Buffer.Length < ProtocolConstants.HeaderSize)
                 {
-                    throw new FormatException("Invalid discovery HELLO envelope.");
+                    throw new FormatException("Control datagram is shorter than the protocol header.");
                 }
 
-                HelloPayload hello = HelloPayloadCodec.Decode(request.Payload);
+                MessageType messageType = (MessageType)result.Buffer[6];
 
-                if (hello.Role != PeerRole.AndroidController ||
-                    !hello.Capabilities.HasFlag(TransportCapabilities.Wifi))
+                switch (messageType)
                 {
-                    throw new FormatException("HELLO is not a Wi-Fi controller discovery request.");
+                    case MessageType.Hello:
+                        await HandleHelloAsync(
+                            client,
+                            result,
+                            cancellationToken).ConfigureAwait(false);
+                        break;
+
+                    case MessageType.AuthChallenge:
+                        await HandleAuthChallengeAsync(
+                            client,
+                            result,
+                            cancellationToken).ConfigureAwait(false);
+                        break;
+
+                    case MessageType.SessionReady:
+                        await HandleSessionReadyAsync(
+                            client,
+                            result,
+                            cancellationToken).ConfigureAwait(false);
+                        break;
+
+                    default:
+                        throw new FormatException(
+                            "Unsupported Wi-Fi control message.");
                 }
-
-                var responsePayload = new HelloPayload(
-                    PeerRole.WindowsReceiver,
-                    _capabilities,
-                    _receiverPeerId,
-                    _realtimePort,
-                    hello.DiscoveryNonce);
-
-                byte[] response = ProtocolFrameCodec.Encode(
-                    new ProtocolFrame(
-                        ProtocolVersion.Current,
-                        MessageType.Hello,
-                        FrameFlags.None,
-                        SessionId.Zero,
-                        0,
-                        GetMonotonicMicroseconds(),
-                        HelloPayloadCodec.Encode(responsePayload)));
-
-                await client.SendAsync(
-                    response,
-                    result.RemoteEndPoint,
-                    cancellationToken).ConfigureAwait(false);
 
                 Interlocked.Increment(ref _requestsAccepted);
             }
             catch (Exception exception) when (
                 exception is FormatException or
-                ArgumentException)
+                ArgumentException or
+                System.Security.Cryptography.CryptographicException)
             {
                 Interlocked.Increment(ref _requestsRejected);
+            }
+        }
+    }
+
+    private async Task HandleHelloAsync(
+        UdpClient client,
+        UdpReceiveResult result,
+        CancellationToken cancellationToken)
+    {
+        ProtocolFrame request = ProtocolFrameCodec.Decode(result.Buffer);
+
+        if (request.MessageType != MessageType.Hello ||
+            request.Flags != FrameFlags.None ||
+            request.SessionId != SessionId.Zero)
+        {
+            throw new FormatException("Invalid discovery HELLO envelope.");
+        }
+
+        HelloPayload hello = HelloPayloadCodec.Decode(request.Payload);
+
+        if (hello.Role != PeerRole.AndroidController ||
+            !hello.Capabilities.HasFlag(TransportCapabilities.Wifi))
+        {
+            throw new FormatException(
+                "HELLO is not a Wi-Fi controller discovery request.");
+        }
+
+        var responsePayload = new HelloPayload(
+            PeerRole.WindowsReceiver,
+            _capabilities,
+            _receiverPeerId,
+            _realtimePort,
+            hello.DiscoveryNonce);
+
+        byte[] response = ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.Hello,
+                FrameFlags.None,
+                SessionId.Zero,
+                0,
+                GetMonotonicMicroseconds(),
+                HelloPayloadCodec.Encode(responsePayload)));
+
+        await client.SendAsync(
+            response,
+            result.RemoteEndPoint,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task HandleAuthChallengeAsync(
+        UdpClient client,
+        UdpReceiveResult result,
+        CancellationToken cancellationToken)
+    {
+        WifiTrustedControlProcessor processor =
+            _trustedControlProcessor ??
+            throw new FormatException(
+                "Trusted reconnect is not configured.");
+
+        Func<PeerId, byte[]?> trustResolver =
+            _trustSecretResolver ??
+            throw new FormatException(
+                "Trusted reconnect resolver is not configured.");
+
+        byte[] response = processor.HandleChallenge(
+            result.Buffer,
+            result.RemoteEndPoint,
+            trustResolver,
+            GetMonotonicMicroseconds());
+
+        await client.SendAsync(
+            response,
+            result.RemoteEndPoint,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task HandleSessionReadyAsync(
+        UdpClient client,
+        UdpReceiveResult result,
+        CancellationToken cancellationToken)
+    {
+        WifiTrustedControlProcessor processor =
+            _trustedControlProcessor ??
+            throw new FormatException(
+                "Trusted reconnect is not configured.");
+
+        WifiTrustedControlCompletion completion =
+            processor.HandleSessionReady(
+                result.Buffer,
+                result.RemoteEndPoint,
+                GetMonotonicMicroseconds());
+
+        bool transferred = false;
+
+        try
+        {
+            await client.SendAsync(
+                completion.ResponseDatagram,
+                result.RemoteEndPoint,
+                cancellationToken).ConfigureAwait(false);
+
+            EventHandler<WifiTrustedSessionEstablishedEventArgs>? handler =
+                TrustedSessionEstablished;
+
+            if (handler is null)
+            {
+                return;
+            }
+
+            handler(
+                this,
+                new WifiTrustedSessionEstablishedEventArgs(
+                    completion.RemotePeerId,
+                    completion.Session,
+                    result.RemoteEndPoint));
+
+            transferred = true;
+        }
+        finally
+        {
+            if (!transferred)
+            {
+                completion.Dispose();
+            }
+            else
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(
+                    completion.ResponseDatagram);
             }
         }
     }
@@ -198,4 +339,29 @@ public sealed class WifiDiscoveryResponder : IAsyncDisposable
 
         return checked((ulong)(elapsed.Ticks / 10));
     }
+}
+
+
+public sealed class WifiTrustedSessionEstablishedEventArgs : EventArgs
+{
+    public WifiTrustedSessionEstablishedEventArgs(
+        PeerId remotePeerId,
+        WifiTrustedSession session,
+        IPEndPoint controlEndPoint)
+    {
+        RemotePeerId = remotePeerId;
+        Session = session ?? throw new ArgumentNullException(nameof(session));
+        ControlEndPoint = controlEndPoint ??
+            throw new ArgumentNullException(nameof(controlEndPoint));
+    }
+
+    public PeerId RemotePeerId { get; }
+
+    /// <summary>
+    /// Ownership transfers to the event subscriber. The subscriber must
+    /// eventually dispose this session.
+    /// </summary>
+    public WifiTrustedSession Session { get; }
+
+    public IPEndPoint ControlEndPoint { get; }
 }
