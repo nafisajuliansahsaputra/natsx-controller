@@ -6,13 +6,14 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Build
-import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import com.natsx.controller.core.gamepad.DpadState
 import com.natsx.controller.core.gamepad.GamepadButtons
 import com.natsx.controller.core.gamepad.GamepadState
 import com.natsx.controller.core.gamepad.GamepadStateStore
+import com.natsx.controller.core.haptics.ControllerHapticSink
+import com.natsx.controller.core.haptics.NoOpControllerHapticSink
 import com.natsx.controller.core.input.AnalogStickProcessor
 import kotlin.math.max
 import kotlin.math.min
@@ -20,6 +21,8 @@ import kotlin.math.min
 class ControllerSurfaceView(
     context: Context,
     private val stateStore: GamepadStateStore,
+    private val haptics: ControllerHapticSink =
+        NoOpControllerHapticSink,
 ) : View(context) {
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
@@ -166,7 +169,7 @@ class ControllerSurfaceView(
         activate(target.id, x, y)
 
         if (target.id != ControlId.LEFT_STICK && target.id != ControlId.RIGHT_STICK) {
-            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            haptics.touchTick()
         }
     }
 
