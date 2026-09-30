@@ -1,5 +1,6 @@
 package com.natsx.controller.core.connection
 
+import android.bluetooth.BluetoothAdapter
 import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.haptics.ControllerHapticSink
 import com.natsx.controller.core.protocol.CapabilityFlags
@@ -12,6 +13,9 @@ import com.natsx.controller.core.protocol.TransportMask
 import com.natsx.controller.core.protocol.TrustState
 import com.natsx.controller.security.AndroidTrustedReceiverStore
 import com.natsx.controller.security.TrustedReceiverRecord
+import com.natsx.controller.transport.bluetooth.BluetoothControllerTransport
+import com.natsx.controller.transport.bluetooth.BluetoothFallbackHost
+import com.natsx.controller.transport.bluetooth.EstablishedBluetoothSession
 import com.natsx.controller.transport.wifi.EstablishedWifiSession
 import com.natsx.controller.transport.wifi.WifiControllerTransport
 import com.natsx.controller.transport.wifi.WifiDiscoveryClient
@@ -36,6 +40,8 @@ data class ControllerConnectionStatus(
     val message: String,
     val receiverName: String? = null,
     val hostAddress: String? = null,
+    val activeTransport: String? = null,
+    val backupTransport: String? = null,
 )
 
 class ControllerConnectionRuntime(
@@ -43,19 +49,45 @@ class ControllerConnectionRuntime(
     private val stateStore: GamepadStateStore,
     private val trustedReceivers: AndroidTrustedReceiverStore,
     private val haptics: ControllerHapticSink,
+    private val bluetoothAdapter: BluetoothAdapter? = null,
 ) : AutoCloseable {
     private val running = AtomicBoolean(false)
-    private val lastInboundNanos = AtomicLong(0)
-    private val transportFailed = AtomicBoolean(false)
+
+    private val wifiLastInboundNanos =
+        AtomicLong(0)
+    private val wifiFailed =
+        AtomicBoolean(false)
+
+    private val bluetoothLastInboundNanos =
+        AtomicLong(0)
+    private val bluetoothFailed =
+        AtomicBoolean(false)
 
     @Volatile
-    private var worker: Thread? = null
+    private var wifiWorker: Thread? = null
 
     @Volatile
-    private var activeTransport: WifiControllerTransport? = null
+    private var bluetoothWorker: Thread? = null
 
     @Volatile
-    private var activePublisher: LatestGamepadPublisher? = null
+    private var activeWifiTransport:
+        WifiControllerTransport? = null
+
+    @Volatile
+    private var activeWifiPublisher:
+        LatestGamepadPublisher? = null
+
+    @Volatile
+    private var bluetoothHost:
+        BluetoothFallbackHost? = null
+
+    @Volatile
+    private var standbyBluetoothTransport:
+        BluetoothControllerTransport? = null
+
+    @Volatile
+    private var standbyBluetoothPublisher:
+        LatestGamepadPublisher? = null
 
     @Volatile
     var status = ControllerConnectionStatus(
@@ -65,20 +97,35 @@ class ControllerConnectionRuntime(
         private set
 
     @Volatile
-    var onStatusChanged: ((ControllerConnectionStatus) -> Unit)? = null
+    var onStatusChanged:
+        ((ControllerConnectionStatus) -> Unit)? = null
 
     fun start() {
         if (!running.compareAndSet(false, true)) {
             return
         }
 
-        worker = Thread(
-            { runLoop() },
-            "natsx-connection-runtime",
+        startBluetoothFallbackIfPossible()
+
+        wifiWorker = Thread(
+            { runWifiLoop() },
+            "natsx-wifi-connection-runtime",
         ).apply {
             isDaemon = true
             start()
         }
+    }
+
+    fun refreshBluetoothFallback() {
+        if (!running.get()) {
+            return
+        }
+
+        if (bluetoothHost != null) {
+            return
+        }
+
+        startBluetoothFallbackIfPossible()
     }
 
     fun stop() {
@@ -86,15 +133,28 @@ class ControllerConnectionRuntime(
             return
         }
 
-        activePublisher?.close()
-        activePublisher = null
+        activeWifiPublisher?.close()
+        activeWifiPublisher = null
 
-        activeTransport?.close()
-        activeTransport = null
+        activeWifiTransport?.close()
+        activeWifiTransport = null
+
+        standbyBluetoothPublisher?.close()
+        standbyBluetoothPublisher = null
+
+        standbyBluetoothTransport?.close()
+        standbyBluetoothTransport = null
+
+        bluetoothHost?.close()
+        bluetoothHost = null
+
         haptics.stopRumble()
 
-        worker?.interrupt()
-        worker = null
+        wifiWorker?.interrupt()
+        wifiWorker = null
+
+        bluetoothWorker?.interrupt()
+        bluetoothWorker = null
 
         updateStatus(
             ControllerConnectionState.STOPPED,
@@ -106,16 +166,19 @@ class ControllerConnectionRuntime(
         stop()
     }
 
-    private fun runLoop() {
+    private fun runWifiLoop() {
         var recoveryDelayMs = 100L
 
         while (running.get()) {
-            val trustedIds = trustedReceivers.listTrustedDeviceIds()
+            val trustedIds =
+                trustedReceivers.listTrustedDeviceIds()
 
             if (trustedIds.isEmpty()) {
                 updateStatus(
                     ControllerConnectionState.PAIRING_REQUIRED,
                     "Pair a Windows receiver to start playing.",
+                    backupTransport =
+                        bluetoothBackupLabel(),
                 )
                 sleepInterruptibly(750)
                 continue
@@ -129,11 +192,14 @@ class ControllerConnectionRuntime(
                 }
 
                 val record = runCatching {
-                    trustedReceivers.tryGet(windowsDeviceId)
+                    trustedReceivers.tryGet(
+                        windowsDeviceId,
+                    )
                 }.getOrNull() ?: continue
 
                 try {
-                    connected = tryTrustedReceiver(record)
+                    connected =
+                        tryTrustedReceiver(record)
                 } finally {
                     record.pairingRootKey.fill(0)
                 }
@@ -149,10 +215,20 @@ class ControllerConnectionRuntime(
             }
 
             if (!connected) {
-                updateStatus(
-                    ControllerConnectionState.RECOVERING,
-                    "Receiver unavailable. Retrying automatically.",
-                )
+                if (standbyBluetoothTransport
+                        ?.isRunning == true
+                ) {
+                    updateStatus(
+                        ControllerConnectionState.ACTIVE,
+                        "Wi-Fi unavailable. Bluetooth fallback is ready.",
+                        activeTransport = "Bluetooth",
+                    )
+                } else {
+                    updateStatus(
+                        ControllerConnectionState.RECOVERING,
+                        "Receiver unavailable. Retrying automatically.",
+                    )
+                }
 
                 sleepInterruptibly(recoveryDelayMs)
                 recoveryDelayMs = when {
@@ -175,6 +251,8 @@ class ControllerConnectionRuntime(
                 "Trying last receiver endpoint.",
                 receiverName = record.displayName,
                 hostAddress = directHost,
+                backupTransport =
+                    bluetoothBackupLabel(),
             )
 
             val directAddress = runCatching {
@@ -196,6 +274,8 @@ class ControllerConnectionRuntime(
             ControllerConnectionState.DISCOVERING,
             "Searching local network for trusted receiver.",
             receiverName = record.displayName,
+            backupTransport =
+                bluetoothBackupLabel(),
         )
 
         val discovered = runCatching {
@@ -205,7 +285,8 @@ class ControllerConnectionRuntime(
 
         val matching =
             discovered.firstOrNull {
-                it.response.windowsDeviceId == record.windowsDeviceId
+                it.response.windowsDeviceId ==
+                    record.windowsDeviceId
             } ?: return false
 
         return tryEndpoint(
@@ -220,7 +301,8 @@ class ControllerConnectionRuntime(
         record: TrustedReceiverRecord,
         address: InetAddress,
         port: Int,
-        discoveredName: String? = record.displayName,
+        discoveredName: String? =
+            record.displayName,
     ): Boolean {
         if (!running.get()) {
             return false
@@ -231,6 +313,8 @@ class ControllerConnectionRuntime(
             "Authenticating trusted receiver.",
             receiverName = discoveredName,
             hostAddress = address.hostAddress,
+            backupTransport =
+                bluetoothBackupLabel(),
         )
 
         val androidHello = HelloPayload(
@@ -251,11 +335,14 @@ class ControllerConnectionRuntime(
             trustState = TrustState.PAIRED,
         )
 
-        val sessionClient = WifiTrustedSessionClient(
-            androidHello = androidHello,
-            expectedWindowsDeviceId = record.windowsDeviceId,
-            pairingRootKey = record.pairingRootKey,
-        )
+        val sessionClient =
+            WifiTrustedSessionClient(
+                androidHello = androidHello,
+                expectedWindowsDeviceId =
+                    record.windowsDeviceId,
+                pairingRootKey =
+                    record.pairingRootKey,
+            )
 
         val established = try {
             sessionClient.connect(
@@ -270,9 +357,11 @@ class ControllerConnectionRuntime(
         sessionClient.close()
 
         trustedReceivers.updateEndpoint(
-            windowsDeviceId = record.windowsDeviceId,
+            windowsDeviceId =
+                record.windowsDeviceId,
             displayName = discoveredName,
-            hostAddress = address.hostAddress.orEmpty(),
+            hostAddress =
+                address.hostAddress.orEmpty(),
             port = port,
         )
 
@@ -286,127 +375,406 @@ class ControllerConnectionRuntime(
         established: EstablishedWifiSession,
         receiverName: String?,
     ): Boolean {
-        val session = established.trustedSession
-        transportFailed.set(false)
-        lastInboundNanos.set(System.nanoTime())
+        val session =
+            established.trustedSession
+
+        wifiFailed.set(false)
+        wifiLastInboundNanos.set(
+            System.nanoTime(),
+        )
 
         val transport = WifiControllerTransport(
-            remoteAddress = established.remoteAddress,
-            remotePort = established.remotePort,
-            sessionId = session.sessionId,
-            sessionKey = session.sessionKey,
+            remoteAddress =
+                established.remoteAddress,
+            remotePort =
+                established.remotePort,
+            sessionId =
+                session.sessionId,
+            sessionKey =
+                session.sessionKey,
         )
 
         transport.onFrameReceived = { frame ->
-            lastInboundNanos.set(System.nanoTime())
-
-            if (frame.messageType == MessageType.RUMBLE) {
-                runCatching {
-                    ControlPayloadCodec.decodeRumble(
-                        frame.payload,
-                    )
-                }.getOrNull()?.let { rumble ->
-                    haptics.applyRumble(
-                        lowFrequency =
-                            rumble.lowFrequency,
-                        highFrequency =
-                            rumble.highFrequency,
-                        durationMilliseconds =
-                            rumble.durationMilliseconds,
-                    )
-                }
-            }
+            wifiLastInboundNanos.set(
+                System.nanoTime(),
+            )
+            handleOutputFrame(frame)
         }
 
         transport.onTransportError = {
-            transportFailed.set(true)
+            wifiFailed.set(true)
         }
 
         return try {
             transport.start()
 
-            val publisher = LatestGamepadPublisher(
-                stateStore = stateStore,
-                sender = WifiGamepadFrameSender(
-                    transport = transport,
-                    sessionId = session.sessionId,
-                ),
+            val publisher =
+                LatestGamepadPublisher(
+                    stateStore = stateStore,
+                    sender =
+                        WifiGamepadFrameSender(
+                            transport =
+                                transport,
+                            sessionId =
+                                session.sessionId,
+                        ),
+                )
+
+            activeWifiTransport =
+                transport
+            activeWifiPublisher =
+                publisher
+
+            publisher.start(
+                sendInitialState = true,
             )
-
-            activeTransport = transport
-            activePublisher = publisher
-
-            publisher.start(sendInitialState = true)
 
             updateStatus(
                 ControllerConnectionState.ACTIVE,
                 "Connected over Wi-Fi.",
                 receiverName = receiverName,
-                hostAddress = established.remoteAddress.hostAddress,
+                hostAddress =
+                    established
+                        .remoteAddress
+                        .hostAddress,
+                activeTransport = "Wi-Fi",
+                backupTransport =
+                    bluetoothBackupLabel(),
             )
 
-            while (running.get() && !transportFailed.get()) {
+            while (
+                running.get() &&
+                !wifiFailed.get()
+            ) {
                 val silenceMs =
-                    (System.nanoTime() - lastInboundNanos.get()) /
-                        1_000_000L
+                    (
+                        System.nanoTime() -
+                            wifiLastInboundNanos.get()
+                    ) / 1_000_000L
 
-                if (silenceMs >= INBOUND_SILENCE_RECOVERY_MS) {
+                if (silenceMs >=
+                    WIFI_INBOUND_SILENCE_RECOVERY_MS
+                ) {
                     break
                 }
 
-                sleepInterruptibly(ACTIVE_MONITOR_INTERVAL_MS)
+                sleepInterruptibly(
+                    ACTIVE_MONITOR_INTERVAL_MS,
+                )
             }
 
             running.get()
         } finally {
-            activePublisher?.close()
-            activePublisher = null
+            activeWifiPublisher?.close()
+            activeWifiPublisher = null
 
-            activeTransport?.close()
-            activeTransport = null
+            activeWifiTransport?.close()
+            activeWifiTransport = null
+
             haptics.stopRumble()
-
             session.sessionKey.fill(0)
 
             if (running.get()) {
+                if (standbyBluetoothTransport
+                        ?.isRunning == true
+                ) {
+                    updateStatus(
+                        ControllerConnectionState.ACTIVE,
+                        "Wi-Fi session lost. Bluetooth fallback remains connected.",
+                        receiverName =
+                            receiverName,
+                        activeTransport =
+                            "Bluetooth",
+                    )
+                } else {
+                    updateStatus(
+                        ControllerConnectionState.RECOVERING,
+                        "Wi-Fi session lost. Reconnecting automatically.",
+                        receiverName =
+                            receiverName,
+                        hostAddress =
+                            established
+                                .remoteAddress
+                                .hostAddress,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun startBluetoothFallbackIfPossible() {
+        val adapter =
+            bluetoothAdapter ?: return
+
+        val host =
+            BluetoothFallbackHost(
+                adapter = adapter,
+                androidDeviceId =
+                    androidDeviceId,
+                trustResolver = {
+                    windowsDeviceId ->
+                    runCatching {
+                        trustedReceivers
+                            .tryGet(
+                                windowsDeviceId,
+                            )
+                            ?.pairingRootKey
+                    }.getOrNull()
+                },
+            )
+
+        try {
+            host.start()
+        } catch (_: Throwable) {
+            host.close()
+            return
+        }
+
+        bluetoothHost = host
+
+        bluetoothWorker = Thread(
+            { runBluetoothLoop(host) },
+            "natsx-bluetooth-fallback-runtime",
+        ).apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun runBluetoothLoop(
+        host: BluetoothFallbackHost,
+    ) {
+        while (running.get()) {
+            val established =
+                try {
+                    host.pollEstablished(
+                        BLUETOOTH_POLL_MS,
+                    )
+                } catch (_: InterruptedException) {
+                    Thread.currentThread()
+                        .interrupt()
+                    break
+                }
+
+            if (established == null) {
+                continue
+            }
+
+            runBluetoothSession(
+                established,
+            )
+        }
+    }
+
+    private fun runBluetoothSession(
+        established:
+            EstablishedBluetoothSession,
+    ) {
+        val session =
+            established.trustedSession
+
+        bluetoothFailed.set(false)
+        bluetoothLastInboundNanos.set(
+            System.nanoTime(),
+        )
+
+        val transport =
+            BluetoothControllerTransport(
+                connection =
+                    established.connection,
+                session = session,
+            )
+
+        transport.onFrameReceived = { frame ->
+            bluetoothLastInboundNanos.set(
+                System.nanoTime(),
+            )
+            handleOutputFrame(frame)
+        }
+
+        transport.onTransportError = {
+            bluetoothFailed.set(true)
+        }
+
+        try {
+            transport.start()
+
+            val publisher =
+                LatestGamepadPublisher(
+                    stateStore = stateStore,
+                    sender = transport,
+                )
+
+            standbyBluetoothTransport =
+                transport
+            standbyBluetoothPublisher =
+                publisher
+
+            publisher.start(
+                sendInitialState = true,
+            )
+
+            if (activeWifiTransport == null) {
+                updateStatus(
+                    ControllerConnectionState.ACTIVE,
+                    "Connected over Bluetooth fallback.",
+                    receiverName =
+                        trustedReceivers
+                            .listMetadata()
+                            .firstOrNull {
+                                it.windowsDeviceId ==
+                                    session.windowsDeviceId
+                            }
+                            ?.displayName,
+                    activeTransport =
+                        "Bluetooth",
+                )
+            } else {
+                publishCurrentStatusWithBackup()
+            }
+
+            while (
+                running.get() &&
+                transport.isRunning &&
+                !bluetoothFailed.get()
+            ) {
+                val silenceMs =
+                    (
+                        System.nanoTime() -
+                            bluetoothLastInboundNanos
+                                .get()
+                    ) / 1_000_000L
+
+                if (silenceMs >=
+                    BLUETOOTH_INBOUND_SILENCE_RECOVERY_MS
+                ) {
+                    break
+                }
+
+                sleepInterruptibly(
+                    ACTIVE_MONITOR_INTERVAL_MS,
+                )
+            }
+        } finally {
+            standbyBluetoothPublisher
+                ?.close()
+            standbyBluetoothPublisher = null
+
+            standbyBluetoothTransport
+                ?.close()
+            standbyBluetoothTransport = null
+
+            session.sessionKey.fill(0)
+
+            if (running.get() &&
+                activeWifiTransport == null
+            ) {
                 updateStatus(
                     ControllerConnectionState.RECOVERING,
-                    "Wi-Fi session lost. Reconnecting automatically.",
-                    receiverName = receiverName,
-                    hostAddress = established.remoteAddress.hostAddress,
+                    "Bluetooth fallback lost. Retrying Wi-Fi and Bluetooth automatically.",
                 )
             }
         }
     }
+
+    private fun handleOutputFrame(
+        frame:
+            com.natsx.controller.core.protocol
+                .ProtocolFrame,
+    ) {
+        if (frame.messageType !=
+            MessageType.RUMBLE
+        ) {
+            return
+        }
+
+        runCatching {
+            ControlPayloadCodec.decodeRumble(
+                frame.payload,
+            )
+        }.getOrNull()?.let { rumble ->
+            haptics.applyRumble(
+                lowFrequency =
+                    rumble.lowFrequency,
+                highFrequency =
+                    rumble.highFrequency,
+                durationMilliseconds =
+                    rumble.durationMilliseconds,
+            )
+        }
+    }
+
+    private fun publishCurrentStatusWithBackup() {
+        val current = status
+
+        updateStatus(
+            current.state,
+            current.message,
+            receiverName =
+                current.receiverName,
+            hostAddress =
+                current.hostAddress,
+            activeTransport =
+                current.activeTransport ?:
+                    "Wi-Fi",
+            backupTransport =
+                bluetoothBackupLabel(),
+        )
+    }
+
+    private fun bluetoothBackupLabel():
+        String? =
+        if (standbyBluetoothTransport
+                ?.isRunning == true
+        ) {
+            "Bluetooth READY"
+        } else {
+            null
+        }
 
     private fun updateStatus(
         state: ControllerConnectionState,
         message: String,
         receiverName: String? = null,
         hostAddress: String? = null,
+        activeTransport: String? = null,
+        backupTransport: String? = null,
     ) {
         val next = ControllerConnectionStatus(
             state = state,
             message = message,
             receiverName = receiverName,
             hostAddress = hostAddress,
+            activeTransport =
+                activeTransport,
+            backupTransport =
+                backupTransport,
         )
 
         status = next
         onStatusChanged?.invoke(next)
     }
 
-    private fun sleepInterruptibly(milliseconds: Long) {
+    private fun sleepInterruptibly(
+        milliseconds: Long,
+    ) {
         try {
             Thread.sleep(milliseconds)
         } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
+            Thread.currentThread()
+                .interrupt()
         }
     }
 
     private companion object {
         const val DISCOVERY_TIMEOUT_MS = 800
-        const val ACTIVE_MONITOR_INTERVAL_MS = 40L
-        const val INBOUND_SILENCE_RECOVERY_MS = 250L
+        const val ACTIVE_MONITOR_INTERVAL_MS =
+            40L
+        const val WIFI_INBOUND_SILENCE_RECOVERY_MS =
+            250L
+        const val BLUETOOTH_INBOUND_SILENCE_RECOVERY_MS =
+            1_000L
+        const val BLUETOOTH_POLL_MS =
+            500L
     }
 }
