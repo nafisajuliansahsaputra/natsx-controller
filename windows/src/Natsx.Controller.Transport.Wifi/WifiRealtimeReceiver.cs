@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Threading.Channels;
+using Natsx.Controller.Connection;
 using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Transport.Wifi;
@@ -17,6 +18,8 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
     private readonly WifiTrustedSession _trustedSession;
     private readonly Channel<WifiGamepadDatagram> _latestState;
     private readonly TimeProvider _timeProvider;
+    private readonly WifiHealthTracker _healthTracker;
+    private readonly TransportHealthEvaluator _healthEvaluator;
     private readonly object _remoteEndpointLock = new();
 
     private UdpClient? _udpClient;
@@ -34,11 +37,14 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
 
     public WifiRealtimeReceiver(
         WifiTrustedSession trustedSession,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ConnectionPolicy? connectionPolicy = null)
     {
         _trustedSession = trustedSession
             ?? throw new ArgumentNullException(nameof(trustedSession));
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _healthTracker = new WifiHealthTracker(_timeProvider);
+        _healthEvaluator = new TransportHealthEvaluator(connectionPolicy);
 
         _latestState = Channel.CreateBounded<WifiGamepadDatagram>(
             new BoundedChannelOptions(1)
@@ -74,18 +80,25 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
         }
     }
 
-    public TimeSpan? RoundTripTime
-    {
-        get
-        {
-            long micros = Interlocked.Read(ref _lastRoundTripTimeMicros);
-            return micros < 0
-                ? null
-                : TimeSpan.FromMicroseconds(micros);
-        }
-    }
+    public TimeSpan? RoundTripTime =>
+        _healthTracker.Snapshot().RoundTripTime;
+
+    public TimeSpan Jitter =>
+        _healthTracker.Snapshot().Jitter;
+
+    public double PacketLossPercent =>
+        _healthTracker.Snapshot().PacketLossPercent;
 
     public ChannelReader<WifiGamepadDatagram> States => _latestState.Reader;
+
+    public TransportHealthSnapshot GetHealthSnapshot(
+        TransportRuntimeState state = TransportRuntimeState.Ready)
+    {
+        TransportMetrics metrics =
+            _healthTracker.ToTransportMetrics(state, Silence);
+
+        return _healthEvaluator.Evaluate(metrics);
+    }
 
     public Task StartAsync(
         IPEndPoint bindEndPoint,
@@ -207,6 +220,7 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
                                 _trustedSession);
 
                         MarkAuthenticatedRemote(result.RemoteEndPoint);
+                        _healthTracker.RecordState(state.Sequence);
                         Interlocked.Increment(ref _acceptedDatagrams);
                         Interlocked.Exchange(
                             ref _lastAcceptedTimestamp,
@@ -230,9 +244,11 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
                             ulong elapsed = nowMicros - echoedProbe;
                             if (elapsed <= long.MaxValue)
                             {
+                                TimeSpan rtt = TimeSpan.FromMicroseconds((long)elapsed);
                                 Interlocked.Exchange(
                                     ref _lastRoundTripTimeMicros,
                                     (long)elapsed);
+                                _healthTracker.RecordRoundTripTime(rtt);
                             }
                         }
 
