@@ -110,10 +110,18 @@
                 <StackPanel>
                     <TextBlock FontWeight="SemiBold"
                                Text="Connection diagnostics" />
-                    <TextBlock x:Name="DiagnosticsText"
+                    <TextBlock x:Name="ActiveTransportText"
                                Margin="0,8,0,0"
+                               FontWeight="SemiBold"
+                               Text="Active transport: --" />
+                    <TextBlock x:Name="DiagnosticsText"
+                               Margin="0,6,0,0"
                                Opacity="0.72"
-                               Text="RTT --   Jitter --   Loss --   Health --" />
+                               Text="Wi-Fi  RTT --   Jitter --   Loss --   Health --" />
+                    <TextBlock x:Name="BluetoothText"
+                               Margin="0,4,0,0"
+                               Opacity="0.72"
+                               Text="Bluetooth  Waiting   RTT --   Jitter --   Health --" />
                 </StackPanel>
             </Border>
 
