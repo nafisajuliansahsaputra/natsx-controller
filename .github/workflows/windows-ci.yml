@@ -50,3 +50,14 @@ jobs:
 
       - name: Test
         run: dotnet test windows/Natsx.Controller.slnx --configuration Release --no-build --verbosity normal
+
+      - name: Publish receiver
+        run: dotnet publish windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release --no-restore --output artifacts/windows-receiver
+
+      - name: Upload Windows receiver
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-controller-windows-receiver
+          path: artifacts/windows-receiver
+          if-no-files-found: error
+          retention-days: 14
