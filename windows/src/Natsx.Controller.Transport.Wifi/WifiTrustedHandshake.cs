@@ -251,15 +251,15 @@ public sealed class WifiTrustedHandshakeResponder
             trustSecret,
             challenge.SessionId,
             challenge.Payload.ChallengeNonce,
-            _localPeerId,
-            challenge.Payload.ChallengerPeerId);
+            challenge.Payload.ChallengerPeerId,
+            _localPeerId);
 
         byte[] sessionKey = TrustedReconnectCrypto.DeriveSessionKey(
             trustSecret,
             challenge.SessionId,
             challenge.Payload.ChallengeNonce,
-            _localPeerId,
-            challenge.Payload.ChallengerPeerId);
+            challenge.Payload.ChallengerPeerId,
+            _localPeerId);
 
         try
         {
