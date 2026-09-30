@@ -89,9 +89,7 @@ public sealed class WifiControllerTransport : IControllerTransport
             _pumpCancellation = pumpCancellation;
             _pumpTask = PumpStatesAsync(pumpCancellation.Token);
 
-            if (State is
-                TransportRuntimeState.Connecting or
-                TransportRuntimeState.Authenticating)
+            if (State == TransportRuntimeState.Connecting)
             {
                 _lifecycle.SetState(TransportRuntimeState.Stabilizing);
             }
@@ -148,10 +146,7 @@ public sealed class WifiControllerTransport : IControllerTransport
             await foreach (WifiGamepadDatagram datagram in
                 _receiver.States.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
-                if (State is
-                    TransportRuntimeState.Connecting or
-                    TransportRuntimeState.Authenticating or
-                    TransportRuntimeState.Stabilizing)
+                if (State == TransportRuntimeState.Stabilizing)
                 {
                     _lifecycle.SetState(TransportRuntimeState.Ready);
                 }
