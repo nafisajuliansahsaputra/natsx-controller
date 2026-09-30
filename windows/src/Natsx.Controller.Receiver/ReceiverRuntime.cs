@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.Sockets;
+using System.Threading.Channels;
 using Natsx.Controller.Connection;
 using Natsx.Controller.Core;
 using Natsx.Controller.Protocol;
@@ -28,10 +30,19 @@ public sealed class ReceiverRuntime : IAsyncDisposable
     private readonly WifiGamepadInputRouter _wifiRouter;
     private readonly WifiControllerTransport _wifiTransport;
     private readonly WifiDiscoveryResponder _discoveryResponder;
+    private readonly Channel<RumbleState> _rumbleChannel =
+        Channel.CreateBounded<RumbleState>(
+            new BoundedChannelOptions(1)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.DropOldest,
+            });
 
     private CancellationTokenSource? _runtimeCts;
     private Task? _safetyLoop;
     private Task? _statusLoop;
+    private Task? _rumbleLoop;
 
     public ReceiverRuntime(
         SessionId windowsDeviceId,
@@ -81,6 +92,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         _wifiTransport.SessionEstablished += OnWifiSessionEstablished;
         _wifiTransport.FrameReceived += OnWifiFrameReceived;
+        _backend.RumbleReceived += OnRumbleReceived;
 
         _discoveryResponder = new WifiDiscoveryResponder(
             _windowsDeviceId,
@@ -117,6 +129,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         _safetyLoop = RunSafetyLoopAsync(_runtimeCts.Token);
         _statusLoop = RunStatusLoopAsync(_runtimeCts.Token);
+        _rumbleLoop = RunRumbleLoopAsync(_runtimeCts.Token);
 
         PublishStatus("Receiver ready — waiting for trusted controller.");
     }
@@ -126,10 +139,12 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         CancellationTokenSource? cts = _runtimeCts;
         Task? safetyLoop = _safetyLoop;
         Task? statusLoop = _statusLoop;
+        Task? rumbleLoop = _rumbleLoop;
 
         _runtimeCts = null;
         _safetyLoop = null;
         _statusLoop = null;
+        _rumbleLoop = null;
 
         if (cts is not null)
             await cts.CancelAsync();
@@ -137,13 +152,20 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         if (_backend.IsStarted)
             _safetyEngine.ForceNeutral();
 
+        if (_wifiTransport.HasAuthenticatedSession)
+        {
+            await SendRumbleAsync(
+                new RumbleState(0, 0),
+                cancellationToken);
+        }
+
         await _wifiTransport.DisconnectAsync(cancellationToken);
         await _discoveryResponder.StopAsync();
 
         if (_backend.IsStarted)
             await _backend.StopAsync(cancellationToken);
 
-        foreach (Task? task in new[] { safetyLoop, statusLoop })
+        foreach (Task? task in new[] { safetyLoop, statusLoop, rumbleLoop })
         {
             if (task is null)
                 continue;
@@ -172,6 +194,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         _wifiTransport.SessionEstablished -= OnWifiSessionEstablished;
         _wifiTransport.FrameReceived -= OnWifiFrameReceived;
+        _backend.RumbleReceived -= OnRumbleReceived;
 
         await _wifiTransport.DisposeAsync();
         await _discoveryResponder.DisposeAsync();
@@ -200,6 +223,70 @@ public sealed class ReceiverRuntime : IAsyncDisposable
     {
         if (frame.MessageType == MessageType.GamepadState)
             _wifiRouter.TryHandle(frame);
+    }
+
+    private void OnRumbleReceived(RumbleState state)
+    {
+        _rumbleChannel.Writer.TryWrite(state);
+    }
+
+    private async Task RunRumbleLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        await foreach (
+            RumbleState state in
+            _rumbleChannel.Reader.ReadAllAsync(
+                cancellationToken))
+        {
+            await SendRumbleAsync(
+                state,
+                cancellationToken);
+        }
+    }
+
+    private async Task SendRumbleAsync(
+        RumbleState state,
+        CancellationToken cancellationToken)
+    {
+        IPEndPoint? endpoint =
+            _wifiTransport.RemoteEndPoint;
+        SessionId sessionId =
+            _wifiTransport.ActiveSessionId;
+
+        if (endpoint is null ||
+            sessionId == SessionId.Zero ||
+            !_wifiTransport.HasAuthenticatedSession)
+        {
+            return;
+        }
+
+        var frame = new ProtocolFrame(
+            ProtocolVersion.Current,
+            MessageType.Rumble,
+            FrameFlags.Authenticated,
+            sessionId,
+            0,
+            GetMonotonicMicroseconds(),
+            ControlPayloadCodec.EncodeRumble(
+                new RumblePayload(
+                    state.LowFrequencyMotor,
+                    state.HighFrequencyMotor,
+                    0)));
+
+        try
+        {
+            await _wifiTransport.SendAsync(
+                frame,
+                endpoint,
+                cancellationToken);
+        }
+        catch (Exception exception) when (
+            exception is SocketException or
+            InvalidOperationException or
+            OperationCanceledException)
+        {
+            // Rumble is best-effort output and never blocks input.
+        }
     }
 
     private async Task RunSafetyLoopAsync(CancellationToken cancellationToken)
