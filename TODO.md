@@ -191,7 +191,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Implement trusted peer identification.
 - [x] Implement authenticated realtime frame validation.
 - [x] Implement realtime UDP state flow.
-- [ ] Implement control/handshake flow.
+- [x] Implement control/handshake flow.
 - [x] Implement bounded/latest-state behavior.
 - [x] Implement heartbeat.
 - [x] Implement RTT measurement.
