@@ -184,7 +184,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
     }
 
     private void OnWifiSessionEstablished(
-        EstablishedTrustedSession established,
+        WifiSessionEstablishedInfo established,
         IPEndPoint remoteEndPoint)
     {
         _controllerSession.BeginNewSession(TransportKind.Wifi);
