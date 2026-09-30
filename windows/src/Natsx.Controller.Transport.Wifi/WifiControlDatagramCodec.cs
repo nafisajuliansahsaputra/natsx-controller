@@ -20,8 +20,8 @@ public static class WifiControlDatagramCodec
                 MessageType.Heartbeat,
                 FrameFlags.Authenticated,
                 trustedSession.SessionId,
-                Sequence: 0,
-                MonotonicTimestampMicros: monotonicTimestampMicros,
+                0,
+                monotonicTimestampMicros,
                 Array.Empty<byte>()),
             trustedSession.SessionKey);
     }
@@ -44,8 +44,8 @@ public static class WifiControlDatagramCodec
                 MessageType.HeartbeatAck,
                 FrameFlags.Authenticated,
                 trustedSession.SessionId,
-                Sequence: 0,
-                MonotonicTimestampMicros: responderTimestampMicros,
+                0,
+                responderTimestampMicros,
                 payload),
             trustedSession.SessionKey);
     }
