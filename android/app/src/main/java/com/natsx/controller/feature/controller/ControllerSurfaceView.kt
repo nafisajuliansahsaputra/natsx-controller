@@ -108,6 +108,8 @@ class ControllerSurfaceView(
 
     fun releaseAllInputs() {
         activePointers.clear()
+        leftStickProcessor.reset()
+        rightStickProcessor.reset()
         stateStore.neutralize()
         invalidate()
     }
@@ -182,8 +184,15 @@ class ControllerSurfaceView(
 
     private fun release(controlId: ControlId) {
         when (controlId) {
-            ControlId.LEFT_STICK -> stateStore.setLeftStick(0, 0)
-            ControlId.RIGHT_STICK -> stateStore.setRightStick(0, 0)
+            ControlId.LEFT_STICK -> {
+                leftStickProcessor.reset()
+                stateStore.setLeftStick(0, 0)
+            }
+
+            ControlId.RIGHT_STICK -> {
+                rightStickProcessor.reset()
+                stateStore.setRightStick(0, 0)
+            }
             ControlId.A -> stateStore.setButton(GamepadButtons.A, false)
             ControlId.B -> stateStore.setButton(GamepadButtons.B, false)
             ControlId.X -> stateStore.setButton(GamepadButtons.X, false)
