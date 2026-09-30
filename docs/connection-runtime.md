@@ -18,6 +18,34 @@ transport packet
  -> IVirtualGamepadBackend
 ```
 
+## Pre-active lifecycle
+
+Smart Connection consumes transport lifecycle states before a candidate becomes
+eligible:
+
+```text
+DISCOVERING
+  -> CONNECTING
+  -> AUTHENTICATING
+  -> STABILIZING
+  -> READY
+```
+
+The transport runtime receives state-change notifications immediately rather
+than waiting only for the 25 ms health polling loop.
+
+For Wi-Fi, the trusted control processor publishes `AUTHENTICATING` after a
+trusted challenge has been accepted and `STABILIZING` after authenticated
+`SESSION_READY` succeeds. The realtime transport reaches `READY` only after
+the first authenticated full-state datagram arrives.
+
+Pre-ready lifecycle reports are not added to health-history windows and are not
+counted as hard failures. They are also never eligible for authoritative
+selection.
+
+A shared `TransportLifecycle` instance may bridge control/authentication and
+realtime components so they expose one coherent state.
+
 ## Warm candidates
 
 A non-authoritative transport may continue receiving fresh full-state packets.

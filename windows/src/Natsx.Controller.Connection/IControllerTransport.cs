@@ -6,6 +6,8 @@ public interface IControllerTransport : IAsyncDisposable
 {
     event EventHandler<TransportGamepadStateEventArgs>? GamepadStateReceived;
 
+    event EventHandler<TransportRuntimeStateChangedEventArgs>? StateChanged;
+
     TransportKind Kind { get; }
 
     TransportRuntimeState State { get; }

@@ -438,12 +438,26 @@ COOLDOWN
 UNAVAILABLE
 AVAILABLE
 CONNECTING
+AUTHENTICATING
+STABILIZING
 READY
 ACTIVE
 DEGRADED
 FAILED
 COOLDOWN
 ```
+
+Pre-active lifecycle semantics are explicit:
+
+- `CONNECTING` — the transport endpoint/socket/link is being opened;
+- `AUTHENTICATING` — trusted peer proof/session authentication is in progress;
+- `STABILIZING` — authentication is complete, but the transport has not yet
+  demonstrated fresh realtime controller state;
+- `READY` — at least one fresh authenticated realtime state has arrived and
+  the candidate may participate in normal selection.
+
+Pre-ready states are never eligible to become authoritative and do not count as
+hard transport failures merely because realtime silence is still infinite.
 
 ### Default preference
 

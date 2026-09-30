@@ -6,6 +6,83 @@ namespace Natsx.Controller.Connection.Tests;
 public sealed class SmartConnectionManagerTests
 {
     [Fact]
+    public void PreActiveLifecycle_ProgressesWithoutBecomingSelectable()
+    {
+        var clock = new ManualTimeProvider();
+        var manager = new SmartConnectionManager(timeProvider: clock);
+
+        manager.Report(Snapshot(
+            TransportKind.Wifi,
+            0,
+            TransportHealthGrade.Warning,
+            TransportRuntimeState.Connecting));
+
+        Assert.Null(manager.Evaluate());
+        Assert.Equal(ConnectionManagerState.Connecting, manager.State);
+
+        manager.Report(Snapshot(
+            TransportKind.Wifi,
+            0,
+            TransportHealthGrade.Warning,
+            TransportRuntimeState.Authenticating));
+
+        Assert.Null(manager.Evaluate());
+        Assert.Equal(ConnectionManagerState.Authenticating, manager.State);
+
+        manager.Report(Snapshot(
+            TransportKind.Wifi,
+            0,
+            TransportHealthGrade.Lost,
+            TransportRuntimeState.Stabilizing));
+
+        Assert.Null(manager.Evaluate());
+        Assert.Equal(ConnectionManagerState.Stabilizing, manager.State);
+        Assert.False(manager.IsCircuitOpen(TransportKind.Wifi));
+
+        manager.Report(Snapshot(
+            TransportKind.Wifi,
+            90,
+            TransportHealthGrade.Good,
+            TransportRuntimeState.Ready));
+
+        HandoverProposal proposal =
+            Assert.IsType<HandoverProposal>(manager.Evaluate());
+
+        Assert.Equal(ConnectionManagerState.Ready, manager.State);
+        Assert.Equal(TransportKind.Wifi, proposal.To);
+    }
+
+    [Fact]
+    public void FurthestPreActiveCandidate_DrivesManagerState()
+    {
+        var manager = new SmartConnectionManager();
+
+        manager.Report(Snapshot(
+            TransportKind.Bluetooth,
+            0,
+            TransportHealthGrade.Warning,
+            TransportRuntimeState.Connecting));
+
+        manager.Report(Snapshot(
+            TransportKind.Wifi,
+            0,
+            TransportHealthGrade.Warning,
+            TransportRuntimeState.Authenticating));
+
+        Assert.Null(manager.Evaluate());
+        Assert.Equal(ConnectionManagerState.Authenticating, manager.State);
+
+        manager.Report(Snapshot(
+            TransportKind.Usb,
+            0,
+            TransportHealthGrade.Warning,
+            TransportRuntimeState.Stabilizing));
+
+        Assert.Null(manager.Evaluate());
+        Assert.Equal(ConnectionManagerState.Stabilizing, manager.State);
+    }
+
+    [Fact]
     public void InitialSelection_PrefersHealthyWifiOverBluetooth()
     {
         var clock = new ManualTimeProvider();

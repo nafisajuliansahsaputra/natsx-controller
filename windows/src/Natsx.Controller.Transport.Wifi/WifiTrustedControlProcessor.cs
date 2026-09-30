@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Cryptography;
+using Natsx.Controller.Connection;
 using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Transport.Wifi;
@@ -13,6 +14,7 @@ public sealed class WifiTrustedControlProcessor : IDisposable
     private readonly PeerId _localPeerId;
     private readonly TransportCapabilities _capabilities;
     private readonly TimeProvider _timeProvider;
+    private readonly TransportLifecycle? _lifecycle;
     private readonly object _gate = new();
     private readonly Dictionary<SessionId, PendingSession> _pending = new();
 
@@ -24,7 +26,8 @@ public sealed class WifiTrustedControlProcessor : IDisposable
             TransportCapabilities.Wifi |
             TransportCapabilities.Bluetooth |
             TransportCapabilities.UsbDirect,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        TransportLifecycle? lifecycle = null)
     {
         if (!capabilities.HasFlag(TransportCapabilities.Wifi))
         {
@@ -36,6 +39,7 @@ public sealed class WifiTrustedControlProcessor : IDisposable
         _localPeerId = localPeerId;
         _capabilities = capabilities;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _lifecycle = lifecycle;
     }
 
     public int PendingCount
@@ -107,6 +111,8 @@ public sealed class WifiTrustedControlProcessor : IDisposable
                     remoteEndPoint,
                     session);
 
+                MarkAuthenticating();
+
                 return response.ResponseDatagram.ToArray();
             }
             catch
@@ -157,6 +163,8 @@ public sealed class WifiTrustedControlProcessor : IDisposable
                     pending.Session,
                     local,
                     monotonicTimestampMicros);
+
+            MarkStabilizing();
 
             return new WifiTrustedControlCompletion(
                 pending.RemotePeerId,
@@ -265,6 +273,45 @@ public sealed class WifiTrustedControlProcessor : IDisposable
             PendingSession pending = _pending[sessionId];
             _pending.Remove(sessionId);
             pending.Session.Dispose();
+        }
+    }
+
+    private void MarkAuthenticating()
+    {
+        if (_lifecycle is null)
+        {
+            return;
+        }
+
+        if (_lifecycle.State is
+            TransportRuntimeState.Unavailable or
+            TransportRuntimeState.Available or
+            TransportRuntimeState.Connecting or
+            TransportRuntimeState.Authenticating or
+            TransportRuntimeState.Failed)
+        {
+            _lifecycle.SetState(
+                TransportRuntimeState.Authenticating);
+        }
+    }
+
+    private void MarkStabilizing()
+    {
+        if (_lifecycle is null)
+        {
+            return;
+        }
+
+        if (_lifecycle.State is
+            TransportRuntimeState.Unavailable or
+            TransportRuntimeState.Available or
+            TransportRuntimeState.Connecting or
+            TransportRuntimeState.Authenticating or
+            TransportRuntimeState.Stabilizing or
+            TransportRuntimeState.Failed)
+        {
+            _lifecycle.SetState(
+                TransportRuntimeState.Stabilizing);
         }
     }
 

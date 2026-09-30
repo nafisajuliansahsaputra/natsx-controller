@@ -222,9 +222,9 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 - [x] DISCONNECTED.
 - [x] DISCOVERING.
-- [ ] CONNECTING.
-- [ ] AUTHENTICATING.
-- [ ] STABILIZING.
+- [x] CONNECTING.
+- [x] AUTHENTICATING.
+- [x] STABILIZING.
 - [x] READY.
 - [x] ACTIVE.
 - [x] SUSPECT.

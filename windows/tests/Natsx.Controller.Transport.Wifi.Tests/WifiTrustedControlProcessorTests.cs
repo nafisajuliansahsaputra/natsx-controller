@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Cryptography;
+using Natsx.Controller.Connection;
 using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Transport.Wifi.Tests;
@@ -19,8 +20,14 @@ public sealed class WifiTrustedControlProcessorTests
             windowsPeer,
             trustSecret);
 
+        var lifecycle = new TransportLifecycle(
+            TransportRuntimeState.Available);
+
         using var processor =
-            new WifiTrustedControlProcessor(windowsPeer);
+            new WifiTrustedControlProcessor(
+                windowsPeer,
+                timeProvider: null,
+                lifecycle: lifecycle);
 
         byte[] authResponse = processor.HandleChallenge(
             challenger.EncodeChallenge(100),
@@ -34,6 +41,9 @@ public sealed class WifiTrustedControlProcessorTests
             challenger.AcceptResponse(authResponse);
 
         Assert.Equal(1, processor.PendingCount);
+        Assert.Equal(
+            TransportRuntimeState.Authenticating,
+            lifecycle.State);
 
         byte[] androidReady =
             WifiControlDatagramCodec.EncodeSessionReady(
@@ -52,6 +62,9 @@ public sealed class WifiTrustedControlProcessorTests
 
         Assert.Equal(0, processor.PendingCount);
         Assert.Equal(androidPeer, completion.RemotePeerId);
+        Assert.Equal(
+            TransportRuntimeState.Stabilizing,
+            lifecycle.State);
 
         SessionReadyPayload windowsReady =
             WifiControlDatagramCodec.DecodeSessionReady(
@@ -63,6 +76,60 @@ public sealed class WifiTrustedControlProcessorTests
         Assert.True(
             windowsReady.Capabilities.HasFlag(
                 TransportCapabilities.Wifi));
+    }
+
+    [Fact]
+    public void ReconnectHandshake_DoesNotDemoteAlreadyActiveTransport()
+    {
+        PeerId androidPeer = PeerId.CreateRandom();
+        PeerId windowsPeer = PeerId.CreateRandom();
+        byte[] trustSecret = RandomNumberGenerator.GetBytes(32);
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 55010);
+        var lifecycle = new TransportLifecycle(
+            TransportRuntimeState.Active);
+
+        using var challenger = WifiTrustedHandshakeChallenge.Create(
+            androidPeer,
+            windowsPeer,
+            trustSecret);
+
+        using var processor =
+            new WifiTrustedControlProcessor(
+                windowsPeer,
+                timeProvider: null,
+                lifecycle: lifecycle);
+
+        byte[] authResponse = processor.HandleChallenge(
+            challenger.EncodeChallenge(100),
+            endpoint,
+            _ => trustSecret.ToArray(),
+            200);
+
+        Assert.Equal(
+            TransportRuntimeState.Active,
+            lifecycle.State);
+
+        using WifiTrustedSession androidSession =
+            challenger.AcceptResponse(authResponse);
+
+        byte[] androidReady =
+            WifiControlDatagramCodec.EncodeSessionReady(
+                androidSession,
+                new SessionReadyPayload(
+                    PeerRole.AndroidController,
+                    TransportCapabilities.Wifi,
+                    androidPeer),
+                300);
+
+        using WifiTrustedControlCompletion completion =
+            processor.HandleSessionReady(
+                androidReady,
+                endpoint,
+                400);
+
+        Assert.Equal(
+            TransportRuntimeState.Active,
+            lifecycle.State);
     }
 
     [Fact]

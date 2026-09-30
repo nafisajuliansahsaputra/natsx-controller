@@ -21,6 +21,8 @@ public enum TransportRuntimeState
     Unavailable,
     Available,
     Connecting,
+    Authenticating,
+    Stabilizing,
     Ready,
     Active,
     Degraded,
