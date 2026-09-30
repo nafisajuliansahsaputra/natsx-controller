@@ -21,13 +21,17 @@ data class WifiResolvedEndpoint(
  * 3. Fall back to LAN discovery constrained to the trusted receiver Peer ID.
  * 4. Cache a successful discovery result for the next reconnect.
  */
+fun interface WifiEndpointProvider {
+    fun resolve(): WifiResolvedEndpoint?
+}
+
 class WifiEndpointResolver(
     private val receiverPeerId: PeerId,
     private val endpointCache: WifiEndpointCache,
     private val endpointProbe: WifiEndpointProbe,
     private val discovery: WifiReceiverDiscovery,
-) {
-    fun resolve(): WifiResolvedEndpoint? {
+) : WifiEndpointProvider {
+    override fun resolve(): WifiResolvedEndpoint? {
         endpointCache.get(receiverPeerId)?.let { cached ->
             if (endpointProbe.isReachable(cached)) {
                 return WifiResolvedEndpoint(
