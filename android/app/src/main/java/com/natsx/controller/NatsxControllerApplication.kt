@@ -2,6 +2,7 @@ package com.natsx.controller
 
 import android.app.Application
 import com.natsx.controller.core.gamepad.GamepadStateStore
+import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
 import com.natsx.controller.core.session.ControllerRealtimePublisher
 import com.natsx.controller.core.session.RealtimeStateBroadcaster
 import com.natsx.controller.core.session.SessionSequence
@@ -25,6 +26,12 @@ class NatsxControllerApplication : Application() {
 
     val localPeerId: PeerId by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         LocalPeerIdentityStore(trustPreferences).getOrCreate()
+    }
+
+    val pairingConfirmation: PairingConfirmationCoordinator by lazy(
+        LazyThreadSafetyMode.SYNCHRONIZED,
+    ) {
+        PairingConfirmationCoordinator()
     }
 
     val trustedPeerStore: TrustedPeerStore by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
