@@ -62,3 +62,21 @@ The source prototype is not sufficient to mark M9 complete. It still requires:
 5. receiver integration only after those checks pass.
 
 Do not install this prototype on a production machine yet.
+
+
+## Test-signed physical-validation artifact
+
+Windows Driver CI now creates an ephemeral, non-shipping test-signed OPPO A58
+package after the static INF gate passes. The CI signing step:
+
+- embeds a SHA-256 test signature in the KMDF SYS;
+- creates the catalog with Inf2Cat for supported Windows 10/11 x64 targets;
+- signs the catalog with the same ephemeral test identity;
+- exports only the public certificate;
+- records certificate/file SHA-256 values in `package-manifest.json`;
+- never exports the private signing key.
+
+The physical machine transition is documented in
+`docs/testing/windows-kernel-test-mode-transition.md`. Secure Boot/BitLocker
+and TESTSIGNING changes remain explicit test-machine operations and are not
+performed automatically by the normal build or receiver runtime.
