@@ -1,19 +1,17 @@
-using Windows.Devices.Usb;
-
 namespace Natsx.Controller.Transport.Usb;
 
 public sealed class WinUsbAoaAccessoryConnection : IAsyncDisposable
 {
-    private readonly UsbDevice _device;
+    private readonly IDisposable _owner;
     private bool _disposed;
 
     internal WinUsbAoaAccessoryConnection(
-        UsbDevice device,
+        IDisposable owner,
         WinUsbAoaAccessoryDevice identity,
         Stream input,
         Stream output)
     {
-        _device = device ?? throw new ArgumentNullException(nameof(device));
+        _owner = owner ?? throw new ArgumentNullException(nameof(owner));
         Identity = identity ?? throw new ArgumentNullException(nameof(identity));
         Input = input ?? throw new ArgumentNullException(nameof(input));
         Output = output ?? throw new ArgumentNullException(nameof(output));
@@ -45,7 +43,7 @@ public sealed class WinUsbAoaAccessoryConnection : IAsyncDisposable
         }
         finally
         {
-            _device.Dispose();
+            _owner.Dispose();
         }
 
         GC.SuppressFinalize(this);
