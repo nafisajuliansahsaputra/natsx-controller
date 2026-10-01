@@ -18,6 +18,10 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         ConnectionPolicy.Competitive;
     private readonly SemaphoreSlim _transportMutationGate =
         new(1, 1);
+    private readonly object _pairingGate =
+        new();
+
+    private TaskCompletionSource<bool>? _pairingConfirmationSource;
 
     private CancellationTokenSource? _lifetime;
     private WindowsTrustServices? _trustServices;
@@ -38,7 +42,26 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
     public event Action<string>? StatusChanged;
 
+    public event Action<PairingConfirmationPrompt?>?
+        PairingConfirmationChanged;
+
     public bool IsStarted => _started;
+
+    public bool ResolvePairingConfirmation(
+        bool approved)
+    {
+        TaskCompletionSource<bool>? source;
+
+        lock (_pairingGate)
+        {
+            source =
+                _pairingConfirmationSource;
+        }
+
+        return source?.TrySetResult(
+            approved) ??
+            false;
+    }
 
     public async ValueTask StartAsync(
         CancellationToken cancellationToken = default)
@@ -62,8 +85,8 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         if (trustedPeers.Count == 0)
         {
-            throw new InvalidOperationException(
-                "No trusted Android controller is paired with this Windows receiver yet.");
+            Report(
+                "No trusted controller paired yet. Connect the phone by USB to start secure pairing.");
         }
 
         var lifetime =
@@ -922,7 +945,42 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                     TransportRuntimeState.Connecting);
 
             Report(
-                "Waiting for trusted Android USB session…");
+                "Waiting for Android USB session…");
+
+            byte[] firstFrame =
+                await ReadUsbFrameWithTimeoutAsync(
+                        connection.Input,
+                        TimeSpan.FromSeconds(15),
+                        cancellationToken,
+                        "Timed out waiting for Android USB session traffic. Open NATSX Controller on the phone.")
+                    .ConfigureAwait(false);
+
+            MessageType messageType =
+                ReadUsbInitialMessageType(
+                    firstFrame);
+
+            if (messageType ==
+                MessageType.PairingOffer)
+            {
+                await CompleteUsbPairingAsync(
+                        connection,
+                        trust,
+                        firstFrame,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                firstFrame =
+                    await ReadUsbFrameWithTimeoutAsync(
+                            connection.Input,
+                            TimeSpan.FromSeconds(15),
+                            cancellationToken,
+                            "Pairing completed, but Android did not start the trusted USB reconnect.")
+                        .ConfigureAwait(false);
+
+                messageType =
+                    ReadUsbInitialMessageType(
+                        firstFrame);
+            }
 
             using var handshakeTimeout =
                 CancellationTokenSource
@@ -931,28 +989,6 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
             handshakeTimeout.CancelAfter(
                 TimeSpan.FromSeconds(15));
-
-            byte[] firstFrame;
-
-            try
-            {
-                firstFrame =
-                    await UsbStreamFrameCodec
-                        .ReadFrameAsync(
-                            connection.Input,
-                            handshakeTimeout.Token)
-                        .ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-                when (!cancellationToken.IsCancellationRequested)
-            {
-                throw new TimeoutException(
-                    "Timed out waiting for the trusted Android USB session. Open NATSX Controller on the phone and make sure this PC is paired.");
-            }
-
-            MessageType messageType =
-                ReadUsbInitialMessageType(
-                    firstFrame);
 
             UsbTrustedSession trustedSession;
             PeerId remotePeerId;
@@ -1123,6 +1159,262 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         }
     }
 
+    private async ValueTask CompleteUsbPairingAsync(
+        WinUsbAoaAccessoryConnection connection,
+        WindowsTrustServices trust,
+        byte[] firstFrame,
+        CancellationToken cancellationToken)
+    {
+        PairingOfferPayload offer =
+            PairingFrameCodec
+                .DecodeOffer(
+                    firstFrame);
+
+        using var responder =
+            new PairingResponderSession(
+                trust.LocalPeerId,
+                offer);
+
+        await WriteUsbFrameAsync(
+                connection.Output,
+                PairingFrameCodec
+                    .EncodeResponse(
+                        responder.Response),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        bool approved =
+            await RequestPairingConfirmationAsync(
+                    responder.ComparisonCode,
+                    responder.RemotePeerId,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        if (!approved)
+        {
+            await TrySendPairingAbortAsync(
+                    connection.Output,
+                    PairingAbortReason.UserRejected,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            throw new InvalidOperationException(
+                "Pairing was rejected or timed out on Windows.");
+        }
+
+        PairingConfirmPayload localConfirmation =
+            responder.ApproveDisplayedCode();
+
+        await WriteUsbFrameAsync(
+                connection.Output,
+                PairingFrameCodec
+                    .EncodeConfirm(
+                        localConfirmation),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        byte[] remoteFrame =
+            await ReadUsbFrameWithTimeoutAsync(
+                    connection.Input,
+                    TimeSpan.FromMinutes(2),
+                    cancellationToken,
+                    "Timed out waiting for Android pairing confirmation.")
+                .ConfigureAwait(false);
+
+        MessageType remoteType =
+            ReadUsbInitialMessageType(
+                remoteFrame);
+
+        if (remoteType ==
+            MessageType.PairingAbort)
+        {
+            PairingAbortPayload abort =
+                PairingFrameCodec
+                    .DecodeAbort(
+                        remoteFrame);
+
+            throw new InvalidOperationException(
+                $"Android aborted pairing: {abort.Reason}.");
+        }
+
+        if (remoteType !=
+            MessageType.PairingConfirm)
+        {
+            throw new FormatException(
+                $"Expected PAIRING_CONFIRM from Android, received {remoteType}.");
+        }
+
+        PairingConfirmPayload remoteConfirmation =
+            PairingFrameCodec
+                .DecodeConfirm(
+                    remoteFrame);
+
+        using PairingEstablishedMaterial established =
+            responder.AcceptRemoteConfirmation(
+                remoteConfirmation);
+
+        byte[] secret =
+            established.CopyTrustSecret();
+
+        try
+        {
+            trust.TrustedPeers.Put(
+                new TrustedPeerRecord(
+                    established.RemotePeerId,
+                    "NATSX Android Controller",
+                    (byte)(
+                        TransportCapabilities.Wifi |
+                        TransportCapabilities.Bluetooth |
+                        TransportCapabilities.UsbDirect),
+                    DateTimeOffset.UtcNow,
+                    TrustedPeerRecord
+                        .CurrentPairingVersion),
+                secret);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(
+                secret);
+        }
+
+        Report(
+            $"Pairing complete. Trusted Android peer: {established.RemotePeerId}.");
+    }
+
+    private async ValueTask<bool> RequestPairingConfirmationAsync(
+        string comparisonCode,
+        PeerId remotePeerId,
+        CancellationToken cancellationToken)
+    {
+        var source =
+            new TaskCompletionSource<bool>(
+                TaskCreationOptions
+                    .RunContinuationsAsynchronously);
+
+        lock (_pairingGate)
+        {
+            if (_pairingConfirmationSource is not null)
+            {
+                throw new InvalidOperationException(
+                    "Another pairing confirmation is already pending.");
+            }
+
+            _pairingConfirmationSource =
+                source;
+        }
+
+        PairingConfirmationChanged?.Invoke(
+            new PairingConfirmationPrompt(
+                comparisonCode,
+                remotePeerId));
+
+        try
+        {
+            return await source.Task
+                .WaitAsync(
+                    TimeSpan.FromMinutes(2),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+        finally
+        {
+            lock (_pairingGate)
+            {
+                if (ReferenceEquals(
+                        _pairingConfirmationSource,
+                        source))
+                {
+                    _pairingConfirmationSource =
+                        null;
+                }
+            }
+
+            PairingConfirmationChanged?.Invoke(
+                null);
+        }
+    }
+
+    private static async ValueTask WriteUsbFrameAsync(
+        Stream output,
+        byte[] frame,
+        CancellationToken cancellationToken)
+    {
+        byte[] packet =
+            UsbStreamFrameCodec.Encode(
+                frame);
+
+        try
+        {
+            await output.WriteAsync(
+                    packet,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(
+                frame);
+            CryptographicOperations.ZeroMemory(
+                packet);
+        }
+    }
+
+    private static async ValueTask TrySendPairingAbortAsync(
+        Stream output,
+        PairingAbortReason reason,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await WriteUsbFrameAsync(
+                    output,
+                    PairingFrameCodec
+                        .EncodeAbort(
+                            new PairingAbortPayload(
+                                reason)),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+        }
+    }
+
+    private static async ValueTask<byte[]>
+        ReadUsbFrameWithTimeoutAsync(
+            Stream input,
+            TimeSpan timeout,
+            CancellationToken cancellationToken,
+            string timeoutMessage)
+    {
+        using var timeoutCancellation =
+            CancellationTokenSource
+                .CreateLinkedTokenSource(
+                    cancellationToken);
+
+        timeoutCancellation.CancelAfter(
+            timeout);
+
+        try
+        {
+            return await UsbStreamFrameCodec
+                .ReadFrameAsync(
+                    input,
+                    timeoutCancellation.Token)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                timeoutMessage);
+        }
+    }
+
     private static MessageType ReadUsbInitialMessageType(
         ReadOnlySpan<byte> frame)
     {
@@ -1188,6 +1480,18 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         _lifetime = null;
         lifetime?.Cancel();
+
+        lock (_pairingGate)
+        {
+            _pairingConfirmationSource
+                ?.TrySetCanceled();
+
+            _pairingConfirmationSource =
+                null;
+        }
+
+        PairingConfirmationChanged?.Invoke(
+            null);
 
         Task? usbMonitor =
             _usbMonitorTask;
