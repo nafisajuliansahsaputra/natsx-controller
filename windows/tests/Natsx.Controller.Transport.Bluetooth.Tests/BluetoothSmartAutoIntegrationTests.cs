@@ -428,7 +428,11 @@ public sealed class BluetoothSmartAutoIntegrationTests
     private sealed class ManualTimeProvider :
         TimeProvider
     {
-        private long _timestamp;
+        // Production monotonic clocks are already non-zero by the time a
+        // realtime frame arrives. Keep zero reserved for receiver "no sample"
+        // sentinels in deterministic tests as well.
+        private long _timestamp =
+            TimeSpan.FromSeconds(1).Ticks;
 
         public override long TimestampFrequency =>
             TimeSpan.TicksPerSecond;
