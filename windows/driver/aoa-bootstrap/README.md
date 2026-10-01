@@ -21,9 +21,12 @@ Current scope:
   revision and declares `NatsxAoaBootstrap` as a device-specific lower filter;
 - the earlier ADB-on `PID_2765` composite layout is recorded only as a
   diagnostic comparison and is not a NATSX dependency;
-- the INF remains intentionally outside the install/package build until the
-  existing filter-stack metadata is captured and the lower-filter position is
-  validated against the real WPD stack;
+- the ADB-off device reports `WinUsb` in both `LowerFilters` and
+  `CompoundLowerFilters`, which is normal for the Windows USB-MTP stack;
+- the INF remains intentionally outside the install/package build because a
+  second generic lower filter has no guaranteed relative order against WinUSB
+  unless the base stack exposes usable filter levels; the effective PnP stack
+  must be captured and the ordering/compatibility plan validated first;
 - no driver is loaded by normal application runtime unless the prototype
   package is explicitly installed for physical validation.
 
