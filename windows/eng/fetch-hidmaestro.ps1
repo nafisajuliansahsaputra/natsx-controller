@@ -35,7 +35,22 @@ try {
     Write-Host "Downloading HIDMaestro $Version..."
     Invoke-WebRequest -Uri $Uri -OutFile $ZipPath -UseBasicParsing
 
-    $ActualSha256 = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $Sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $ArchiveStream = [System.IO.File]::OpenRead($ZipPath)
+        try {
+            $HashBytes = $Sha256.ComputeHash($ArchiveStream)
+        }
+        finally {
+            $ArchiveStream.Dispose()
+        }
+    }
+    finally {
+        $Sha256.Dispose()
+    }
+
+    $ActualSha256 =
+        ([System.BitConverter]::ToString($HashBytes) -replace "-", "").ToLowerInvariant()
 
     if ($ActualSha256 -ne $ExpectedSha256) {
         throw "HIDMaestro archive SHA-256 mismatch. Expected $ExpectedSha256, got $ActualSha256."
