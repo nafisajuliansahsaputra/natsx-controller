@@ -98,16 +98,24 @@ The probe sends only AOA request 51 (GET_PROTOCOL). It does **not** send AOA
 identity strings and does **not** send START_ACCESSORY, so it will not
 intentionally switch the phone into accessory mode.
 
-Interpretation:
+Physical result on the OPPO A58 no-ADB target:
 
-- if `winusb-initialize` fails, the inbox WinUSB lower filter is not directly
-  usable through this device interface and the kernel bootstrap boundary
-  remains necessary;
-- if initialization succeeds but `aoa-get-protocol` fails, user-mode access
-  exists but does not provide the endpoint-zero path AOA needs;
-- if the probe returns a non-zero AOA protocol version, do not install the
-  NATSX filter yet; the driverless bootstrap path should be promoted into a
-  bounded prototype and tested before accepting any kernel-stack mutation.
+```text
+Success: false
+Stage: winusb-initialize
+Win32Error: 1 (ERROR_INVALID_FUNCTION / Incorrect function)
+```
+
+The existing inbox MTP WinUSB lower filter therefore does not expose a usable
+application WinUSB handle through the device interface that Windows publishes
+for this WPD device. The driverless bootstrap path is closed for this validated
+stack and the kernel bootstrap boundary remains necessary.
+
+Before installation, the KMDF prototype now moves its custom IOCTL channel to a
+sideband control device. This follows the Windows filter-driver pattern used
+when a filter can sit underneath another driver that may reject unknown IOCTLs.
+The PnP filter stack remains pass-through; user-mode control requests no longer
+depend on traversing WPD/WUDF first.
 
 ## Package/attach gate
 
