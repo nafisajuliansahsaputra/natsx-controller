@@ -170,6 +170,30 @@ public sealed class SmartConnectionManagerTests
     }
 
     [Fact]
+    public void Usb_TakesOverFromHealthyBluetoothAfterStabilization()
+    {
+        var clock = new ManualTimeProvider();
+        var manager = new SmartConnectionManager(timeProvider: clock);
+
+        manager.Report(Snapshot(TransportKind.Bluetooth, 95));
+        var initial = Assert.IsType<HandoverProposal>(manager.Evaluate());
+        manager.Commit(initial);
+
+        manager.Report(Snapshot(TransportKind.Usb, 95));
+        Assert.Null(manager.Evaluate());
+
+        clock.Advance(ConnectionPolicy.Competitive.UsbRecoveryStability);
+        manager.Report(Snapshot(TransportKind.Usb, 95));
+        manager.Report(Snapshot(TransportKind.Bluetooth, 95));
+
+        HandoverProposal proposal =
+            Assert.IsType<HandoverProposal>(manager.Evaluate());
+
+        Assert.Equal(TransportKind.Usb, proposal.To);
+        Assert.Equal(HandoverReason.PreferredUsbReady, proposal.Reason);
+    }
+
+    [Fact]
     public void Cooldown_PreventsImmediateWifiHandback()
     {
         var clock = new ManualTimeProvider();
