@@ -71,6 +71,10 @@ jobs:
         shell: powershell
         run: .\windows\driver\aoa-bootstrap\build-oppo-a58-test-package.ps1
 
+      - name: Test-sign OPPO A58 validation package
+        shell: powershell
+        run: .\windows\driver\aoa-bootstrap\sign-oppo-a58-ci-test-package.ps1
+
       - name: Upload driver prototype
         if: success()
         uses: actions/upload-artifact@v4
