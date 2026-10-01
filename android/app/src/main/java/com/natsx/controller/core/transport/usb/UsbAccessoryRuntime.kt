@@ -38,6 +38,7 @@ class UsbAccessoryRuntime(
         }
 
     private val closed = AtomicBoolean(false)
+    private val connectInFlight = AtomicBoolean(false)
     private val gate = Any()
 
     private var connection: UsbAccessoryConnection? = null
@@ -47,6 +48,19 @@ class UsbAccessoryRuntime(
 
     fun connect(accessory: UsbAccessory) {
         if (closed.get() || !UsbAccessoryIdentity.matches(accessory)) {
+            return
+        }
+
+        synchronized(gate) {
+            if (activeAccessory == accessory && sender != null) {
+                return
+            }
+        }
+
+        if (!connectInFlight.compareAndSet(false, true)) {
+            status.publish(
+                "USB connection attempt already in progress.",
+            )
             return
         }
 
@@ -67,6 +81,8 @@ class UsbAccessoryRuntime(
                     "USB error: $detail",
                     isError = true,
                 )
+            } finally {
+                connectInFlight.set(false)
             }
         }
     }
@@ -293,6 +309,10 @@ class UsbAccessoryRuntime(
                         opened.input,
                     )
 
+            status.publish(
+                "Windows pairing confirmation frame received.",
+            )
+
             val remoteConfirm:
                 PairingConfirmPayload =
                 when (
@@ -325,10 +345,17 @@ class UsbAccessoryRuntime(
                         )
                 }
 
+            status.publish(
+                "Verifying Windows pairing confirmation…",
+            )
+
             pairing
                 .acceptRemoteConfirmation(
                     remoteConfirm,
                 ).use { established ->
+                    status.publish(
+                        "Windows pairing confirmation verified.",
+                    )
                     val secret =
                         established
                             .copyTrustSecret()
@@ -348,6 +375,10 @@ class UsbAccessoryRuntime(
                                 pairedAtEpochMillis =
                                     System.currentTimeMillis(),
                             )
+
+                        status.publish(
+                            "Saving trusted Windows receiver…",
+                        )
 
                         trustedPeerStore.put(
                             record,
