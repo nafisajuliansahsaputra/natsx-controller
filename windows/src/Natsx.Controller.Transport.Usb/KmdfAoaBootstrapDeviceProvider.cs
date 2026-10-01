@@ -180,14 +180,41 @@ internal sealed class KmdfAoaBootstrapDevice :
                     "The NATSX AOA bootstrap GET_STATUS response does not match GET_VERSION.");
             }
 
-            if (status.AttachedTargetCount != 1 ||
-                status.ReadyUsbTargetCount != 1)
+            if (status.AttachedTargetCount != 1)
             {
                 throw new BootstrapTargetNotReadyException(
-                    status.AttachedTargetCount,
-                    status.ReadyUsbTargetCount,
-                    status.LastUsbTargetCreateStatus,
-                    status.UsbTargetCreateAttemptCount);
+                    $"Expected exactly one attached bootstrap target, found {status.AttachedTargetCount}.");
+            }
+
+            byte[] rawProbeResponse =
+                DeviceIoControl(
+                    handle,
+                    AoaBootstrapDriverProtocol.ProbeProtocolRawControlCode,
+                    AoaBootstrapDriverProtocol.RawProtocolProbeResponseSize);
+
+            AoaBootstrapRawProtocolProbe rawProbe =
+                AoaBootstrapDriverProtocol.ParseRawProtocolProbe(
+                    rawProbeResponse);
+
+            if (rawProbe.ProtocolVersion != version.ProtocolVersion ||
+                rawProbe.DriverBuild != version.DriverBuild)
+            {
+                throw new IOException(
+                    "The NATSX raw AOA protocol probe does not match GET_VERSION.");
+            }
+
+            if (rawProbe.SubmitStatus != 0 ||
+                rawProbe.UsbStatus != 0 ||
+                rawProbe.BytesTransferred != 2 ||
+                rawProbe.AoaProtocolVersion == 0 ||
+                rawProbe.Reserved != 0)
+            {
+                throw new BootstrapTargetNotReadyException(
+                    $"Raw endpoint-zero probe is not ready. " +
+                    $"SubmitStatus=0x{unchecked((uint)rawProbe.SubmitStatus):X8}, " +
+                    $"UsbStatus=0x{rawProbe.UsbStatus:X8}, " +
+                    $"Bytes={rawProbe.BytesTransferred}, " +
+                    $"AoaProtocol={rawProbe.AoaProtocolVersion}.");
             }
 
             return new KmdfAoaBootstrapDevice(
@@ -331,12 +358,19 @@ internal sealed class BootstrapTargetNotReadyException :
     IOException
 {
     public BootstrapTargetNotReadyException(
+        string diagnostic)
+        : base(
+            "The NATSX AOA bootstrap target is not ready. " +
+            diagnostic)
+    {
+    }
+
+    public BootstrapTargetNotReadyException(
         uint attachedTargetCount,
         uint readyUsbTargetCount,
         int lastUsbTargetCreateStatus,
         uint usbTargetCreateAttemptCount)
-        : base(
-            $"The NATSX AOA bootstrap driver is loaded, but the USB target is not uniquely ready. " +
+        : this(
             $"Attached={attachedTargetCount}, Ready={readyUsbTargetCount}, " +
             $"LastCreateStatus=0x{unchecked((uint)lastUsbTargetCreateStatus):X8}, " +
             $"CreateAttempts={usbTargetCreateAttemptCount}.")
