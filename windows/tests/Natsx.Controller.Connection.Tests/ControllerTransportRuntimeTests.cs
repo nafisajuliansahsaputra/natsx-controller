@@ -349,6 +349,98 @@ public sealed class ControllerTransportRuntimeTests
     }
 
     [Fact]
+    public async Task DetachActiveTransport_FailsOverWithEquivalentGlobalSequence()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new FakeBackend();
+        var session = new ControllerSession();
+        ConnectionPolicy policy = ConnectionPolicy.Competitive;
+        var safety = new InputSafetyEngine(
+            session,
+            backend,
+            policy,
+            clock);
+        var manager = new SmartConnectionManager(
+            policy,
+            clock);
+
+        var usb =
+            new FakeTransport(
+                TransportKind.Usb,
+                clock)
+            {
+                Snapshot =
+                    Healthy(
+                        TransportKind.Usb,
+                        98),
+            };
+
+        var wifi =
+            new FakeTransport(
+                TransportKind.Wifi,
+                clock)
+            {
+                Snapshot =
+                    Healthy(
+                        TransportKind.Wifi,
+                        95),
+            };
+
+        await using var runtime =
+            new ControllerTransportRuntime(
+                session,
+                safety,
+                manager,
+                new IControllerTransport[]
+                {
+                    usb,
+                    wifi,
+                },
+                policy,
+                clock);
+
+        await runtime.StartAsync();
+
+        GamepadState sharedState =
+            GamepadState.Neutral with
+            {
+                Buttons = GamepadButtons.A,
+                LeftX = 3210,
+            };
+
+        usb.Publish(
+            42,
+            sharedState);
+        wifi.Publish(
+            42,
+            sharedState);
+
+        runtime.EvaluateOnce();
+
+        Assert.Equal(
+            TransportKind.Usb,
+            runtime.ActiveTransport);
+
+        bool removed =
+            await runtime.DetachTransportAsync(
+                TransportKind.Usb);
+
+        Assert.True(removed);
+        Assert.Equal(
+            TransportKind.Wifi,
+            runtime.ActiveTransport);
+        Assert.Equal(
+            TransportKind.Wifi,
+            session.AuthoritativeTransport);
+        Assert.Equal(
+            (uint)42,
+            session.LastAcceptedSequence);
+        Assert.Equal(
+            sharedState,
+            backend.LastState);
+    }
+
+    [Fact]
     public async Task NonAuthoritativeRealtimeState_DoesNotReachBackend()
     {
         var clock = new ManualTimeProvider();
