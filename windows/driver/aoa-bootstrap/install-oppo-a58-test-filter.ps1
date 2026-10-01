@@ -1,70 +1,12 @@
 [CmdletBinding()]
 param(
-    [string]$InstanceId,
+    [string]$InstanceId = "USB\VID_22D9&PID_2764\W4U4SCSSGMIBLJ8H",
     [string]$PackageDirectory,
     [switch]$Install,
     [switch]$IUnderstandThisRestartsTheUsbDevice
 )
 
 $ErrorActionPreference = "Stop"
-
-function Resolve-ExactTargetDevice {
-    param(
-        [string]$RequestedInstanceId,
-        [Parameter(Mandatory = $true)]
-        [string]$ExpectedHardwareId
-    )
-
-    if (-not [string]::IsNullOrWhiteSpace($RequestedInstanceId)) {
-        $requested = Get-PnpDevice -InstanceId $RequestedInstanceId -PresentOnly -ErrorAction SilentlyContinue
-        if ($null -eq $requested) {
-            throw "Requested OPPO A58 instance is not currently present: $RequestedInstanceId"
-        }
-
-        $requestedHardwareIds = @(
-            (Get-PnpDeviceProperty -InstanceId $requested.InstanceId -KeyName "DEVPKEY_Device_HardwareIds" -ErrorAction Stop).Data
-        )
-
-        if ($requestedHardwareIds -notcontains $ExpectedHardwareId) {
-            throw "Requested device does not expose the exact validated hardware ID '$ExpectedHardwareId'."
-        }
-
-        return $requested
-    }
-
-    $candidates = @(
-        Get-PnpDevice -PresentOnly -ErrorAction Stop |
-            Where-Object { $_.InstanceId -like "USB\VID_22D9&PID_2764*" }
-    )
-
-    $exactMatches = @(
-        foreach ($candidate in $candidates) {
-            try {
-                $ids = @(
-                    (Get-PnpDeviceProperty -InstanceId $candidate.InstanceId -KeyName "DEVPKEY_Device_HardwareIds" -ErrorAction Stop).Data
-                )
-
-                if ($ids -contains $ExpectedHardwareId) {
-                    $candidate
-                }
-            }
-            catch {
-                # Ignore transient candidate/property failures and continue exact matching.
-            }
-        }
-    )
-
-    if ($exactMatches.Count -eq 0) {
-        throw "No present OPPO A58 exposes '$ExpectedHardwareId'. Reconnect the phone with USB debugging/ADB disabled and USB mode set to File Transfer, then retry."
-    }
-
-    if ($exactMatches.Count -gt 1) {
-        $ids = ($exactMatches | ForEach-Object { $_.InstanceId }) -join "; "
-        throw "Multiple exact OPPO A58 targets are present; pass -InstanceId explicitly. Matches: $ids"
-    }
-
-    return $exactMatches[0]
-}
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Resolve-Path (Join-Path $scriptRoot "..\..\..")
@@ -133,9 +75,7 @@ if (-not [string]::IsNullOrWhiteSpace([string]$manifest.CatalogSha256) -and
     throw "Catalog SHA-256 does not match package-manifest.json."
 }
 
-$device = Resolve-ExactTargetDevice -RequestedInstanceId $InstanceId -ExpectedHardwareId $expectedHardwareId
-$InstanceId = $device.InstanceId
-
+$device = Get-PnpDevice -InstanceId $InstanceId -PresentOnly -ErrorAction Stop
 $hardwareIds = @(
     (Get-PnpDeviceProperty -InstanceId $InstanceId -KeyName "DEVPKEY_Device_HardwareIds" -ErrorAction Stop).Data
 )
@@ -207,7 +147,6 @@ $trustedPublisher =
     Test-Path ("Cert:\LocalMachine\TrustedPublisher\" + $expectedSignerThumbprint)
 
 $preflight = [ordered]@{
-    TargetInstanceId = $InstanceId
     TargetStatus = $device.Status
     TargetClass = $device.Class
     TargetHardwareId = $expectedHardwareId
