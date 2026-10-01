@@ -120,9 +120,12 @@ USB, Wi-Fi, and Bluetooth serialize the same logical protocol.
 
 ### Virtual controller
 
-Current planned backend: HIDMaestro Xbox 360-compatible profile/integration.
+Current Windows backend: HIDMaestro Xbox 360-compatible profile/integration.
 
-The backend must remain replaceable at the architecture boundary until integration is proven.
+The receiver creates the virtual backend independently from Wi-Fi, Bluetooth,
+or USB transport lifetime. The backend remains replaceable behind
+`IVirtualGamepadBackend`; transport attach/detach must never recreate the
+controller device.
 
 ---
 
