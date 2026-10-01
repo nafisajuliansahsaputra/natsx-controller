@@ -122,9 +122,9 @@ public sealed class WinUsbAoaAccessoryBackend : IAoaAccessoryDataBackend
                     .AsStreamForRead(bufferSize: 0);
 
             Stream output =
-                dataInterface.BulkOutPipes[0]
-                    .OutputStream
-                    .AsStreamForWrite(bufferSize: 0);
+                new WinRtUsbDirectOutputStream(
+                    dataInterface.BulkOutPipes[0]
+                        .OutputStream);
 
             return new WinUsbAoaAccessoryConnection(
                 device,
