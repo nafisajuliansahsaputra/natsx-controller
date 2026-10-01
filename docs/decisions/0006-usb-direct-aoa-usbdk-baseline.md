@@ -1,6 +1,6 @@
 # ADR 0006 — USB Direct via Android Open Accessory and UsbDk host access
 
-**Status:** Accepted  
+**Status:** Provisional  
 **Date:** 2026-10-01
 
 ## Context
@@ -64,7 +64,11 @@ NATSX uses only the accessory data interface. The presence of an ADB-capable pro
 
 ### Windows host backend
 
-Use a UsbDk-style native host backend for device enumeration, endpoint-zero control transfers, and bulk endpoint I/O.
+AOA is accepted as the Android/USB protocol topology. The exact Windows native host backend remains **unresolved for release**.
+
+UsbDk is retained only as a prototype/reference candidate because it can enumerate arbitrary USB devices and perform raw redirect/control/bulk I/O without requiring permanent manual WinUSB replacement. It is **not approved as the shipping default** until physical Windows 11 validation proves acceptable stability.
+
+The shipping backend must provide the same application-owned abstraction for device enumeration, endpoint-zero control transfers, re-enumeration, and bulk I/O.
 
 Reason:
 
@@ -146,3 +150,14 @@ Costs:
 - physical-device compatibility must be tested across Android OEMs;
 - charge-only cables must be detected and reported clearly;
 - AOA temporarily replaces MTP while accessory mode is active.
+
+
+## Safety follow-up
+
+Current upstream libusb Windows guidance discourages UsbDk because of reported stability issues, and public UsbDk issue reports include serious failures on recent Windows builds. Therefore:
+
+- no UsbDk installer/runtime is added to the repository yet;
+- no driver install is performed by the receiver;
+- physical backend validation remains an open M9 task;
+- the transport/session layers continue independently behind interfaces;
+- the ADR must be superseded or promoted to Accepted only after the native backend and its installation model pass physical compatibility testing.

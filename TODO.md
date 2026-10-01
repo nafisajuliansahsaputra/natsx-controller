@@ -288,18 +288,18 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ## M9 — USB Direct transport
 
 - [x] Validate final Android USB accessory/direct data approach.
-- [x] Validate Windows-side USB implementation.
-- [x] Record ADR for exact USB design.
+- [ ] Validate Windows-side USB implementation.
+- [ ] Record ADR for exact USB design.
 - [ ] Implement direct USB transport.
 - [x] No USB tethering.
 - [x] No ADB requirement.
 - [ ] Detect charge-only/non-data cable failure.
-- [ ] Implement handshake.
-- [ ] Implement USB health monitoring.
-- [ ] Implement 250–500 ms stabilization.
-- [ ] Integrate with Smart Connection Manager.
-- [ ] Wi-Fi/Bluetooth -> USB preferred takeover.
-- [ ] USB disconnect -> immediate best-backup takeover.
+- [x] Implement handshake.
+- [x] Implement USB health monitoring.
+- [x] Implement 250–500 ms stabilization.
+- [x] Integrate with Smart Connection Manager.
+- [x] Wi-Fi/Bluetooth -> USB preferred takeover.
+- [x] USB disconnect -> immediate best-backup takeover.
 - [ ] Verify Windows Ethernet/LAN route remains unaffected.
 
 **Exit criteria:** USB can be plugged/unplugged during a running controller session and Smart Auto moves transports without manual reconnect.
