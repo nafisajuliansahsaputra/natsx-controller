@@ -1,6 +1,8 @@
 #include <ntddk.h>
 #include <wdf.h>
+#include <usb.h>
 #include <usbdi.h>
+#include <usbioctl.h>
 #include <usbdlib.h>
 #include <wdfusb.h>
 #include <initguid.h>
@@ -65,6 +67,19 @@ NatsxDeleteControlDeviceIfUnused(
 static NTSTATUS
 NatsxReferenceReadyTarget(
     _Out_ WDFDEVICE* Device
+    );
+
+static NTSTATUS
+NatsxReferenceSingleAttachedTarget(
+    _Out_ WDFDEVICE* Device
+    );
+
+static NTSTATUS
+NatsxProbeAoaProtocolRawUrb(
+    _In_ WDFDEVICE Device,
+    _Out_ PUSHORT AoaProtocolVersion,
+    _Out_ PULONG UsbStatus,
+    _Out_ PULONG BytesTransferred
     );
 
 static VOID
@@ -420,6 +435,73 @@ NatsxEvtControlIoDeviceControl(
     }
 
     if (IoControlCode ==
+        IOCTL_NATSX_AOA_PROBE_PROTOCOL_RAW) {
+        if (OutputBufferLength <
+            sizeof(NATSX_AOA_RAW_PROTOCOL_PROBE_RESPONSE)) {
+            WdfRequestComplete(
+                Request,
+                STATUS_BUFFER_TOO_SMALL);
+            return;
+        }
+
+        PNATSX_AOA_RAW_PROTOCOL_PROBE_RESPONSE response = NULL;
+        NTSTATUS status =
+            WdfRequestRetrieveOutputBuffer(
+                Request,
+                sizeof(NATSX_AOA_RAW_PROTOCOL_PROBE_RESPONSE),
+                (PVOID*)&response,
+                NULL);
+
+        if (!NT_SUCCESS(status)) {
+            WdfRequestComplete(
+                Request,
+                status);
+            return;
+        }
+
+        RtlZeroMemory(
+            response,
+            sizeof(*response));
+
+        response->ProtocolVersion =
+            NATSX_AOA_BOOTSTRAP_PROTOCOL_VERSION;
+        response->DriverBuild =
+            NATSX_AOA_BOOTSTRAP_DRIVER_BUILD;
+
+        WDFDEVICE targetDevice =
+            WDF_NO_HANDLE;
+
+        status =
+            NatsxReferenceSingleAttachedTarget(
+                &targetDevice);
+
+        if (NT_SUCCESS(status)) {
+            status =
+                NatsxProbeAoaProtocolRawUrb(
+                    targetDevice,
+                    &response->AoaProtocolVersion,
+                    &response->UsbStatus,
+                    &response->BytesTransferred);
+
+            WdfObjectDereference(
+                targetDevice);
+        }
+
+        response->SubmitStatus =
+            status;
+        response->Reserved =
+            0;
+
+        // The diagnostic IOCTL itself succeeds so user mode can always read
+        // the exact kernel/USB status without START_AOA side effects.
+        WdfRequestCompleteWithInformation(
+            Request,
+            STATUS_SUCCESS,
+            sizeof(*response));
+        return;
+    }
+
+    if (IoControlCode ==
         IOCTL_NATSX_AOA_START) {
         if (OutputBufferLength <
             sizeof(NATSX_AOA_START_RESPONSE)) {
@@ -697,6 +779,122 @@ NatsxGetTargetReadiness(
         attachedCount;
     *ReadyUsbTargetCount =
         readyCount;
+}
+
+static NTSTATUS
+NatsxReferenceSingleAttachedTarget(
+    _Out_ WDFDEVICE* Device
+    )
+{
+    *Device =
+        WDF_NO_HANDLE;
+
+    WdfWaitLockAcquire(
+        NatsxTargetDevicesLock,
+        NULL);
+
+    ULONG count =
+        WdfCollectionGetCount(
+            NatsxTargetDevices);
+
+    if (count == 1) {
+        WDFDEVICE target =
+            (WDFDEVICE)WdfCollectionGetItem(
+                NatsxTargetDevices,
+                0);
+
+        WdfObjectReference(
+            target);
+        *Device =
+            target;
+    }
+
+    WdfWaitLockRelease(
+        NatsxTargetDevicesLock);
+
+    if (count == 0) {
+        return STATUS_DEVICE_NOT_READY;
+    }
+
+    if (count > 1) {
+        return STATUS_DEVICE_BUSY;
+    }
+
+    return STATUS_SUCCESS;
+}
+
+static NTSTATUS
+NatsxProbeAoaProtocolRawUrb(
+    _In_ WDFDEVICE Device,
+    _Out_ PUSHORT AoaProtocolVersion,
+    _Out_ PULONG UsbStatus,
+    _Out_ PULONG BytesTransferred
+    )
+{
+    *AoaProtocolVersion =
+        0;
+    *UsbStatus =
+        0;
+    *BytesTransferred =
+        0;
+
+    USHORT protocolVersion =
+        0;
+
+    URB urb;
+    RtlZeroMemory(
+        &urb,
+        sizeof(urb));
+
+    UsbBuildVendorRequest(
+        &urb,
+        URB_FUNCTION_VENDOR_DEVICE,
+        sizeof(struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST),
+        USBD_TRANSFER_DIRECTION_IN | USBD_SHORT_TRANSFER_OK,
+        0,
+        AOA_GET_PROTOCOL,
+        0,
+        0,
+        &protocolVersion,
+        NULL,
+        sizeof(protocolVersion),
+        NULL);
+
+    WDF_MEMORY_DESCRIPTOR urbDescriptor;
+    WDF_MEMORY_DESCRIPTOR_INIT_BUFFER(
+        &urbDescriptor,
+        &urb,
+        sizeof(urb));
+
+    WDF_REQUEST_SEND_OPTIONS sendOptions;
+    WDF_REQUEST_SEND_OPTIONS_INIT(
+        &sendOptions,
+        WDF_REQUEST_SEND_OPTION_TIMEOUT);
+
+    WDF_REQUEST_SEND_OPTIONS_SET_TIMEOUT(
+        &sendOptions,
+        WDF_REL_TIMEOUT_IN_MS(
+            AOA_CONTROL_TIMEOUT_MS));
+
+    NTSTATUS status =
+        WdfIoTargetSendInternalIoctlOthersSynchronously(
+            WdfDeviceGetIoTarget(Device),
+            WDF_NO_HANDLE,
+            IOCTL_INTERNAL_USB_SUBMIT_URB,
+            &urbDescriptor,
+            NULL,
+            NULL,
+            &sendOptions,
+            NULL);
+
+    *UsbStatus =
+        (ULONG)urb.UrbHeader.Status;
+    *BytesTransferred =
+        urb.UrbControlVendorClassRequest.TransferBufferLength;
+    *AoaProtocolVersion =
+        protocolVersion;
+
+    return status;
 }
 
 static NTSTATUS
