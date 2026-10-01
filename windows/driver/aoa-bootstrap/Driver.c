@@ -3,6 +3,7 @@
 #include <usbdi.h>
 #include <usbdlib.h>
 #include <wdfusb.h>
+#include <wdmsec.h>
 #include <initguid.h>
 
 #include "Public.h"
@@ -11,6 +12,9 @@
 #define AOA_SEND_STRING 52u
 #define AOA_START_ACCESSORY 53u
 #define AOA_CONTROL_TIMEOUT_MS 750u
+
+#define NATSX_CONTROL_DEVICE_NAME L"\\Device\\NatsxAoaBootstrap"
+#define NATSX_CONTROL_SYMBOLIC_LINK L"\\DosDevices\\NatsxAoaBootstrap"
 
 typedef struct _DEVICE_CONTEXT {
     WDFUSBDEVICE UsbDevice;
@@ -23,7 +27,12 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(
 DRIVER_INITIALIZE DriverEntry;
 EVT_WDF_DRIVER_DEVICE_ADD NatsxEvtDeviceAdd;
 EVT_WDF_DEVICE_PREPARE_HARDWARE NatsxEvtDevicePrepareHardware;
-EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL NatsxEvtIoDeviceControl;
+EVT_WDF_OBJECT_CONTEXT_CLEANUP NatsxEvtDeviceContextCleanup;
+EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL NatsxEvtControlIoDeviceControl;
+
+static WDFCOLLECTION NatsxTargetDevices = NULL;
+static WDFWAITLOCK NatsxTargetDevicesLock = NULL;
+static WDFDEVICE NatsxControlDevice = NULL;
 
 static NTSTATUS
 NatsxSendVendorControl(
@@ -42,25 +51,20 @@ NatsxStartAccessoryMode(
     _Out_ PUSHORT ProtocolVersion
     );
 
+static NTSTATUS
+NatsxEnsureControlDevice(
+    _In_ WDFDRIVER Driver
+    );
+
 static VOID
-NatsxForwardRequest(
-    _In_ WDFQUEUE Queue,
-    _In_ WDFREQUEST Request
-    )
-{
-    WDFDEVICE device = WdfIoQueueGetDevice(Queue);
-    WDFIOTARGET target = WdfDeviceGetIoTarget(device);
+NatsxDeleteControlDeviceIfUnused(
+    VOID
+    );
 
-    WdfRequestFormatRequestUsingCurrentType(Request);
-
-    if (!WdfRequestSend(
-            Request,
-            target,
-            WDF_NO_SEND_OPTIONS)) {
-        NTSTATUS status = WdfRequestGetStatus(Request);
-        WdfRequestComplete(Request, status);
-    }
-}
+static NTSTATUS
+NatsxReferenceReadyTarget(
+    _Out_ WDFDEVICE* Device
+    );
 
 NTSTATUS
 DriverEntry(
@@ -69,17 +73,55 @@ DriverEntry(
     )
 {
     WDF_DRIVER_CONFIG config;
+    WDF_OBJECT_ATTRIBUTES attributes;
+    WDFDRIVER driver = WDF_NO_HANDLE;
+    NTSTATUS status;
 
     WDF_DRIVER_CONFIG_INIT(
         &config,
         NatsxEvtDeviceAdd);
 
-    return WdfDriverCreate(
-        DriverObject,
-        RegistryPath,
-        WDF_NO_OBJECT_ATTRIBUTES,
-        &config,
-        WDF_NO_HANDLE);
+    status =
+        WdfDriverCreate(
+            DriverObject,
+            RegistryPath,
+            WDF_NO_OBJECT_ATTRIBUTES,
+            &config,
+            &driver);
+
+    if (!NT_SUCCESS(status)) {
+        return status;
+    }
+
+    WDF_OBJECT_ATTRIBUTES_INIT(
+        &attributes);
+    attributes.ParentObject =
+        driver;
+
+    status =
+        WdfCollectionCreate(
+            &attributes,
+            &NatsxTargetDevices);
+
+    if (!NT_SUCCESS(status)) {
+        return status;
+    }
+
+    WDF_OBJECT_ATTRIBUTES_INIT(
+        &attributes);
+    attributes.ParentObject =
+        driver;
+
+    status =
+        WdfWaitLockCreate(
+            &attributes,
+            &NatsxTargetDevicesLock);
+
+    if (!NT_SUCCESS(status)) {
+        return status;
+    }
+
+    return STATUS_SUCCESS;
 }
 
 NTSTATUS
@@ -93,12 +135,12 @@ NatsxEvtDeviceAdd(
     WDFDEVICE device;
     WDF_OBJECT_ATTRIBUTES attributes;
     WDF_PNPPOWER_EVENT_CALLBACKS pnpCallbacks;
-    WDF_IO_QUEUE_CONFIG queueConfig;
     NTSTATUS status;
 
-    // This is a pass-through lower-filter prototype. It must never replace
-    // the OEM MTP/PTP function driver.
-    WdfFdoInitSetFilter(DeviceInit);
+    // This remains a pass-through PnP filter. It must never replace the
+    // normal WPD/MTP function driver.
+    WdfFdoInitSetFilter(
+        DeviceInit);
 
     WDF_PNPPOWER_EVENT_CALLBACKS_INIT(
         &pnpCallbacks);
@@ -111,11 +153,16 @@ NatsxEvtDeviceAdd(
     WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(
         &attributes,
         DEVICE_CONTEXT);
+    attributes.EvtCleanupCallback =
+        NatsxEvtDeviceContextCleanup;
+    attributes.ExecutionLevel =
+        WdfExecutionLevelPassive;
 
-    status = WdfDeviceCreate(
-        &DeviceInit,
-        &attributes,
-        &device);
+    status =
+        WdfDeviceCreate(
+            &DeviceInit,
+            &attributes,
+            &device);
 
     if (!NT_SUCCESS(status)) {
         return status;
@@ -124,27 +171,25 @@ NatsxEvtDeviceAdd(
     NatsxGetDeviceContext(device)->UsbDevice =
         WDF_NO_HANDLE;
 
-    status = WdfDeviceCreateDeviceInterface(
-        device,
-        &GUID_DEVINTERFACE_NATSX_AOA_BOOTSTRAP,
+    WdfWaitLockAcquire(
+        NatsxTargetDevicesLock,
         NULL);
 
+    status =
+        WdfCollectionAdd(
+            NatsxTargetDevices,
+            device);
+
+    WdfWaitLockRelease(
+        NatsxTargetDevicesLock);
+
     if (!NT_SUCCESS(status)) {
-        return status;
+        // Once installed, the filter must prefer losing NATSX bootstrap
+        // capability over preventing the OEM device stack from starting.
+        return STATUS_SUCCESS;
     }
 
-    WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(
-        &queueConfig,
-        WdfIoQueueDispatchParallel);
-
-    queueConfig.EvtIoDeviceControl =
-        NatsxEvtIoDeviceControl;
-
-    return WdfIoQueueCreate(
-        device,
-        &queueConfig,
-        WDF_NO_OBJECT_ATTRIBUTES,
-        WDF_NO_HANDLE);
+    return STATUS_SUCCESS;
 }
 
 NTSTATUS
@@ -160,27 +205,36 @@ NatsxEvtDevicePrepareHardware(
     PDEVICE_CONTEXT context =
         NatsxGetDeviceContext(Device);
 
-    if (context->UsbDevice != WDF_NO_HANDLE) {
-        return STATUS_SUCCESS;
+    if (context->UsbDevice == WDF_NO_HANDLE) {
+        WDF_USB_DEVICE_CREATE_CONFIG usbConfig;
+
+        WDF_USB_DEVICE_CREATE_CONFIG_INIT(
+            &usbConfig,
+            USBD_CLIENT_CONTRACT_VERSION_602);
+
+        NTSTATUS status =
+            WdfUsbTargetDeviceCreateWithParameters(
+                Device,
+                &usbConfig,
+                WDF_NO_OBJECT_ATTRIBUTES,
+                &context->UsbDevice);
+
+        if (!NT_SUCCESS(status)) {
+            // A filter must not prevent the normal WPD/MTP stack from
+            // starting. The NATSX control channel simply remains absent.
+            context->UsbDevice =
+                WDF_NO_HANDLE;
+            return STATUS_SUCCESS;
+        }
     }
 
-    WDF_USB_DEVICE_CREATE_CONFIG usbConfig;
-
-    WDF_USB_DEVICE_CREATE_CONFIG_INIT(
-        &usbConfig,
-        USBD_CLIENT_CONTRACT_VERSION_602);
-
     NTSTATUS status =
-        WdfUsbTargetDeviceCreateWithParameters(
-            Device,
-            &usbConfig,
-            WDF_NO_OBJECT_ATTRIBUTES,
-            &context->UsbDevice);
+        NatsxEnsureControlDevice(
+            WdfDeviceGetDriver(Device));
 
     if (!NT_SUCCESS(status)) {
-        // A filter must not prevent the OEM function stack from starting.
-        // The NATSX user-mode client will observe DEVICE_NOT_READY instead.
-        context->UsbDevice = WDF_NO_HANDLE;
+        // Sideband diagnostics/bootstrap are optional from the perspective of
+        // the OEM stack. Do not break MTP if the control object cannot start.
         return STATUS_SUCCESS;
     }
 
@@ -188,7 +242,44 @@ NatsxEvtDevicePrepareHardware(
 }
 
 VOID
-NatsxEvtIoDeviceControl(
+NatsxEvtDeviceContextCleanup(
+    _In_ WDFOBJECT Object
+    )
+{
+    WDFDEVICE device =
+        (WDFDEVICE)Object;
+
+    WdfWaitLockAcquire(
+        NatsxTargetDevicesLock,
+        NULL);
+
+    ULONG count =
+        WdfCollectionGetCount(
+            NatsxTargetDevices);
+
+    for (ULONG index = 0;
+         index < count;
+         ++index) {
+        if (WdfCollectionGetItem(
+                NatsxTargetDevices,
+                index) == Object) {
+            WdfCollectionRemoveItem(
+                NatsxTargetDevices,
+                index);
+            break;
+        }
+    }
+
+    WdfWaitLockRelease(
+        NatsxTargetDevicesLock);
+
+    UNREFERENCED_PARAMETER(device);
+
+    NatsxDeleteControlDeviceIfUnused();
+}
+
+VOID
+NatsxEvtControlIoDeviceControl(
     _In_ WDFQUEUE Queue,
     _In_ WDFREQUEST Request,
     _In_ size_t OutputBufferLength,
@@ -196,9 +287,11 @@ NatsxEvtIoDeviceControl(
     _In_ ULONG IoControlCode
     )
 {
+    UNREFERENCED_PARAMETER(Queue);
     UNREFERENCED_PARAMETER(InputBufferLength);
 
-    if (IoControlCode == IOCTL_NATSX_AOA_GET_VERSION) {
+    if (IoControlCode ==
+        IOCTL_NATSX_AOA_GET_VERSION) {
         if (OutputBufferLength <
             sizeof(NATSX_AOA_VERSION_RESPONSE)) {
             WdfRequestComplete(
@@ -234,7 +327,8 @@ NatsxEvtIoDeviceControl(
         return;
     }
 
-    if (IoControlCode == IOCTL_NATSX_AOA_START) {
+    if (IoControlCode ==
+        IOCTL_NATSX_AOA_START) {
         if (OutputBufferLength <
             sizeof(NATSX_AOA_START_RESPONSE)) {
             WdfRequestComplete(
@@ -243,37 +337,53 @@ NatsxEvtIoDeviceControl(
             return;
         }
 
-        PNATSX_AOA_START_RESPONSE response = NULL;
+        WDFDEVICE targetDevice =
+            WDF_NO_HANDLE;
+
         NTSTATUS status =
+            NatsxReferenceReadyTarget(
+                &targetDevice);
+
+        if (!NT_SUCCESS(status)) {
+            WdfRequestComplete(
+                Request,
+                status);
+            return;
+        }
+
+        PNATSX_AOA_START_RESPONSE response = NULL;
+
+        status =
             WdfRequestRetrieveOutputBuffer(
                 Request,
                 sizeof(NATSX_AOA_START_RESPONSE),
                 (PVOID*)&response,
                 NULL);
 
+        if (NT_SUCCESS(status)) {
+            USHORT aoaVersion = 0;
+
+            status =
+                NatsxStartAccessoryMode(
+                    targetDevice,
+                    &aoaVersion);
+
+            if (NT_SUCCESS(status)) {
+                response->AoaProtocolVersion =
+                    aoaVersion;
+                response->Reserved = 0;
+            }
+        }
+
+        WdfObjectDereference(
+            targetDevice);
+
         if (!NT_SUCCESS(status)) {
             WdfRequestComplete(
                 Request,
                 status);
             return;
         }
-
-        USHORT aoaVersion = 0;
-        status =
-            NatsxStartAccessoryMode(
-                WdfIoQueueGetDevice(Queue),
-                &aoaVersion);
-
-        if (!NT_SUCCESS(status)) {
-            WdfRequestComplete(
-                Request,
-                status);
-            return;
-        }
-
-        response->AoaProtocolVersion =
-            aoaVersion;
-        response->Reserved = 0;
 
         WdfRequestCompleteWithInformation(
             Request,
@@ -282,9 +392,238 @@ NatsxEvtIoDeviceControl(
         return;
     }
 
-    NatsxForwardRequest(
-        Queue,
-        Request);
+    WdfRequestComplete(
+        Request,
+        STATUS_INVALID_DEVICE_REQUEST);
+}
+
+static NTSTATUS
+NatsxEnsureControlDevice(
+    _In_ WDFDRIVER Driver
+    )
+{
+    NTSTATUS status =
+        STATUS_SUCCESS;
+
+    WdfWaitLockAcquire(
+        NatsxTargetDevicesLock,
+        NULL);
+
+    if (NatsxControlDevice != NULL) {
+        WdfWaitLockRelease(
+            NatsxTargetDevicesLock);
+        return STATUS_SUCCESS;
+    }
+
+    PWDFDEVICE_INIT controlInit =
+        WdfControlDeviceInitAllocate(
+            Driver,
+            &SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RW_RES_R);
+
+    if (controlInit == NULL) {
+        WdfWaitLockRelease(
+            NatsxTargetDevicesLock);
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
+
+    WdfDeviceInitSetExclusive(
+        controlInit,
+        FALSE);
+
+    WdfDeviceInitSetIoType(
+        controlInit,
+        WdfDeviceIoBuffered);
+
+    WdfDeviceInitSetCharacteristics(
+        controlInit,
+        FILE_DEVICE_SECURE_OPEN,
+        FALSE);
+
+    DECLARE_CONST_UNICODE_STRING(
+        deviceName,
+        NATSX_CONTROL_DEVICE_NAME);
+
+    status =
+        WdfDeviceInitAssignName(
+            controlInit,
+            &deviceName);
+
+    if (!NT_SUCCESS(status)) {
+        WdfDeviceInitFree(
+            controlInit);
+        WdfWaitLockRelease(
+            NatsxTargetDevicesLock);
+        return status;
+    }
+
+    WDF_OBJECT_ATTRIBUTES attributes;
+    WDF_OBJECT_ATTRIBUTES_INIT(
+        &attributes);
+    attributes.ExecutionLevel =
+        WdfExecutionLevelPassive;
+
+    WDFDEVICE controlDevice =
+        WDF_NO_HANDLE;
+
+    status =
+        WdfDeviceCreate(
+            &controlInit,
+            &attributes,
+            &controlDevice);
+
+    if (!NT_SUCCESS(status)) {
+        if (controlInit != NULL) {
+            WdfDeviceInitFree(
+                controlInit);
+        }
+
+        WdfWaitLockRelease(
+            NatsxTargetDevicesLock);
+        return status;
+    }
+
+    DECLARE_CONST_UNICODE_STRING(
+        symbolicLink,
+        NATSX_CONTROL_SYMBOLIC_LINK);
+
+    status =
+        WdfDeviceCreateSymbolicLink(
+            controlDevice,
+            &symbolicLink);
+
+    if (!NT_SUCCESS(status)) {
+        WdfObjectDelete(
+            controlDevice);
+        WdfWaitLockRelease(
+            NatsxTargetDevicesLock);
+        return status;
+    }
+
+    WDF_IO_QUEUE_CONFIG queueConfig;
+    WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(
+        &queueConfig,
+        WdfIoQueueDispatchSequential);
+    queueConfig.EvtIoDeviceControl =
+        NatsxEvtControlIoDeviceControl;
+
+    status =
+        WdfIoQueueCreate(
+            controlDevice,
+            &queueConfig,
+            WDF_NO_OBJECT_ATTRIBUTES,
+            WDF_NO_HANDLE);
+
+    if (!NT_SUCCESS(status)) {
+        WdfObjectDelete(
+            controlDevice);
+        WdfWaitLockRelease(
+            NatsxTargetDevicesLock);
+        return status;
+    }
+
+    WdfControlFinishInitializing(
+        controlDevice);
+
+    NatsxControlDevice =
+        controlDevice;
+
+    WdfWaitLockRelease(
+        NatsxTargetDevicesLock);
+
+    return STATUS_SUCCESS;
+}
+
+static VOID
+NatsxDeleteControlDeviceIfUnused(
+    VOID
+    )
+{
+    WDFDEVICE controlDevice =
+        WDF_NO_HANDLE;
+
+    WdfWaitLockAcquire(
+        NatsxTargetDevicesLock,
+        NULL);
+
+    if (WdfCollectionGetCount(
+            NatsxTargetDevices) == 0 &&
+        NatsxControlDevice != NULL) {
+        controlDevice =
+            NatsxControlDevice;
+        NatsxControlDevice =
+            NULL;
+    }
+
+    WdfWaitLockRelease(
+        NatsxTargetDevicesLock);
+
+    if (controlDevice != WDF_NO_HANDLE) {
+        WdfObjectDelete(
+            controlDevice);
+    }
+}
+
+static NTSTATUS
+NatsxReferenceReadyTarget(
+    _Out_ WDFDEVICE* Device
+    )
+{
+    *Device =
+        WDF_NO_HANDLE;
+
+    WDFDEVICE readyDevice =
+        WDF_NO_HANDLE;
+    ULONG readyCount = 0;
+
+    WdfWaitLockAcquire(
+        NatsxTargetDevicesLock,
+        NULL);
+
+    ULONG count =
+        WdfCollectionGetCount(
+            NatsxTargetDevices);
+
+    for (ULONG index = 0;
+         index < count;
+         ++index) {
+        WDFDEVICE candidate =
+            (WDFDEVICE)WdfCollectionGetItem(
+                NatsxTargetDevices,
+                index);
+
+        if (NatsxGetDeviceContext(candidate)->UsbDevice ==
+            WDF_NO_HANDLE) {
+            continue;
+        }
+
+        readyDevice =
+            candidate;
+        readyCount++;
+
+        if (readyCount > 1) {
+            break;
+        }
+    }
+
+    if (readyCount == 1) {
+        WdfObjectReference(
+            readyDevice);
+        *Device =
+            readyDevice;
+    }
+
+    WdfWaitLockRelease(
+        NatsxTargetDevicesLock);
+
+    if (readyCount == 0) {
+        return STATUS_DEVICE_NOT_READY;
+    }
+
+    if (readyCount > 1) {
+        return STATUS_DEVICE_BUSY;
+    }
+
+    return STATUS_SUCCESS;
 }
 
 static NTSTATUS
