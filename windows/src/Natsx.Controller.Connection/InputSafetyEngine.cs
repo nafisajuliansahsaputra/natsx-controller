@@ -44,6 +44,25 @@ public sealed class InputSafetyEngine
         return true;
     }
 
+    public bool TryAdoptEquivalentState(
+        TransportKind transport,
+        uint sequence,
+        GamepadState state)
+    {
+        if (!_session.TryAdoptEquivalentState(
+                transport,
+                sequence,
+                state))
+        {
+            return false;
+        }
+
+        _lastFreshTimestamp = _timeProvider.GetTimestamp();
+        _hasFreshState = true;
+        _isNeutralized = false;
+        return true;
+    }
+
     public bool Evaluate()
     {
         if (!_hasFreshState || _isNeutralized)
