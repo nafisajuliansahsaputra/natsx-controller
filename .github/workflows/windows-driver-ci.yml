@@ -45,6 +45,10 @@ jobs:
         shell: pwsh
         run: msbuild windows/driver/aoa-bootstrap/Natsx.AoaBootstrap.Driver.vcxproj /m /p:Configuration=Release /p:Platform=x64
 
+      - name: Prepare and validate OPPO A58 test package
+        shell: powershell
+        run: .\windows\driver\aoa-bootstrap\build-oppo-a58-test-package.ps1
+
       - name: Upload driver prototype
         if: success()
         uses: actions/upload-artifact@v4
@@ -54,4 +58,5 @@ jobs:
             windows/driver/aoa-bootstrap/x64/Release/*.sys
             windows/driver/aoa-bootstrap/x64/Release/*.pdb
             windows/driver/aoa-bootstrap/x64/Release/*.cer
+            windows/driver/aoa-bootstrap/artifacts/oppo-a58-test-package/**
           if-no-files-found: error
