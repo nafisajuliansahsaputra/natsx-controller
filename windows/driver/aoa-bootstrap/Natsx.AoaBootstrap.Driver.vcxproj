@@ -60,6 +60,8 @@
   <ItemGroup>
     <ClCompile Include="Driver.c" />
     <ClInclude Include="Public.h" />
+    <Inf Include="Natsx.AoaBootstrap.OPPOA58.Extension.inx" />
+    <FilesToPackage Include="$(TargetPath)" />
     <None Include="packages.config" />
   </ItemGroup>
 
