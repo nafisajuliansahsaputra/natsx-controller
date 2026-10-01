@@ -43,19 +43,30 @@ test attach.
 
 ## Current physical target captured on 2026-10-01
 
-The first physical target is an OPPO A58 whose normal USB stack was observed as:
+The first physical target is an OPPO A58.
 
-- composite parent: `USB\\VID_22D9&PID_2765&REV_0404`;
-- parent service: `usbccgp`;
-- MTP/WPD child: `USB\\VID_22D9&PID_2765&MI_00`, service `WUDFWpdMtp`;
-- optional ADB child: `USB\\VID_22D9&PID_2765&MI_01`, service `WINUSB`.
+With USB debugging enabled, Windows exposed a composite device:
 
-The bootstrap prototype must target the composite parent, not either child
-interface. This capture was taken while an ADB interface was present, so it is
-**not yet sufficient** to define the install match. Disable USB debugging,
-unplug/replug the phone in normal File Transfer/MTP mode, and capture the USB
-stack again. The ADB-off parent hardware ID must be supported independently;
-NATSX must not require the `MI_01` ADB function to exist.
+- parent: `USB\\VID_22D9&PID_2765&REV_0404`, service `usbccgp`;
+- MTP/WPD child: `MI_00`, service `WUDFWpdMtp`;
+- incidental ADB child: `MI_01`, service `WINUSB`.
+
+With USB debugging disabled, the shipping-relevant no-ADB state is different:
+
+- device: `USB\\VID_22D9&PID_2764&REV_0404`;
+- class: `WPD`;
+- service: `WUDFWpdMtp`;
+- base INF: `wpdmtp.inf`;
+- parent: USB root hub;
+- no ADB interface is present.
+
+NATSX must target the no-ADB `PID_2764` state. The `PID_2765` composite
+layout is only a diagnostic comparison and must never become a dependency.
+
+Before packaging the filter, capture the existing filter metadata for the exact
+`PID_2764` instance. The inspector reports legacy and declarative
+upper/lower-filter properties so the test package can avoid colliding with an
+existing filter stack.
 
 ## Package/attach gate
 
