@@ -63,10 +63,25 @@ With USB debugging disabled, the shipping-relevant no-ADB state is different:
 NATSX must target the no-ADB `PID_2764` state. The `PID_2765` composite
 layout is only a diagnostic comparison and must never become a dependency.
 
-Before packaging the filter, capture the existing filter metadata for the exact
-`PID_2764` instance. The inspector reports legacy and declarative
-upper/lower-filter properties so the test package can avoid colliding with an
-existing filter stack.
+The ADB-off capture reports no upper filters and reports `WinUsb` as both
+`LowerFilters` and `CompoundLowerFilters`. That is consistent with the normal
+Windows USB-MTP stack, where WinUSB sits below the WPD MTP function driver; it
+is not an ADB dependency.
+
+This creates a real ordering gate for NATSX: adding another generic
+`FilterPosition=Lower` filter can leave relative order among lower filters
+unspecified when the base stack does not expose named filter levels. Do not
+install the source INF until the effective stack is captured and the prototype
+has a deliberate ordering/compatibility plan.
+
+Capture the exact effective stack with:
+
+```powershell
+.\windows\eng\inspect-usb-bootstrap-target.ps1 `
+  -InstanceId "USB\VID_22D9&PID_2764\W4U4SCSSGMIBLJ8H" `
+  -IncludePnpUtilStack `
+  -AsJson
+```
 
 ## Package/attach gate
 
