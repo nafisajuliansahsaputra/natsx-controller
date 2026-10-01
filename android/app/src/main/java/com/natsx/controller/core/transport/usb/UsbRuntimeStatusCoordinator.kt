@@ -10,6 +10,8 @@ data class UsbRuntimeStatus(
 class UsbRuntimeStatusCoordinator {
     private val listeners =
         CopyOnWriteArraySet<(UsbRuntimeStatus) -> Unit>()
+    private val historyGate = Any()
+    private val history = ArrayDeque<String>()
 
     @Volatile
     private var current =
@@ -32,6 +34,20 @@ class UsbRuntimeStatusCoordinator {
 
         current = next
 
+        synchronized(historyGate) {
+            history.addLast(
+                if (isError) {
+                    "ERROR — $message"
+                } else {
+                    message
+                },
+            )
+
+            while (history.size > MAX_HISTORY) {
+                history.removeFirst()
+            }
+        }
+
         listeners.forEach { listener ->
             runCatching {
                 listener(next)
@@ -50,5 +66,16 @@ class UsbRuntimeStatusCoordinator {
         listener: (UsbRuntimeStatus) -> Unit,
     ) {
         listeners -= listener
+    }
+
+    fun historyText(): String =
+        synchronized(historyGate) {
+            history.joinToString(
+                separator = "\n",
+            )
+        }
+
+    private companion object {
+        const val MAX_HISTORY = 8
     }
 }
