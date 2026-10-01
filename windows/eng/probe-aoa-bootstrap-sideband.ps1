@@ -60,7 +60,9 @@ namespace Natsx.AoaBootstrap
                 if (handle.IsInvalid)
                 {
                     int error = Marshal.GetLastWin32Error();
-                    throw new Win32Exception(error, "Could not open \\.\\NatsxAoaBootstrap.");
+                    throw new Win32Exception(
+                        error,
+                        "Could not open \\.\\NatsxAoaBootstrap (Win32 error " + error + ").");
                 }
 
                 byte[] response = new byte[8];
@@ -78,7 +80,9 @@ namespace Natsx.AoaBootstrap
                     IntPtr.Zero))
                 {
                     int error = Marshal.GetLastWin32Error();
-                    throw new Win32Exception(error, "NATSX bootstrap GET_VERSION failed.");
+                    throw new Win32Exception(
+                        error,
+                        "NATSX bootstrap GET_VERSION failed (Win32 error " + error + ").");
                 }
 
                 if (bytesReturned < 8)
