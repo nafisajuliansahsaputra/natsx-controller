@@ -65,6 +65,8 @@ namespace Natsx.AoaBootstrap
 
                 byte[] response = new byte[8];
 
+                uint bytesReturned = 0;
+
                 if (!DeviceIoControl(
                     handle,
                     IOCTL_NATSX_GET_VERSION,
@@ -72,7 +74,7 @@ namespace Natsx.AoaBootstrap
                     0,
                     response,
                     (uint)response.Length,
-                    out uint bytesReturned,
+                    out bytesReturned,
                     IntPtr.Zero))
                 {
                     int error = Marshal.GetLastWin32Error();
