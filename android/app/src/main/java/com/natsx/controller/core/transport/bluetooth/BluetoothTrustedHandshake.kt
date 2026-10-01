@@ -13,6 +13,8 @@ import com.natsx.controller.core.protocol.ProtocolFrame
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
 import com.natsx.controller.core.protocol.ProtocolVersion
 import com.natsx.controller.core.protocol.ProtocolTransport
+import com.natsx.controller.core.protocol.RumblePayload
+import com.natsx.controller.core.protocol.RumblePayloadCodec
 import com.natsx.controller.core.protocol.SessionId
 import com.natsx.controller.core.protocol.SessionReadyPayload
 import com.natsx.controller.core.protocol.SessionReadyPayloadCodec
