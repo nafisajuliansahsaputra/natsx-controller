@@ -49,6 +49,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
     public event Action<PairingConfirmationPrompt?>?
         PairingConfirmationChanged;
 
+    public event Action<ReceiverDiagnosticsSnapshot>?
+        DiagnosticsChanged;
+
     public bool IsStarted => _started;
 
     public bool ResolvePairingConfirmation(
@@ -142,13 +145,19 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
             transportRuntime.HandoverCommitted +=
                 proposal =>
+                {
                     Report(
                         $"Active transport: {proposal.To}.");
+                    PublishDiagnostics();
+                };
 
             transportRuntime.TransportFaulted +=
                 (transport, exception) =>
+                {
                     Report(
                         $"{transport} transport fault: {exception.Message}");
+                    PublishDiagnostics();
+                };
 
             await transportRuntime
                 .StartAsync(
@@ -158,6 +167,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             _transportRuntime =
                 transportRuntime;
             _started = true;
+            PublishDiagnostics();
 
             await StartWifiHostAsync(
                     trust,
@@ -1821,6 +1831,75 @@ public sealed class ReceiverRuntime : IAsyncDisposable
     {
         StatusChanged?.Invoke(
             status);
+
+        PublishDiagnostics();
+    }
+
+    private void PublishDiagnostics()
+    {
+        ControllerTransportRuntime? runtime =
+            _transportRuntime;
+
+        TransportKind? active =
+            runtime?.ActiveTransport;
+
+        var backup = new List<string>();
+
+        if (runtime is not null)
+        {
+            foreach (TransportKind kind in Enum.GetValues<TransportKind>())
+            {
+                if (active == kind)
+                {
+                    continue;
+                }
+
+                if (!runtime.TryGetTransportState(
+                        kind,
+                        out TransportRuntimeState state))
+                {
+                    continue;
+                }
+
+                if (state is
+                    TransportRuntimeState.Ready or
+                    TransportRuntimeState.Active or
+                    TransportRuntimeState.Stabilizing or
+                    TransportRuntimeState.Degraded)
+                {
+                    backup.Add(
+                        $"{kind} ({state})");
+                }
+            }
+        }
+
+        int trustedControllerCount =
+            _trustServices?
+                .TrustedPeers
+                .List()
+                .Count ??
+            0;
+
+        DiagnosticsChanged?.Invoke(
+            new ReceiverDiagnosticsSnapshot(
+                SmartAutoState:
+                    runtime?.State.ToString() ??
+                    "Starting",
+                ActiveTransport:
+                    active?.ToString() ??
+                    "None",
+                BackupTransports:
+                    backup.Count == 0
+                        ? "None"
+                        : string.Join(
+                            ", ",
+                            backup),
+                VirtualControllerStatus:
+                    _virtualGamepad?.IsStarted == true
+                        ? "Ready"
+                        : "Unavailable",
+                TrustedControllerCount:
+                    trustedControllerCount));
     }
 
     private async ValueTask CleanupAsync()
