@@ -114,20 +114,14 @@ class UsbRealtimeSender(
         executor.shutdownNow()
         controlExecutor?.shutdownNow()
 
-        try {
-            inputStream?.close()
-        } catch (_: IOException) {
-        }
-
-        synchronized(outputLock) {
-            try {
-                outputStream.close()
-            } catch (_: IOException) {
-            }
-        }
-
-        // UsbTrustedSession belongs to the logical controller
-        // session and may be shared with a reconnecting transport.
+        // The UsbAccessoryConnection owns the shared accessory file
+        // descriptor and its stream wrappers. Closing either stream here can
+        // invalidate the same descriptor before the connection owner tears it
+        // down, which is especially fragile during physical detach on OEM
+        // Android builds.
+        //
+        // UsbTrustedSession belongs to the logical controller session and may
+        // be shared with a reconnecting transport.
     }
 
     private fun drainLatest() {
