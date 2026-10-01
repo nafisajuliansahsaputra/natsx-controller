@@ -65,6 +65,12 @@ NatsxReferenceReadyTarget(
     _Out_ WDFDEVICE* Device
     );
 
+static VOID
+NatsxGetTargetReadiness(
+    _Out_ PULONG AttachedTargetCount,
+    _Out_ PULONG ReadyUsbTargetCount
+    );
+
 NTSTATUS
 DriverEntry(
     _In_ PDRIVER_OBJECT DriverObject,
@@ -331,6 +337,47 @@ NatsxEvtControlIoDeviceControl(
     }
 
     if (IoControlCode ==
+        IOCTL_NATSX_AOA_GET_STATUS) {
+        if (OutputBufferLength <
+            sizeof(NATSX_AOA_STATUS_RESPONSE)) {
+            WdfRequestComplete(
+                Request,
+                STATUS_BUFFER_TOO_SMALL);
+            return;
+        }
+
+        PNATSX_AOA_STATUS_RESPONSE response = NULL;
+        NTSTATUS status =
+            WdfRequestRetrieveOutputBuffer(
+                Request,
+                sizeof(NATSX_AOA_STATUS_RESPONSE),
+                (PVOID*)&response,
+                NULL);
+
+        if (!NT_SUCCESS(status)) {
+            WdfRequestComplete(
+                Request,
+                status);
+            return;
+        }
+
+        response->ProtocolVersion =
+            NATSX_AOA_BOOTSTRAP_PROTOCOL_VERSION;
+        response->DriverBuild =
+            NATSX_AOA_BOOTSTRAP_DRIVER_BUILD;
+
+        NatsxGetTargetReadiness(
+            &response->AttachedTargetCount,
+            &response->ReadyUsbTargetCount);
+
+        WdfRequestCompleteWithInformation(
+            Request,
+            STATUS_SUCCESS,
+            sizeof(*response));
+        return;
+    }
+
+    if (IoControlCode ==
         IOCTL_NATSX_AOA_START) {
         if (OutputBufferLength <
             sizeof(NATSX_AOA_START_RESPONSE)) {
@@ -568,6 +615,46 @@ NatsxDeleteControlDeviceIfUnused(
         WdfObjectDelete(
             controlDevice);
     }
+}
+
+static VOID
+NatsxGetTargetReadiness(
+    _Out_ PULONG AttachedTargetCount,
+    _Out_ PULONG ReadyUsbTargetCount
+    )
+{
+    ULONG attachedCount = 0;
+    ULONG readyCount = 0;
+
+    WdfWaitLockAcquire(
+        NatsxTargetDevicesLock,
+        NULL);
+
+    attachedCount =
+        WdfCollectionGetCount(
+            NatsxTargetDevices);
+
+    for (ULONG index = 0;
+         index < attachedCount;
+         ++index) {
+        WDFDEVICE candidate =
+            (WDFDEVICE)WdfCollectionGetItem(
+                NatsxTargetDevices,
+                index);
+
+        if (NatsxGetDeviceContext(candidate)->UsbDevice !=
+            WDF_NO_HANDLE) {
+            readyCount++;
+        }
+    }
+
+    WdfWaitLockRelease(
+        NatsxTargetDevicesLock);
+
+    *AttachedTargetCount =
+        attachedCount;
+    *ReadyUsbTargetCount =
+        readyCount;
 }
 
 static NTSTATUS
