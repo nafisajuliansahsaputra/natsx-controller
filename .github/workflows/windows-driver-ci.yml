@@ -31,6 +31,12 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      - name: Cache WDK packages
+        uses: actions/cache@v4
+        with:
+          path: windows/driver/aoa-bootstrap/packages
+          key: wdk-nuget-${{ runner.os }}-${{ hashFiles('windows/driver/aoa-bootstrap/packages.config') }}
+
       - name: Restore WDK packages
         shell: pwsh
         run: nuget restore windows/driver/aoa-bootstrap/packages.config -PackagesDirectory windows/driver/aoa-bootstrap/packages -NonInteractive
@@ -38,3 +44,14 @@ jobs:
       - name: Build x64 Release
         shell: pwsh
         run: msbuild windows/driver/aoa-bootstrap/Natsx.AoaBootstrap.Driver.vcxproj /m /p:Configuration=Release /p:Platform=x64
+
+      - name: Upload driver prototype
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-aoa-bootstrap-driver-x64
+          path: |
+            windows/driver/aoa-bootstrap/x64/Release/*.sys
+            windows/driver/aoa-bootstrap/x64/Release/*.pdb
+            windows/driver/aoa-bootstrap/x64/Release/*.cer
+          if-no-files-found: error
