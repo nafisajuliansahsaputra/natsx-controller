@@ -23,11 +23,12 @@
                 <StackPanel>
                     <TextBlock FontSize="18"
                                FontWeight="SemiBold"
-                               Text="Foundation ready" />
-                    <TextBlock Margin="0,8,0,0"
+                               Text="Receiver runtime" />
+                    <TextBlock x:Name="StatusText"
+                               Margin="0,8,0,0"
                                TextWrapping="Wrap"
                                Opacity="0.72"
-                               Text="Transport, pairing, virtual-controller, and Smart Auto services attach behind this UI. The UI does not own the realtime controller engine." />
+                               Text="Starting receiver…" />
                 </StackPanel>
             </Border>
         </StackPanel>
