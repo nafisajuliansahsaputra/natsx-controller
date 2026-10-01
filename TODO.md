@@ -272,11 +272,11 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Implement Bluetooth permissions/setup.
 - [ ] Implement first-time OS pairing flow.
 - [x] Implement RFCOMM transport.
-- [ ] Implement trusted auto-reconnect.
+- [x] Implement trusted auto-reconnect.
 - [x] Implement protocol handshake.
 - [x] Implement health metrics appropriate to Bluetooth.
 - [ ] Integrate with Smart Connection Manager.
-- [ ] Support READY/warm standby.
+- [x] Support READY/warm standby.
 - [ ] Wi-Fi -> Bluetooth failover.
 - [ ] Bluetooth -> recovered Wi-Fi handback.
 - [ ] Verify anti-flapping rules.

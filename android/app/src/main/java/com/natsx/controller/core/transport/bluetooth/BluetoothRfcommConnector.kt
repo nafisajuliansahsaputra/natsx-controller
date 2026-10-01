@@ -42,12 +42,23 @@ class AndroidBluetoothRfcommSocket(
     }
 }
 
+interface BluetoothRealtimeLink : RealtimeStateSink, Closeable {
+    val lastHeartbeatReceivedNanos: Long
+}
+
+fun interface BluetoothRealtimeLinkFactory {
+    fun create(): BluetoothRealtimeLink
+}
+
 class BluetoothRfcommRealtimeLink internal constructor(
     private val socket: BluetoothRfcommSocket,
     private val session: BluetoothTrustedSession,
     private val sender: BluetoothRealtimeSender,
-) : RealtimeStateSink, Closeable {
+) : BluetoothRealtimeLink {
     private var closed = false
+
+    override val lastHeartbeatReceivedNanos: Long
+        get() = sender.lastHeartbeatReceivedNanos
 
     override fun publish(envelope: RealtimeStateEnvelope) {
         check(!closed) {
@@ -87,7 +98,9 @@ class BluetoothRfcommRealtimeLink internal constructor(
 class BluetoothRfcommConnector(
     private val socketProvider: BluetoothRfcommSocketProvider,
     private val secondaryJoinClient: BluetoothSecondarySessionJoinClient,
-) {
+) : BluetoothRealtimeLinkFactory {
+    override fun create(): BluetoothRfcommRealtimeLink = connect()
+
     fun connect(): BluetoothRfcommRealtimeLink {
         val socket = socketProvider.open()
 
