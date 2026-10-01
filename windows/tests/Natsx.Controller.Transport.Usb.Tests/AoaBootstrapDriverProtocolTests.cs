@@ -11,11 +11,14 @@ public sealed class AoaBootstrapDriverProtocolTests
             1u,
             AoaBootstrapDriverProtocol.ProtocolVersion);
         Assert.Equal(
-            2u,
+            3u,
             AoaBootstrapDriverProtocol.MinimumSupportedDriverBuild);
         Assert.Equal(
             "NatsxAoaBootstrap",
             AoaBootstrapDriverProtocol.ServiceName);
+        Assert.Equal(
+            @"\\.\NatsxAoaBootstrap",
+            AoaBootstrapDriverProtocol.ControlDevicePath);
     }
 
     [Fact]
@@ -24,7 +27,7 @@ public sealed class AoaBootstrapDriverProtocolTests
         Assert.Throws<InvalidOperationException>(
             () =>
                 AoaBootstrapDriverProtocol.ValidateCompatibility(
-                    new AoaBootstrapDriverVersion(2, 2)));
+                    new AoaBootstrapDriverVersion(2, 3)));
     }
 
     [Fact]
@@ -40,7 +43,7 @@ public sealed class AoaBootstrapDriverProtocolTests
     public void Compatibility_AcceptsCurrentDriver()
     {
         AoaBootstrapDriverProtocol.ValidateCompatibility(
-            new AoaBootstrapDriverVersion(1, 2));
+            new AoaBootstrapDriverVersion(1, 3));
     }
 
     [Fact]
@@ -66,10 +69,10 @@ public sealed class AoaBootstrapDriverProtocolTests
 
         BinaryPrimitives.WriteUInt32LittleEndian(
             bytes.AsSpan(4),
-            2);
+            3);
 
         Assert.Equal(
-            new AoaBootstrapDriverVersion(1, 2),
+            new AoaBootstrapDriverVersion(1, 3),
             AoaBootstrapDriverProtocol.ParseVersion(bytes));
     }
 
