@@ -1,4 +1,5 @@
 using Natsx.Controller.Transport.Usb;
+using Natsx.Controller.Trust.Windows;
 using System.Text.Json;
 
 if (!OperatingSystem.IsWindows())
@@ -8,12 +9,24 @@ if (!OperatingSystem.IsWindows())
 }
 
 var backend = new WinUsbAoaAccessoryBackend();
+WindowsTrustServices trust = WindowsTrustServices.CreateDefault();
+IReadOnlyList<TrustedPeerRecord> trustedPeers = trust.TrustedPeers.List();
 
 IReadOnlyList<WinUsbAoaAccessoryDevice> devices =
     await backend.EnumerateAsync();
 
 var report = new
 {
+    WindowsLocalPeerId = trust.LocalPeerId.ToString(),
+    TrustedPeerCount = trustedPeers.Count,
+    TrustedPeers = trustedPeers.Select(peer => new
+    {
+        PeerId = peer.PeerId.ToString(),
+        peer.DisplayName,
+        peer.Capabilities,
+        PairedAt = peer.PairedAt,
+        peer.PairingVersion,
+    }),
     DeviceCount = devices.Count,
     Devices = devices,
     Opened = false,
@@ -53,6 +66,16 @@ if (connection is null)
 
 var successReport = new
 {
+    WindowsLocalPeerId = trust.LocalPeerId.ToString(),
+    TrustedPeerCount = trustedPeers.Count,
+    TrustedPeers = trustedPeers.Select(peer => new
+    {
+        PeerId = peer.PeerId.ToString(),
+        peer.DisplayName,
+        peer.Capabilities,
+        PairedAt = peer.PairedAt,
+        peer.PairingVersion,
+    }),
     DeviceCount = devices.Count,
     Devices = devices,
     Opened = true,
