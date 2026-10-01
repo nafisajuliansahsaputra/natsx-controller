@@ -1,6 +1,9 @@
 package com.natsx.controller.core.transport.wifi
 
 import android.os.SystemClock
+import com.natsx.controller.core.protocol.MessageType
+import com.natsx.controller.core.protocol.ProtocolConstants
+import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.RealtimeStateSink
 import java.io.Closeable
@@ -25,6 +28,7 @@ fun interface WifiRealtimeLinkFactory {
 class WifiRealtimeSender(
     private val remoteEndpoint: InetSocketAddress,
     private val trustedSession: WifiTrustedSession,
+    private val rumbleSink: (RumblePayload) -> Unit = {},
 ) : WifiRealtimeLink {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -66,6 +70,10 @@ class WifiRealtimeSender(
 
     @Volatile
     var heartbeatAcksSent: Long = 0
+        private set
+
+    @Volatile
+    var rumblesReceived: Long = 0
         private set
 
     @Volatile
@@ -191,31 +199,50 @@ class WifiRealtimeSender(
                     packet.offset + packet.length,
                 )
 
-                val echoedProbeTimestamp =
-                    WifiControlDatagramCodec.decodeHeartbeat(
-                        datagram,
-                        trustedSession,
-                    )
+                when (readMessageType(datagram)) {
+                    MessageType.HEARTBEAT -> {
+                        val echoedProbeTimestamp =
+                            WifiControlDatagramCodec.decodeHeartbeat(
+                                datagram,
+                                trustedSession,
+                            )
 
-                heartbeatsReceived += 1
-                lastHeartbeatReceivedNanos = SystemClock.elapsedRealtimeNanos()
+                        heartbeatsReceived += 1
+                        lastHeartbeatReceivedNanos =
+                            SystemClock.elapsedRealtimeNanos()
 
-                val ack =
-                    WifiControlDatagramCodec.encodeHeartbeatAck(
-                        trustedSession = trustedSession,
-                        responderTimestampMicros = monotonicMicroseconds(),
-                        echoedProbeTimestampMicros = echoedProbeTimestamp,
-                    )
+                        val ack =
+                            WifiControlDatagramCodec.encodeHeartbeatAck(
+                                trustedSession = trustedSession,
+                                responderTimestampMicros = monotonicMicroseconds(),
+                                echoedProbeTimestampMicros = echoedProbeTimestamp,
+                            )
 
-                activeSocket.send(
-                    DatagramPacket(
-                        ack,
-                        ack.size,
-                        remoteEndpoint,
-                    ),
-                )
+                        activeSocket.send(
+                            DatagramPacket(
+                                ack,
+                                ack.size,
+                                remoteEndpoint,
+                            ),
+                        )
 
-                heartbeatAcksSent += 1
+                        heartbeatAcksSent += 1
+                    }
+
+                    MessageType.RUMBLE -> {
+                        val rumble =
+                            WifiControlDatagramCodec.decodeRumble(
+                                datagram,
+                                trustedSession,
+                            )
+
+                        rumbleSink(rumble)
+                        rumblesReceived += 1
+                    }
+
+                    else ->
+                        controlFailures += 1
+                }
             } catch (_: SocketTimeoutException) {
                 // Periodically wake so close/recovery can be observed.
             } catch (_: IOException) {
@@ -233,6 +260,25 @@ class WifiRealtimeSender(
                     controlFailures += 1
                 }
             }
+        }
+    }
+
+    private fun readMessageType(
+        frame: ByteArray,
+    ): MessageType {
+        require(
+            frame.size >=
+                ProtocolConstants.HEADER_SIZE,
+        ) {
+            "Wi-Fi control frame is shorter than the protocol header."
+        }
+
+        return requireNotNull(
+            MessageType.fromWireValue(
+                frame[6].toInt() and 0xFF,
+            ),
+        ) {
+            "Wi-Fi control frame has an unknown message type."
         }
     }
 

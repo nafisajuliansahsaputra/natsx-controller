@@ -1,6 +1,9 @@
 package com.natsx.controller.core.transport.usb
 
 import android.os.SystemClock
+import com.natsx.controller.core.protocol.MessageType
+import com.natsx.controller.core.protocol.ProtocolConstants
+import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.RealtimeStateSink
 import java.io.Closeable
@@ -18,6 +21,7 @@ class UsbRealtimeSender(
     private val inputStream: InputStream? = null,
     private val nowNanos: () -> Long =
         SystemClock::elapsedRealtimeNanos,
+    private val rumbleSink: (RumblePayload) -> Unit = {},
 ) : RealtimeStateSink, Closeable {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -67,6 +71,10 @@ class UsbRealtimeSender(
 
     @Volatile
     var heartbeatAcksSent: Long = 0
+        private set
+
+    @Volatile
+    var rumblesReceived: Long = 0
         private set
 
     @Volatile
@@ -187,34 +195,53 @@ class UsbRealtimeSender(
                     UsbStreamFrameCodec
                         .readFrame(activeInput)
 
-                val echoedProbe =
-                    UsbControlFrameCodec
-                        .decodeHeartbeat(
-                            frame,
-                            trustedSession,
+                when (readMessageType(frame)) {
+                    MessageType.HEARTBEAT -> {
+                        val echoedProbe =
+                            UsbControlFrameCodec
+                                .decodeHeartbeat(
+                                    frame,
+                                    trustedSession,
+                                )
+
+                        heartbeatsReceived += 1
+                        lastHeartbeatReceivedNanos =
+                            nowNanos()
+
+                        val ack =
+                            UsbControlFrameCodec
+                                .encodeHeartbeatAck(
+                                    trustedSession =
+                                        trustedSession,
+                                    responderTimestampMicros =
+                                        monotonicMicroseconds(),
+                                    echoedProbeTimestampMicros =
+                                        echoedProbe,
+                                )
+
+                        writePacket(
+                            UsbStreamFrameCodec
+                                .encode(ack),
                         )
 
-                heartbeatsReceived += 1
-                lastHeartbeatReceivedNanos =
-                    nowNanos()
+                        heartbeatAcksSent += 1
+                    }
 
-                val ack =
-                    UsbControlFrameCodec
-                        .encodeHeartbeatAck(
-                            trustedSession =
-                                trustedSession,
-                            responderTimestampMicros =
-                                monotonicMicroseconds(),
-                            echoedProbeTimestampMicros =
-                                echoedProbe,
-                        )
+                    MessageType.RUMBLE -> {
+                        val rumble =
+                            UsbControlFrameCodec
+                                .decodeRumble(
+                                    frame,
+                                    trustedSession,
+                                )
 
-                writePacket(
-                    UsbStreamFrameCodec
-                        .encode(ack),
-                )
+                        rumbleSink(rumble)
+                        rumblesReceived += 1
+                    }
 
-                heartbeatAcksSent += 1
+                    else ->
+                        controlFailures += 1
+                }
             } catch (_: IOException) {
                 if (!closed.get()) {
                     controlFailures += 1
@@ -229,6 +256,25 @@ class UsbRealtimeSender(
                     controlFailures += 1
                 }
             }
+        }
+    }
+
+    private fun readMessageType(
+        frame: ByteArray,
+    ): MessageType {
+        require(
+            frame.size >=
+                ProtocolConstants.HEADER_SIZE,
+        ) {
+            "Usb control frame is shorter than the protocol header."
+        }
+
+        return requireNotNull(
+            MessageType.fromWireValue(
+                frame[6].toInt() and 0xFF,
+            ),
+        ) {
+            "Usb control frame has an unknown message type."
         }
     }
 

@@ -5,6 +5,8 @@ import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.ProtocolFrame
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
 import com.natsx.controller.core.protocol.ProtocolVersion
+import com.natsx.controller.core.protocol.RumblePayload
+import com.natsx.controller.core.protocol.RumblePayloadCodec
 import com.natsx.controller.core.protocol.SessionReadyPayload
 import com.natsx.controller.core.protocol.SessionReadyPayloadCodec
 import java.nio.ByteBuffer
@@ -44,6 +46,42 @@ object WifiControlDatagramCodec {
         }
 
         return SessionReadyPayloadCodec.decode(frame.payload)
+    }
+
+    fun encodeRumble(
+        trustedSession: WifiTrustedSession,
+        payload: RumblePayload,
+        monotonicTimestampMicros: ULong,
+    ): ByteArray =
+        ProtocolFrameCodec.encode(
+            frame = ProtocolFrame(
+                version = ProtocolVersion.Current,
+                messageType = MessageType.RUMBLE,
+                flags = FrameFlags.AUTHENTICATED,
+                sessionId = trustedSession.sessionId,
+                sequence = 0u,
+                monotonicTimestampMicros = monotonicTimestampMicros,
+                payload = RumblePayloadCodec.encode(payload),
+            ),
+            authenticationKey =
+                trustedSession.authenticationKey(),
+        )
+
+    fun decodeRumble(
+        datagram: ByteArray,
+        trustedSession: WifiTrustedSession,
+    ): RumblePayload {
+        val frame =
+            decodeAuthenticatedFrame(
+                datagram,
+                trustedSession,
+            )
+
+        require(frame.messageType == MessageType.RUMBLE) {
+            "Expected RUMBLE, received " + frame.messageType + "."
+        }
+
+        return RumblePayloadCodec.decode(frame.payload)
     }
 
     fun encodeHeartbeat(

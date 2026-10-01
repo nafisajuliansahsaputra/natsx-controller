@@ -1,6 +1,7 @@
 package com.natsx.controller.core.transport.wifi
 
 import com.natsx.controller.core.protocol.PeerId
+import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.trust.TrustedPeerStore
@@ -13,6 +14,7 @@ class TrustedWifiRealtimeLinkFactory(
     private val reconnectClient: WifiTrustedReconnectClient =
         WifiTrustedReconnectClient(localPeerId),
     private val sessionRegistry: TrustedSessionRegistry? = null,
+    private val rumbleSink: (RumblePayload) -> Unit = {},
 ) : WifiRealtimeLinkFactory {
     override fun create(endpoint: InetSocketAddress): WifiRealtimeLink {
         val material =
@@ -44,6 +46,7 @@ class TrustedWifiRealtimeLinkFactory(
                         delegate = WifiRealtimeSender(
                             remoteEndpoint = endpoint,
                             trustedSession = session,
+                            rumbleSink = rumbleSink,
                         ),
                         ownedSession = session,
                         sessionRegistry = sessionRegistry,

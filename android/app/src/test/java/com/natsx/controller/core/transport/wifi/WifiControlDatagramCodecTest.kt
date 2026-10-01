@@ -7,6 +7,7 @@ import com.natsx.controller.core.protocol.PeerRole
 import com.natsx.controller.core.protocol.ProtocolFrame
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
 import com.natsx.controller.core.protocol.ProtocolVersion
+import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.protocol.SessionId
 import com.natsx.controller.core.protocol.SessionReadyPayload
 import com.natsx.controller.core.protocol.TransportCapabilities
@@ -57,6 +58,32 @@ class WifiControlDatagramCodecTest {
             assertEquals(444_000uL, decodedEcho)
         }
     }
+    @Test
+    fun rumbleRoundTripPreservesMotorStrengths() {
+        WifiTrustedSession(sessionId, key).use { trusted ->
+            val expected =
+                RumblePayload(
+                    lowFrequencyMotor = 210,
+                    highFrequencyMotor = 88,
+                )
+
+            val encoded =
+                WifiControlDatagramCodec.encodeRumble(
+                    trustedSession = trusted,
+                    payload = expected,
+                    monotonicTimestampMicros = 555uL,
+                )
+
+            assertEquals(
+                expected,
+                WifiControlDatagramCodec.decodeRumble(
+                    encoded,
+                    trusted,
+                ),
+            )
+        }
+    }
+
     @Test
     fun heartbeatEncoderProducesAuthenticatedSessionProbe() {
         WifiTrustedSession(sessionId, key).use { trusted ->

@@ -12,6 +12,7 @@ import com.natsx.controller.core.protocol.PairingConfirmPayload
 import com.natsx.controller.core.protocol.PairingFrameCodec
 import com.natsx.controller.core.protocol.PairingInitiatorSession
 import com.natsx.controller.core.protocol.ProtocolConstants
+import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.protocol.TransportCapabilities
 import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import com.natsx.controller.core.session.RealtimeStateBroadcaster
@@ -32,6 +33,7 @@ class UsbAccessoryRuntime(
     private val broadcaster: RealtimeStateBroadcaster,
     private val pairingConfirmation: PairingConfirmationCoordinator,
     private val status: UsbRuntimeStatusCoordinator,
+    private val rumbleSink: (RumblePayload) -> Unit = {},
 ) : Closeable {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -185,6 +187,7 @@ class UsbAccessoryRuntime(
                     outputStream = opened.output,
                     trustedSession = session,
                     inputStream = opened.input,
+                    rumbleSink = rumbleSink,
                 )
 
             broadcaster.addSink(realtimeSender)

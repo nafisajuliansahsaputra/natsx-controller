@@ -113,6 +113,53 @@ object BluetoothControlFrameCodec {
         return SessionReadyPayloadCodec.decode(frame.payload)
     }
 
+    fun encodeRumble(
+        trustedSession: BluetoothTrustedSession,
+        payload: RumblePayload,
+        monotonicTimestampMicros: ULong,
+    ): ByteArray =
+        ProtocolFrameCodec.encode(
+            ProtocolFrame(
+                version = ProtocolVersion.Current,
+                messageType = MessageType.RUMBLE,
+                flags = FrameFlags.AUTHENTICATED,
+                sessionId = trustedSession.sessionId,
+                sequence = 0u,
+                monotonicTimestampMicros =
+                    monotonicTimestampMicros,
+                payload =
+                    RumblePayloadCodec.encode(
+                        payload,
+                    ),
+            ),
+            authenticationKey =
+                trustedSession.authenticationKey(),
+        )
+
+    fun decodeRumble(
+        frameBytes: ByteArray,
+        trustedSession: BluetoothTrustedSession,
+    ): RumblePayload {
+        val frame =
+            decodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession,
+            )
+
+        require(
+            frame.messageType ==
+                MessageType.RUMBLE,
+        ) {
+            "Expected RUMBLE, received " +
+                frame.messageType +
+                "."
+        }
+
+        return RumblePayloadCodec.decode(
+            frame.payload,
+        )
+    }
+
     fun encodeHeartbeat(
         trustedSession: BluetoothTrustedSession,
         monotonicTimestampMicros: ULong,
