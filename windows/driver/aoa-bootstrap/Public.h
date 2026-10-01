@@ -3,7 +3,7 @@
 #include <ntddk.h>
 
 #define NATSX_AOA_BOOTSTRAP_PROTOCOL_VERSION 1u
-#define NATSX_AOA_BOOTSTRAP_DRIVER_BUILD 5u
+#define NATSX_AOA_BOOTSTRAP_DRIVER_BUILD 6u
 
 // Retained as a stable protocol identifier for diagnostics/backward
 // compatibility. Build 3 moved user-mode IOCTL access to a sideband control
@@ -11,7 +11,9 @@
 // that control plane alive independently of WDFUSBDEVICE readiness and adds a
 // read-only target-readiness diagnostic. Build 5 exposes the exact NTSTATUS
 // and attempt count from WdfUsbTargetDeviceCreateWithParameters so physical
-// failures can be diagnosed without sending START_AOA.
+// failures can be diagnosed without sending START_AOA. Build 6 adds a
+// read-only raw-URB AOA GET_PROTOCOL probe that bypasses the WDFUSBDEVICE
+// specialization while preserving the existing OEM WPD/MTP stack.
 // {54E7A3A1-01F0-41B8-B397-75E2A6D42C11}
 DEFINE_GUID(
     GUID_DEVINTERFACE_NATSX_AOA_BOOTSTRAP,
@@ -43,6 +45,13 @@ DEFINE_GUID(
         METHOD_BUFFERED, \
         FILE_READ_DATA)
 
+#define IOCTL_NATSX_AOA_PROBE_PROTOCOL_RAW \
+    CTL_CODE( \
+        FILE_DEVICE_NATSX_AOA_BOOTSTRAP, \
+        0x803, \
+        METHOD_BUFFERED, \
+        FILE_READ_DATA)
+
 typedef struct _NATSX_AOA_VERSION_RESPONSE {
     ULONG ProtocolVersion;
     ULONG DriverBuild;
@@ -61,3 +70,15 @@ typedef struct _NATSX_AOA_STATUS_RESPONSE {
     NTSTATUS LastUsbTargetCreateStatus;
     ULONG UsbTargetCreateAttemptCount;
 } NATSX_AOA_STATUS_RESPONSE, *PNATSX_AOA_STATUS_RESPONSE;
+
+
+typedef struct _NATSX_AOA_RAW_PROTOCOL_PROBE_RESPONSE {
+    ULONG ProtocolVersion;
+    ULONG DriverBuild;
+    NTSTATUS SubmitStatus;
+    ULONG UsbStatus;
+    ULONG BytesTransferred;
+    USHORT AoaProtocolVersion;
+    USHORT Reserved;
+} NATSX_AOA_RAW_PROTOCOL_PROBE_RESPONSE,
+  *PNATSX_AOA_RAW_PROTOCOL_PROBE_RESPONSE;
