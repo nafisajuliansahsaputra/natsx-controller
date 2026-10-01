@@ -14,7 +14,7 @@ public static class UsbAuthFrameCodec
         if (sessionId == SessionId.Zero)
         {
             throw new ArgumentException(
-                "Usb trusted reconnect requires a non-zero session ID.",
+                "USB trusted reconnect requires a non-zero session ID.",
                 nameof(sessionId));
         }
 
@@ -55,7 +55,7 @@ public static class UsbAuthFrameCodec
         if (sessionId == SessionId.Zero)
         {
             throw new ArgumentException(
-                "Usb trusted reconnect requires a non-zero session ID.",
+                "USB trusted reconnect requires a non-zero session ID.",
                 nameof(sessionId));
         }
 
@@ -101,7 +101,7 @@ public sealed class UsbTrustedHandshakeServer
         PeerId localPeerId,
         TransportCapabilities capabilities =
             TransportCapabilities.Wifi |
-            TransportCapabilities.UsbDirect |
+            TransportCapabilities.Bluetooth |
             TransportCapabilities.UsbDirect,
         TimeProvider? timeProvider = null,
         TransportLifecycle? lifecycle = null,
@@ -110,7 +110,7 @@ public sealed class UsbTrustedHandshakeServer
         if (!capabilities.HasFlag(TransportCapabilities.UsbDirect))
         {
             throw new ArgumentException(
-                "Usb handshake must advertise Usb capability.",
+                "USB handshake must advertise USB Direct capability.",
                 nameof(capabilities));
         }
 
@@ -135,14 +135,14 @@ public sealed class UsbTrustedHandshakeServer
         if (!inputStream.CanRead)
         {
             throw new ArgumentException(
-                "Usb handshake input stream must be readable.",
+                "USB handshake input stream must be readable.",
                 nameof(inputStream));
         }
 
         if (!outputStream.CanWrite)
         {
             throw new ArgumentException(
-                "Usb handshake output stream must be writable.",
+                "USB handshake output stream must be writable.",
                 nameof(outputStream));
         }
 
@@ -158,7 +158,7 @@ public sealed class UsbTrustedHandshakeServer
         if (challenge.Payload.TargetPeerId != _localPeerId)
         {
             throw new CryptographicException(
-                "Usb AUTH_CHALLENGE target does not match this receiver.");
+                "USB AUTH_CHALLENGE target does not match this receiver.");
         }
 
         byte[]? trustSecret =
@@ -168,14 +168,14 @@ public sealed class UsbTrustedHandshakeServer
         if (trustSecret is null)
         {
             throw new CryptographicException(
-                "Usb AUTH_CHALLENGE peer is not trusted.");
+                "USB AUTH_CHALLENGE peer is not trusted.");
         }
 
         if (trustSecret.Length != TrustedReconnectCrypto.TrustKeySize)
         {
             CryptographicOperations.ZeroMemory(trustSecret);
             throw new CryptographicException(
-                "Stored Usb trust secret has an invalid length.");
+                "Stored USB trust secret has an invalid length.");
         }
 
         MarkState(TransportRuntimeState.Authenticating);
@@ -235,7 +235,7 @@ public sealed class UsbTrustedHandshakeServer
                         TransportCapabilities.UsbDirect))
                 {
                     throw new CryptographicException(
-                        "Usb SESSION_READY identity, role, or capabilities do not match the trusted peer.");
+                        "USB SESSION_READY identity, role, or capabilities do not match the trusted peer.");
                 }
 
                 byte[] localReadyFrame =
