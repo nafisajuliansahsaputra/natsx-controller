@@ -43,6 +43,12 @@ permanently replacing its MTP/PTP function driver.
 
 The exact driver/filter architecture remains a gated WDK prototype task.
 
+A source-level KMDF pass-through filter prototype now exists on the dedicated
+USB bootstrap branch. It exposes only a private version IOCTL and a bounded
+`START_AOA` operation; user mode does not receive a generic endpoint-zero
+vendor-control primitive. The prototype is not an accepted shipping design
+until its attach/install scope and physical behavior are validated.
+
 ### Driverless Windows claim
 
 Do not claim a fully driverless automatic AOA bootstrap on stock Windows.
