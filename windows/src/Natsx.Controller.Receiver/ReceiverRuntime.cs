@@ -1307,9 +1307,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                     {
                         completion =
                             await joinServer
-                                .JoinAsync(
-                                    connection.Input,
-                                    connection.Output,
+                                .JoinUplinkOnlyAsync(
                                     firstFrame,
                                     handshakeTimeout.Token)
                                 .ConfigureAwait(false);
@@ -1318,7 +1316,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                         when (!cancellationToken.IsCancellationRequested)
                     {
                         throw new TimeoutException(
-                            "Timed out joining USB Direct to the active trusted controller session.");
+                            "Timed out joining USB Direct uplink to the active trusted controller session.");
                     }
 
                     sessionOwner =
