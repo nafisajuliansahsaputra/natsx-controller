@@ -31,6 +31,28 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      - name: Parse driver PowerShell tooling
+        shell: powershell
+        run: |
+          $errors = @()
+          Get-ChildItem windows/driver/aoa-bootstrap -Filter *.ps1 -File | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$parseErrors)
+
+            if ($parseErrors.Count -gt 0) {
+              $errors += $parseErrors
+            }
+          }
+
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+
       - name: Cache WDK packages
         uses: actions/cache@v4
         with:
