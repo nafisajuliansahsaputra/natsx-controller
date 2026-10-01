@@ -428,9 +428,6 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
                     await outputStream.WriteAsync(
                         framed,
                         cancellationToken).ConfigureAwait(false);
-
-                    await outputStream.FlushAsync(
-                        cancellationToken).ConfigureAwait(false);
                 }
                 finally
                 {
