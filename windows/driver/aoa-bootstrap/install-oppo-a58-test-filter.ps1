@@ -42,6 +42,13 @@ if ($manifest.ShippingPackage -ne $false) {
 
 $actualDriverHash = (Get-FileHash -Path $sysPath -Algorithm SHA256).Hash
 $actualInfHash = (Get-FileHash -Path $infPath -Algorithm SHA256).Hash
+$actualCatalogHash =
+    if (Test-Path $catPath) {
+        (Get-FileHash -Path $catPath -Algorithm SHA256).Hash
+    }
+    else {
+        $null
+    }
 
 if ($actualDriverHash -ne $manifest.DriverSha256) {
     throw "Driver SHA-256 does not match package-manifest.json."
@@ -53,6 +60,19 @@ if ($actualInfHash -ne $manifest.InfSha256) {
 
 if ($manifest.InfVerif -ne "passed") {
     throw "Package manifest does not record a passing InfVerif gate."
+}
+
+if ($manifest.SigningMode -ne "ephemeral-ci-test") {
+    throw "Package manifest does not identify the expected ephemeral CI test-signing mode."
+}
+
+if ([string]::IsNullOrWhiteSpace([string]$manifest.TestCertificateThumbprint)) {
+    throw "Package manifest does not contain the CI test-certificate thumbprint."
+}
+
+if (-not [string]::IsNullOrWhiteSpace([string]$manifest.CatalogSha256) -and
+    $actualCatalogHash -ne $manifest.CatalogSha256) {
+    throw "Catalog SHA-256 does not match package-manifest.json."
 }
 
 $device = Get-PnpDevice -InstanceId $InstanceId -PresentOnly -ErrorAction Stop
@@ -94,6 +114,38 @@ $catalogSignature =
         $null
     }
 
+$expectedSignerThumbprint =
+    ([string]$manifest.TestCertificateThumbprint).Replace(" ", "").ToUpperInvariant()
+
+$driverSignerThumbprint =
+    if ($null -ne $driverSignature.SignerCertificate) {
+        $driverSignature.SignerCertificate.Thumbprint.Replace(" ", "").ToUpperInvariant()
+    }
+    else {
+        $null
+    }
+
+$catalogSignerThumbprint =
+    if ($null -ne $catalogSignature -and
+        $null -ne $catalogSignature.SignerCertificate) {
+        $catalogSignature.SignerCertificate.Thumbprint.Replace(" ", "").ToUpperInvariant()
+    }
+    else {
+        $null
+    }
+
+$driverSignerMatchesManifest =
+    $driverSignerThumbprint -eq $expectedSignerThumbprint
+
+$catalogSignerMatchesManifest =
+    $catalogSignerThumbprint -eq $expectedSignerThumbprint
+
+$rootTrusted =
+    Test-Path ("Cert:\LocalMachine\Root\" + $expectedSignerThumbprint)
+
+$trustedPublisher =
+    Test-Path ("Cert:\LocalMachine\TrustedPublisher\" + $expectedSignerThumbprint)
+
 $preflight = [ordered]@{
     TargetStatus = $device.Status
     TargetClass = $device.Class
@@ -103,6 +155,16 @@ $preflight = [ordered]@{
     PackageDirectory = $PackageDirectory
     ManifestInfVerif = $manifest.InfVerif
     DriverSignatureStatus = $driverSignature.Status.ToString()
+    DriverSignatureStatusMessage = $driverSignature.StatusMessage
+    DriverSignerSubject =
+        if ($null -eq $driverSignature.SignerCertificate) {
+            $null
+        }
+        else {
+            $driverSignature.SignerCertificate.Subject
+        }
+    DriverSignerThumbprint = $driverSignerThumbprint
+    DriverSignerMatchesManifest = $driverSignerMatchesManifest
     CatalogPresent = $catalogExists
     CatalogSignatureStatus =
         if ($null -eq $catalogSignature) {
@@ -111,6 +173,25 @@ $preflight = [ordered]@{
         else {
             $catalogSignature.Status.ToString()
         }
+    CatalogSignatureStatusMessage =
+        if ($null -eq $catalogSignature) {
+            $null
+        }
+        else {
+            $catalogSignature.StatusMessage
+        }
+    CatalogSignerSubject =
+        if ($null -eq $catalogSignature -or
+            $null -eq $catalogSignature.SignerCertificate) {
+            $null
+        }
+        else {
+            $catalogSignature.SignerCertificate.Subject
+        }
+    CatalogSignerThumbprint = $catalogSignerThumbprint
+    CatalogSignerMatchesManifest = $catalogSignerMatchesManifest
+    RootTrusted = $rootTrusted
+    TrustedPublisher = $trustedPublisher
     InstallRequested = [bool]$Install
 }
 
@@ -138,12 +219,24 @@ if (-not $catalogExists) {
     throw "Refusing install: package catalog is missing."
 }
 
+if (-not $driverSignerMatchesManifest) {
+    throw "Refusing install: kernel driver signer does not match package-manifest.json."
+}
+
+if (-not $catalogSignerMatchesManifest) {
+    throw "Refusing install: package catalog signer does not match package-manifest.json."
+}
+
+if (-not $rootTrusted -or -not $trustedPublisher) {
+    throw "Refusing install: the exact manifest test certificate is not trusted in both required LocalMachine stores."
+}
+
 if ($driverSignature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
-    throw "Refusing install: kernel driver Authenticode signature is not valid."
+    throw "Refusing install: kernel driver Authenticode signature is not valid after trust."
 }
 
 if ($catalogSignature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
-    throw "Refusing install: package catalog Authenticode signature is not valid."
+    throw "Refusing install: package catalog Authenticode signature is not valid after trust."
 }
 
 $baselineScript = Join-Path $repoRoot "windows\eng\capture-usb-bootstrap-baseline.ps1"
