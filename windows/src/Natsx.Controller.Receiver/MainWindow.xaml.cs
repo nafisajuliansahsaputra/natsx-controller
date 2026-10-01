@@ -17,6 +17,9 @@ public partial class MainWindow : Window
         _runtime.PairingConfirmationChanged +=
             OnPairingConfirmationChanged;
 
+        _runtime.DiagnosticsChanged +=
+            OnDiagnosticsChanged;
+
         Loaded +=
             OnLoaded;
 
@@ -53,6 +56,35 @@ public partial class MainWindow : Window
 
         StatusText.Text =
             status;
+    }
+
+    private void OnDiagnosticsChanged(
+        ReceiverDiagnosticsSnapshot snapshot)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(
+                () =>
+                    OnDiagnosticsChanged(
+                        snapshot));
+            return;
+        }
+
+        SmartAutoStateText.Text =
+            snapshot.SmartAutoState;
+
+        ActiveTransportText.Text =
+            snapshot.ActiveTransport;
+
+        BackupTransportsText.Text =
+            snapshot.BackupTransports;
+
+        VirtualControllerText.Text =
+            snapshot.VirtualControllerStatus;
+
+        TrustedControllerCountText.Text =
+            snapshot.TrustedControllerCount
+                .ToString();
     }
 
     private void OnPairingConfirmationChanged(
@@ -113,6 +145,9 @@ public partial class MainWindow : Window
 
         _runtime.PairingConfirmationChanged -=
             OnPairingConfirmationChanged;
+
+        _runtime.DiagnosticsChanged -=
+            OnDiagnosticsChanged;
 
         await _runtime
             .DisposeAsync();
