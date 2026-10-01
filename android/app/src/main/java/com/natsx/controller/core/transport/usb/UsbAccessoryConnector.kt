@@ -87,14 +87,11 @@ class UsbAccessoryConnection private constructor(
             return
         }
 
-        try {
-            input.close()
-        } finally {
-            try {
-                output.close()
-            } finally {
-                descriptor.close()
-            }
+        // input/output are wrappers over the same accessory descriptor.
+        // Closing them independently can double-close the underlying FD.
+        // The ParcelFileDescriptor is the single lifetime owner.
+        runCatching {
+            descriptor.close()
         }
     }
 
