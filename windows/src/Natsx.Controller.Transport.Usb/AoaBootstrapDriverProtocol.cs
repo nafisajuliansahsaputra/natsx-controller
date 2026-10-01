@@ -27,6 +27,22 @@ public static class AoaBootstrapDriverProtocol
             StartAoaFunction,
             access: 3);
 
+    public static void ValidateCompatibility(
+        AoaBootstrapDriverVersion version)
+    {
+        if (version.ProtocolVersion != ProtocolVersion)
+        {
+            throw new InvalidOperationException(
+                $"Unsupported NATSX AOA bootstrap driver protocol version {version.ProtocolVersion}.");
+        }
+
+        if (version.DriverBuild < MinimumSupportedDriverBuild)
+        {
+            throw new InvalidOperationException(
+                $"NATSX AOA bootstrap driver build {version.DriverBuild} is older than the minimum supported build {MinimumSupportedDriverBuild}.");
+        }
+    }
+
     public static AoaBootstrapDriverVersion ParseVersion(
         ReadOnlySpan<byte> bytes)
     {
