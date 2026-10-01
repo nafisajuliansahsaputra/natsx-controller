@@ -5,7 +5,7 @@ namespace Natsx.Controller.Transport.Usb;
 public static class AoaBootstrapDriverProtocol
 {
     public const uint ProtocolVersion = 1;
-    public const uint MinimumSupportedDriverBuild = 4;
+    public const uint MinimumSupportedDriverBuild = 5;
     public const string ServiceName = "NatsxAoaBootstrap";
     public const string ControlDevicePath = @"\\.\NatsxAoaBootstrap";
 
@@ -19,7 +19,7 @@ public static class AoaBootstrapDriverProtocol
 
     public const int VersionResponseSize = 8;
     public const int StartResponseSize = 4;
-    public const int StatusResponseSize = 16;
+    public const int StatusResponseSize = 24;
 
     public static uint GetVersionControlCode =>
         BuildControlCode(
@@ -79,7 +79,9 @@ public static class AoaBootstrapDriverProtocol
             BinaryPrimitives.ReadUInt32LittleEndian(bytes),
             BinaryPrimitives.ReadUInt32LittleEndian(bytes[4..]),
             BinaryPrimitives.ReadUInt32LittleEndian(bytes[8..]),
-            BinaryPrimitives.ReadUInt32LittleEndian(bytes[12..]));
+            BinaryPrimitives.ReadUInt32LittleEndian(bytes[12..]),
+            BinaryPrimitives.ReadInt32LittleEndian(bytes[16..]),
+            BinaryPrimitives.ReadUInt32LittleEndian(bytes[20..]));
     }
 
     public static ushort ParseAoaProtocolVersion(
@@ -128,4 +130,6 @@ public readonly record struct AoaBootstrapDriverStatus(
     uint ProtocolVersion,
     uint DriverBuild,
     uint AttachedTargetCount,
-    uint ReadyUsbTargetCount);
+    uint ReadyUsbTargetCount,
+    int LastUsbTargetCreateStatus,
+    uint UsbTargetCreateAttemptCount);
