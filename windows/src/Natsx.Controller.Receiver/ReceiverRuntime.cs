@@ -1,3 +1,4 @@
+using System.IO;
 using System.Security.Cryptography;
 using Natsx.Controller.Connection;
 using Natsx.Controller.Core;
