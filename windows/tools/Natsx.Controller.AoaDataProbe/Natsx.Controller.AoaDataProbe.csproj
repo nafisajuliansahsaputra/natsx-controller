@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Natsx.Controller.Transport.Usb/Natsx.Controller.Transport.Usb.csproj" />
+    <ProjectReference Include="../../src/Natsx.Controller.Trust.Windows/Natsx.Controller.Trust.Windows.csproj" />
   </ItemGroup>
 </Project>
