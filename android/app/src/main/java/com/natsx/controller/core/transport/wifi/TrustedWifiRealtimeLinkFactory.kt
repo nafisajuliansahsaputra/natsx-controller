@@ -46,6 +46,9 @@ class TrustedWifiRealtimeLinkFactory(
                             trustedSession = session,
                         ),
                         ownedSession = session,
+                        sessionRegistry = sessionRegistry,
+                        receiverPeerId = receiverPeerId,
+                        sessionId = session.sessionId,
                     )
                 } catch (exception: Exception) {
                     session.close()
@@ -61,6 +64,9 @@ class TrustedWifiRealtimeLinkFactory(
 private class OwnedWifiRealtimeLink(
     private val delegate: WifiRealtimeLink,
     private val ownedSession: WifiTrustedSession,
+    private val sessionRegistry: TrustedSessionRegistry?,
+    private val receiverPeerId: PeerId,
+    private val sessionId: com.natsx.controller.core.protocol.SessionId,
 ) : WifiRealtimeLink {
     private var closed = false
 
@@ -81,6 +87,10 @@ private class OwnedWifiRealtimeLink(
         try {
             delegate.close()
         } finally {
+            sessionRegistry?.removeIfSession(
+                receiverPeerId,
+                sessionId,
+            )
             ownedSession.close()
         }
     }
