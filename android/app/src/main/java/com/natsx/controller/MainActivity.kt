@@ -16,6 +16,8 @@ import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
 import com.natsx.controller.core.pairing.PairingPrompt
 import com.natsx.controller.core.transport.bluetooth.BluetoothPermissionGate
+import com.natsx.controller.core.transport.usb.UsbRuntimeStatus
+import com.natsx.controller.core.transport.usb.UsbRuntimeStatusCoordinator
 import com.natsx.controller.feature.controller.ControllerSurfaceView
 import com.natsx.controller.service.ControllerService
 
@@ -26,10 +28,18 @@ class MainActivity : Activity() {
     private lateinit var pairingOverlay: LinearLayout
     private lateinit var pairingCodeText: TextView
     private lateinit var pairingPeerText: TextView
+    private lateinit var usbRuntimeStatus: UsbRuntimeStatusCoordinator
+    private lateinit var usbStatusText: TextView
 
     private val pairingListener: (PairingPrompt?) -> Unit = { prompt ->
         runOnUiThread {
             showPairingPrompt(prompt)
+        }
+    }
+
+    private val usbStatusListener: (UsbRuntimeStatus) -> Unit = { status ->
+        runOnUiThread {
+            showUsbStatus(status)
         }
     }
 
@@ -47,6 +57,7 @@ class MainActivity : Activity() {
 
         stateStore = app.gamepadStateStore
         pairingConfirmation = app.pairingConfirmation
+        usbRuntimeStatus = app.usbRuntimeStatus
         controllerView = ControllerSurfaceView(this, stateStore)
 
         setContentView(
@@ -55,6 +66,10 @@ class MainActivity : Activity() {
 
         pairingConfirmation.addListener(
             pairingListener,
+        )
+
+        usbRuntimeStatus.addListener(
+            usbStatusListener,
         )
 
         requestBluetoothPermissionsIfNeeded()
@@ -76,6 +91,37 @@ class MainActivity : Activity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
             ),
+        )
+
+        usbStatusText =
+            TextView(this).apply {
+                textSize = 13f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(
+                    Color.argb(
+                        190,
+                        16,
+                        16,
+                        20,
+                    ),
+                )
+                setPadding(
+                    dp(12),
+                    dp(8),
+                    dp(12),
+                    dp(8),
+                )
+            }
+
+        root.addView(
+            usbStatusText,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+            ).apply {
+                topMargin = dp(12)
+            },
         )
 
         pairingOverlay =
@@ -247,6 +293,43 @@ class MainActivity : Activity() {
         pairingOverlay.bringToFront()
     }
 
+    private fun showUsbStatus(
+        status: UsbRuntimeStatus,
+    ) {
+        if (!::usbStatusText.isInitialized) {
+            return
+        }
+
+        usbStatusText.text =
+            if (status.isError) {
+                "USB ERROR — ${status.message}"
+            } else {
+                "USB — ${status.message}"
+            }
+
+        usbStatusText.setTextColor(
+            if (status.isError) {
+                Color.rgb(
+                    255,
+                    150,
+                    150,
+                )
+            } else {
+                Color.WHITE
+            },
+        )
+
+        usbStatusText.bringToFront()
+
+        if (
+            ::pairingOverlay.isInitialized &&
+            pairingOverlay.visibility ==
+                View.VISIBLE
+        ) {
+            pairingOverlay.bringToFront()
+        }
+    }
+
     private fun requestBluetoothPermissionsIfNeeded() {
         val permissionGate = BluetoothPermissionGate(this)
 
@@ -287,6 +370,12 @@ class MainActivity : Activity() {
         if (::pairingConfirmation.isInitialized) {
             pairingConfirmation.removeListener(
                 pairingListener,
+            )
+        }
+
+        if (::usbRuntimeStatus.isInitialized) {
+            usbRuntimeStatus.removeListener(
+                usbStatusListener,
             )
         }
 
