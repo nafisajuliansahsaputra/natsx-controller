@@ -14,6 +14,9 @@ public partial class MainWindow : Window
         _runtime.StatusChanged +=
             OnRuntimeStatusChanged;
 
+        _runtime.PairingConfirmationChanged +=
+            OnPairingConfirmationChanged;
+
         Loaded +=
             OnLoaded;
 
@@ -52,12 +55,64 @@ public partial class MainWindow : Window
             status;
     }
 
+    private void OnPairingConfirmationChanged(
+        PairingConfirmationPrompt? prompt)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(
+                () =>
+                    OnPairingConfirmationChanged(
+                        prompt));
+            return;
+        }
+
+        if (prompt is null)
+        {
+            PairingPanel.Visibility =
+                Visibility.Collapsed;
+            PairingCodeText.Text =
+                string.Empty;
+            PairingPeerText.Text =
+                string.Empty;
+            return;
+        }
+
+        PairingCodeText.Text =
+            prompt.ComparisonCode;
+
+        PairingPeerText.Text =
+            $"Android peer: {prompt.RemotePeerId}";
+
+        PairingPanel.Visibility =
+            Visibility.Visible;
+    }
+
+    private void OnPairingConfirmClicked(
+        object sender,
+        RoutedEventArgs eventArgs)
+    {
+        _runtime.ResolvePairingConfirmation(
+            true);
+    }
+
+    private void OnPairingRejectClicked(
+        object sender,
+        RoutedEventArgs eventArgs)
+    {
+        _runtime.ResolvePairingConfirmation(
+            false);
+    }
+
     private async void OnClosed(
         object? sender,
         EventArgs eventArgs)
     {
         _runtime.StatusChanged -=
             OnRuntimeStatusChanged;
+
+        _runtime.PairingConfirmationChanged -=
+            OnPairingConfirmationChanged;
 
         await _runtime
             .DisposeAsync();
