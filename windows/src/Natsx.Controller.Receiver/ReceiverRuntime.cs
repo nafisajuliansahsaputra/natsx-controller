@@ -259,6 +259,10 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
             _transportRuntime =
                 transportRuntime;
+
+            virtualGamepad.RumbleReceived +=
+                OnVirtualGamepadRumbleReceived;
+
             _started = true;
 
             _diagnosticsTask =
@@ -1964,6 +1968,14 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         return secret;
     }
 
+    private void OnVirtualGamepadRumbleReceived(
+        RumbleState rumble)
+    {
+        _transportRuntime?
+            .TrySubmitRumble(
+                rumble);
+    }
+
     private async Task DiagnosticsLoopAsync(
         CancellationToken cancellationToken)
     {
@@ -2244,6 +2256,12 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             catch
             {
             }
+        }
+
+        if (_virtualGamepad is not null)
+        {
+            _virtualGamepad.RumbleReceived -=
+                OnVirtualGamepadRumbleReceived;
         }
 
         await _transportMutationGate

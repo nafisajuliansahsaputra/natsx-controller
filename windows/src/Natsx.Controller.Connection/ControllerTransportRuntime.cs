@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Natsx.Controller.Core;
 
 namespace Natsx.Controller.Connection;
@@ -17,12 +18,22 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     private readonly Dictionary<TransportKind, LatestTransportState> _latestStates = new();
     private readonly Dictionary<TransportKind, PacketRateTracker> _packetRates = new();
     private readonly HashSet<TransportKind> _seenTransportKinds = new();
+    private readonly Channel<RumbleState> _rumbleQueue =
+        Channel.CreateBounded<RumbleState>(
+            new BoundedChannelOptions(1)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true,
+                SingleWriter = false,
+                AllowSynchronousContinuations = false,
+            });
     private readonly object _transportGate = new();
     private readonly object _connectionGate = new();
     private readonly object _stateGate = new();
 
     private CancellationTokenSource? _lifetime;
     private Task? _evaluationLoop;
+    private Task? _rumbleLoop;
     private bool _started;
     private bool _suppressLifecycleReports;
     private int _reconnectCount;
@@ -55,6 +66,8 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     public event Action<HandoverProposal>? HandoverCommitted;
 
     public event Action<TransportKind, Exception>? TransportFaulted;
+
+    public event Action<TransportKind, Exception>? OutputFaulted;
 
     public TransportKind? ActiveTransport
     {
@@ -148,6 +161,25 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Queues the newest rumble state without blocking the virtual-controller
+    /// callback or realtime input path. When output falls behind, stale rumble
+    /// states are discarded in favor of the newest state.
+    /// </summary>
+    public bool TrySubmitRumble(
+        RumbleState rumble)
+    {
+        if (!_started ||
+            _disposed)
+        {
+            return false;
+        }
+
+        return _rumbleQueue.Writer
+            .TryWrite(
+                rumble);
+    }
+
     public async ValueTask StartAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -187,7 +219,12 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         }
 
         EvaluateOnce();
-        _evaluationLoop = EvaluationLoopAsync(_lifetime.Token);
+        _evaluationLoop =
+            EvaluationLoopAsync(
+                _lifetime.Token);
+        _rumbleLoop =
+            RumbleLoopAsync(
+                _lifetime.Token);
     }
 
     public void EvaluateOnce()
@@ -353,8 +390,10 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
 
         CancellationTokenSource? lifetime = _lifetime;
         Task? loop = _evaluationLoop;
+        Task? rumbleLoop = _rumbleLoop;
         _lifetime = null;
         _evaluationLoop = null;
+        _rumbleLoop = null;
 
         lifetime?.Cancel();
 
@@ -363,6 +402,17 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
             try
             {
                 await loop.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        if (rumbleLoop is not null)
+        {
+            try
+            {
+                await rumbleLoop.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -399,6 +449,90 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         }
 
         lifetime?.Dispose();
+    }
+
+    private async Task RumbleLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (
+                RumbleState rumble in
+                _rumbleQueue.Reader
+                    .ReadAllAsync(
+                        cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                await RouteRumbleAsync(
+                        rumble,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async ValueTask RouteRumbleAsync(
+        RumbleState rumble,
+        CancellationToken cancellationToken)
+    {
+        TransportKind? active =
+            ActiveTransport;
+
+        IControllerTransport[] snapshot =
+            GetTransportSnapshot();
+
+        IEnumerable<IControllerTransport> ordered =
+            snapshot
+                .OrderBy(
+                    transport =>
+                        transport.Kind ==
+                        active
+                            ? 0
+                            : transport.Kind switch
+                            {
+                                TransportKind.Usb => 1,
+                                TransportKind.Wifi => 2,
+                                TransportKind.Bluetooth => 3,
+                                _ => 4,
+                            });
+
+        foreach (IControllerTransport transport in ordered)
+        {
+            if (transport is not IControllerOutputTransport output ||
+                transport.State is
+                    TransportRuntimeState.Unavailable or
+                    TransportRuntimeState.Failed)
+            {
+                continue;
+            }
+
+            try
+            {
+                if (await output
+                    .TrySendRumbleAsync(
+                        rumble,
+                        cancellationToken)
+                    .ConfigureAwait(false))
+                {
+                    return;
+                }
+            }
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                OutputFaulted?.Invoke(
+                    transport.Kind,
+                    exception);
+            }
+        }
     }
 
     private async Task EvaluationLoopAsync(CancellationToken cancellationToken)
