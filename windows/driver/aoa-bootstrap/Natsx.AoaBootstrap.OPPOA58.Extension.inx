@@ -1,5 +1,12 @@
 ; NATSX AOA bootstrap prototype extension INF
-; TARGET: OPPO A58 normal-mode composite USB parent observed on 2026-10-01.
+; OBSERVATION TARGET ONLY: OPPO A58 composite USB parent captured on
+; 2026-10-01 while an ADB interface was present.
+;
+; DO NOT INSTALL THIS FILE YET. Enabling/disabling ADB can change an Android
+; device's USB function composition and may change the parent PID. The project
+; promises no ADB requirement, so the ADB-off normal-mode hardware ID must be
+; captured before this becomes a test package.
+;
 ; This is intentionally device/revision-specific and must never be generalized
 ; to a class-wide MTP/WPD/USB filter.
 ;
@@ -11,8 +18,9 @@
 ;   MI_00 = MTP/WPD
 ;   MI_01 = ADB/WinUSB
 ;
-; NATSX attaches to the composite parent, not either child interface. The ADB
-; child may exist on the test phone but is not used or required by NATSX.
+; NATSX must attach to the composite parent, not either child interface. The
+; ADB child is incidental and is not used or required by NATSX. A second
+; capture with USB debugging disabled is mandatory before packaging.
 
 [Version]
 Signature   = "$WINDOWS NT$"
