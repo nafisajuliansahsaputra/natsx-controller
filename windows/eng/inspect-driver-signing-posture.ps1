@@ -98,7 +98,18 @@ if (Get-Command Get-BitLockerVolume -ErrorAction SilentlyContinue) {
     try {
         $bitLocker = @(
             Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction Stop |
-                Select-Object MountPoint, VolumeStatus, ProtectionStatus, EncryptionPercentage, KeyProtector
+                ForEach-Object {
+                    [pscustomobject]@{
+                        MountPoint = $_.MountPoint
+                        VolumeStatus = $_.VolumeStatus.ToString()
+                        ProtectionStatus = $_.ProtectionStatus.ToString()
+                        EncryptionPercentage = $_.EncryptionPercentage
+                        KeyProtectorTypes = @(
+                            $_.KeyProtector |
+                                ForEach-Object { $_.KeyProtectorType.ToString() }
+                        )
+                    }
+                }
         )
     }
     catch {
