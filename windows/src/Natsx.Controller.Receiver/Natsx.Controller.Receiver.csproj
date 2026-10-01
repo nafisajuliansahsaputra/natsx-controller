@@ -11,6 +11,7 @@
     <ProjectReference Include="../Natsx.Controller.Protocol/Natsx.Controller.Protocol.csproj" />
     <ProjectReference Include="../Natsx.Controller.Connection/Natsx.Controller.Connection.csproj" />
     <ProjectReference Include="../Natsx.Controller.VirtualGamepad/Natsx.Controller.VirtualGamepad.csproj" />
+    <ProjectReference Include="../Natsx.Controller.Transport.Bluetooth/Natsx.Controller.Transport.Bluetooth.csproj" />
     <ProjectReference Include="../Natsx.Controller.Transport.Usb/Natsx.Controller.Transport.Usb.csproj" />
     <ProjectReference Include="../Natsx.Controller.Transport.Wifi/Natsx.Controller.Transport.Wifi.csproj" />
     <ProjectReference Include="../Natsx.Controller.Trust.Windows/Natsx.Controller.Trust.Windows.csproj" />
