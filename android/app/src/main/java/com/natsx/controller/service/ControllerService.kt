@@ -24,6 +24,7 @@ import com.natsx.controller.core.transport.wifi.WifiAutoReconnectRuntime
 import com.natsx.controller.core.transport.wifi.WifiDiscoveryClient
 import com.natsx.controller.core.transport.wifi.WifiEndpointResolver
 import com.natsx.controller.core.transport.wifi.WifiFirstPairingClient
+import com.natsx.controller.core.transport.wifi.WifiReconnectState
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -42,6 +43,7 @@ class ControllerService : Service() {
         }
     private val connectionBootstrapStarted = AtomicBoolean(false)
     private val usbPermissionRequestInFlight = AtomicBoolean(false)
+    private val wifiRuntimeGate = Any()
     private val usbAttachWatcher: ScheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor { runnable ->
             Thread(runnable, "natsx-usb-attach-watcher").apply {
@@ -174,8 +176,10 @@ class ControllerService : Service() {
     }
 
     override fun onDestroy() {
-        wifiRuntime?.close()
-        wifiRuntime = null
+        synchronized(wifiRuntimeGate) {
+            wifiRuntime?.close()
+            wifiRuntime = null
+        }
         connectionExecutor.shutdownNow()
         usbAttachWatcher.shutdownNow()
 
@@ -296,12 +300,22 @@ class ControllerService : Service() {
     private fun startTrustedWifi(
         receiverPeerId: com.natsx.controller.core.protocol.PeerId,
     ) {
-        if (wifiRuntime != null) {
-            return
-        }
+        synchronized(wifiRuntimeGate) {
+            val existing =
+                wifiRuntime
 
-        val resolver =
-            WifiEndpointResolver(
+            if (
+                existing != null &&
+                existing.state != WifiReconnectState.STOPPED
+            ) {
+                return
+            }
+
+            existing?.close()
+            wifiRuntime = null
+
+            val resolver =
+                WifiEndpointResolver(
                 receiverPeerId = receiverPeerId,
                 endpointCache = app.wifiEndpointCache,
                 endpointProbe =
@@ -330,8 +344,9 @@ class ControllerService : Service() {
                 linkFactory = linkFactory,
             )
 
-        wifiRuntime = runtime
-        runtime.start()
+            wifiRuntime = runtime
+            runtime.start()
+        }
     }
 
     private fun waitForTrustedSession(
@@ -386,6 +401,15 @@ class ControllerService : Service() {
         usbAttachWatcher.scheduleWithFixedDelay(
             {
                 runCatching {
+                    val trustedPeers =
+                        app.trustedPeerStore.list()
+
+                    if (trustedPeers.size == 1) {
+                        startTrustedWifi(
+                            trustedPeers.single().peerId,
+                        )
+                    }
+
                     val accessory =
                         UsbAccessoryConnector
                             .findNatsxAccessory(
