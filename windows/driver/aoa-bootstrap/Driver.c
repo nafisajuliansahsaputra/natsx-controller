@@ -17,6 +17,8 @@
 
 typedef struct _DEVICE_CONTEXT {
     WDFUSBDEVICE UsbDevice;
+    NTSTATUS LastUsbTargetCreateStatus;
+    ULONG UsbTargetCreateAttemptCount;
 } DEVICE_CONTEXT, *PDEVICE_CONTEXT;
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(
@@ -175,6 +177,10 @@ NatsxEvtDeviceAdd(
 
     NatsxGetDeviceContext(device)->UsbDevice =
         WDF_NO_HANDLE;
+    NatsxGetDeviceContext(device)->LastUsbTargetCreateStatus =
+        STATUS_NOT_ATTEMPTED;
+    NatsxGetDeviceContext(device)->UsbTargetCreateAttemptCount =
+        0;
 
     WdfWaitLockAcquire(
         NatsxTargetDevicesLock,
@@ -230,12 +236,17 @@ NatsxEvtDevicePrepareHardware(
             &usbConfig,
             USBD_CLIENT_CONTRACT_VERSION_602);
 
+        context->UsbTargetCreateAttemptCount++;
+
         status =
             WdfUsbTargetDeviceCreateWithParameters(
                 Device,
                 &usbConfig,
                 WDF_NO_OBJECT_ATTRIBUTES,
                 &context->UsbDevice);
+
+        context->LastUsbTargetCreateStatus =
+            status;
 
         if (!NT_SUCCESS(status)) {
             // Preserve the OEM WPD/MTP stack. The sideband remains available
@@ -369,6 +380,37 @@ NatsxEvtControlIoDeviceControl(
         NatsxGetTargetReadiness(
             &response->AttachedTargetCount,
             &response->ReadyUsbTargetCount);
+
+        response->LastUsbTargetCreateStatus =
+            STATUS_NOT_ATTEMPTED;
+        response->UsbTargetCreateAttemptCount =
+            0;
+
+        WdfWaitLockAcquire(
+            NatsxTargetDevicesLock,
+            NULL);
+
+        ULONG targetCount =
+            WdfCollectionGetCount(
+                NatsxTargetDevices);
+
+        if (targetCount == 1) {
+            WDFDEVICE target =
+                (WDFDEVICE)WdfCollectionGetItem(
+                    NatsxTargetDevices,
+                    0);
+
+            PDEVICE_CONTEXT context =
+                NatsxGetDeviceContext(target);
+
+            response->LastUsbTargetCreateStatus =
+                context->LastUsbTargetCreateStatus;
+            response->UsbTargetCreateAttemptCount =
+                context->UsbTargetCreateAttemptCount;
+        }
+
+        WdfWaitLockRelease(
+            NatsxTargetDevicesLock);
 
         WdfRequestCompleteWithInformation(
             Request,
