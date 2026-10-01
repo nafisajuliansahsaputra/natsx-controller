@@ -229,9 +229,6 @@ public sealed class UsbSecondarySessionJoinServer
             cancellationToken)
             .ConfigureAwait(false);
 
-        await outputStream.FlushAsync(
-            cancellationToken)
-            .ConfigureAwait(false);
     }
 
     private ulong MonotonicMicros()
