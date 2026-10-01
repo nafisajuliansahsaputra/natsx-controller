@@ -3,7 +3,7 @@
 #include <ntddk.h>
 
 #define NATSX_AOA_BOOTSTRAP_PROTOCOL_VERSION 1u
-#define NATSX_AOA_BOOTSTRAP_DRIVER_BUILD 6u
+#define NATSX_AOA_BOOTSTRAP_DRIVER_BUILD 7u
 
 // Retained as a stable protocol identifier for diagnostics/backward
 // compatibility. Build 3 moved user-mode IOCTL access to a sideband control
@@ -13,7 +13,9 @@
 // and attempt count from WdfUsbTargetDeviceCreateWithParameters so physical
 // failures can be diagnosed without sending START_AOA. Build 6 adds a
 // read-only raw-URB AOA GET_PROTOCOL probe that bypasses the WDFUSBDEVICE
-// specialization while preserving the existing OEM WPD/MTP stack.
+// specialization while preserving the existing OEM WPD/MTP stack. Build 7
+// directs that URB at the physical USB PDO instead of the filter's local
+// next-lower target, matching IOCTL_INTERNAL_USB_SUBMIT_URB semantics.
 // {54E7A3A1-01F0-41B8-B397-75E2A6D42C11}
 DEFINE_GUID(
     GUID_DEVINTERFACE_NATSX_AOA_BOOTSTRAP,
