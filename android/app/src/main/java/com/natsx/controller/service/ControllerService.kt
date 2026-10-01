@@ -386,13 +386,31 @@ class ControllerService : Service() {
         usbAttachWatcher.scheduleWithFixedDelay(
             {
                 runCatching {
+                    val accessory =
+                        UsbAccessoryConnector
+                            .findNatsxAccessory(
+                                usbManager,
+                            )
+
+                    if (usbRuntime.isConnected()) {
+                        if (accessory == null) {
+                            usbPermissionRequestInFlight.set(false)
+                            app.usbRuntimeStatus.publish(
+                                "USB accessory disappeared. Falling back to Wi-Fi…",
+                            )
+                            usbRuntime.disconnect()
+                        }
+
+                        return@runCatching
+                    }
+
                     if (
+                        accessory != null &&
                         app.trustedPeerStore.list().isNotEmpty() &&
-                        app.trustedSessionRegistry.hasAnyActiveSession() &&
-                        !usbRuntime.isConnected()
+                        app.trustedSessionRegistry.hasAnyActiveSession()
                     ) {
-                        connectUsbIfPresent(
-                            publishMissing = false,
+                        connectUsbAccessory(
+                            accessory,
                         )
                     }
                 }
