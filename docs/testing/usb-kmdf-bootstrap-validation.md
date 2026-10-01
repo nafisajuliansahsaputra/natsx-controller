@@ -50,9 +50,12 @@ The first physical target is an OPPO A58 whose normal USB stack was observed as:
 - MTP/WPD child: `USB\\VID_22D9&PID_2765&MI_00`, service `WUDFWpdMtp`;
 - optional ADB child: `USB\\VID_22D9&PID_2765&MI_01`, service `WINUSB`.
 
-The bootstrap prototype must target the composite parent revision only. It must
-not target either child interface. The observed ADB interface is incidental to
-the test phone configuration and is not a NATSX dependency.
+The bootstrap prototype must target the composite parent, not either child
+interface. This capture was taken while an ADB interface was present, so it is
+**not yet sufficient** to define the install match. Disable USB debugging,
+unplug/replug the phone in normal File Transfer/MTP mode, and capture the USB
+stack again. The ADB-off parent hardware ID must be supported independently;
+NATSX must not require the `MI_01` ADB function to exist.
 
 ## Package/attach gate
 
