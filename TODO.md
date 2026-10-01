@@ -302,7 +302,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] USB disconnect -> immediate best-backup takeover.
 - [ ] Verify Windows Ethernet/LAN route remains unaffected.
 
-> Current physical blocker: pre-AOA Windows endpoint-zero bootstrap. Post-AOA AOA data mode already uses scoped Microsoft WinUSB. A KMDF pass-through bootstrap prototype plus user-mode driver bridge exists on the USB prototype branch, but M9 remains incomplete until the filter attach/install strategy and real Windows 11 phone hardware behavior are validated without replacing or breaking the normal phone driver.
+> Current physical blocker: pre-AOA Windows endpoint-zero bootstrap. Post-AOA AOA data mode already uses scoped Microsoft WinUSB. A KMDF pass-through bootstrap prototype plus user-mode driver bridge exists on the USB prototype branch. The first physical target has now been captured as OPPO A58 composite parent `USB\\VID_22D9&PID_2765&REV_0404` (`usbccgp`), with MTP on `MI_00` and incidental ADB/WinUSB on `MI_01`. A source-only device/revision-specific extension-INF lower-filter draft now targets the composite parent only. M9 remains incomplete until that package is built/signed/installed and real Windows 11 behavior is validated without replacing or breaking the normal phone driver.
 
 **Exit criteria:** USB can be plugged/unplugged during a running controller session and Smart Auto moves transports without manual reconnect.
 
