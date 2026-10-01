@@ -131,6 +131,26 @@ validated OPPO A58 no-ADB target `USB\\VID_22D9&PID_2764&REV_0404` with
 `WUDFWpdMtp` / `wpdmtp.inf`. It also records whether an ADB device is
 present, the effective PnP stack, adapters, and IPv4/IPv6 routes.
 
+The first captured machine baseline confirms:
+
+- the OPPO A58 is healthy in no-ADB WPD/MTP mode;
+- ADB is absent;
+- the effective stack remains `WpdUpFltr -> WUDFRd -> WINUSB -> ACPI -> USBHUB3`;
+- Ethernet is up and is the active physical LAN path at capture time;
+- VBS is reported as running and security service code `2` is configured/running;
+- Secure Boot could not be determined from the original non-elevated capture.
+
+Before deciding how to test-sign the kernel driver, run the dedicated read-only
+signing-posture inspector from an **elevated** PowerShell:
+
+```powershell
+.\windows\eng\inspect-driver-signing-posture.ps1 -AsJson
+```
+
+It reads Secure Boot, VBS/HVCI state, current BCD test-signing state, and
+BitLocker status. It does not modify boot configuration, firmware settings,
+certificates, or driver policy.
+
 ## Static package gate
 
 The physical package must first be materialized and pass Windows Driver INF
