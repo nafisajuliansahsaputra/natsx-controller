@@ -2,10 +2,12 @@ using System.Security.Cryptography;
 using Natsx.Controller.Connection;
 using Natsx.Controller.Core;
 using Natsx.Controller.Protocol;
+using Natsx.Controller.Transport.Bluetooth;
 using Natsx.Controller.Transport.Usb;
 using Natsx.Controller.Transport.Wifi;
 using Natsx.Controller.Trust.Windows;
 using Natsx.Controller.VirtualGamepad;
+using Windows.Networking.Sockets;
 
 namespace Natsx.Controller.Receiver;
 
@@ -17,7 +19,11 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         new(1, 1);
 
     private CancellationTokenSource? _lifetime;
+    private WindowsTrustServices? _trustServices;
     private TrustedSessionRegistry? _sessionRegistry;
+    private BluetoothRfcommServiceHost? _bluetoothHost;
+    private IDisposable? _bluetoothSessionOwner;
+    private StreamSocket? _bluetoothSocket;
     private WifiTrustedControlProcessor? _wifiControlProcessor;
     private WifiDiscoveryResponder? _wifiDiscovery;
     private WifiTrustedSession? _wifiSession;
@@ -63,6 +69,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 cancellationToken);
 
         _lifetime = lifetime;
+        _trustServices = trust;
 
         try
         {
@@ -126,6 +133,10 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             await StartWifiHostAsync(
                     trust,
                     sessionRegistry,
+                    lifetime.Token)
+                .ConfigureAwait(false);
+
+            await TryStartBluetoothHostAsync(
                     lifetime.Token)
                 .ConfigureAwait(false);
 
