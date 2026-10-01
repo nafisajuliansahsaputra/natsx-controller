@@ -379,7 +379,20 @@ Android controller
  -> protocol/session layer
 ```
 
-The exact Windows/Android USB API pairing must be validated during the USB milestone, but must preserve the transport interface and protocol contract.
+The Android data path is frozen on Android Open Accessory v1 generic accessory
+mode. Windows is the physical USB host and Android is the accessory/device.
+
+Production USB Direct must use the accessory-only AOA identity; ADB/debugging
+and USB tethering are not part of the transport.
+
+Windows AOA bootstrap remains an explicit driver prototype gate. Plain WinUSB
+cannot be assumed to access a phone that is still owned by its normal MTP /
+composite driver stack. The accepted architecture therefore requires a narrowly
+scoped NATSX bootstrap component rather than a system-wide generic USB capture
+filter. See `docs/decisions/0004-usb-direct-aoa.md`.
+
+After AOA re-enumeration, USB carries the same authenticated logical NATSX
+session and global controller sequence as the wireless transports.
 
 A cable becoming physically present does not immediately make USB authoritative.
 
@@ -946,7 +959,7 @@ These are not excuses to block unrelated work.
 
 - exact v1 binary frame format;
 - exact integrity/authentication primitives;
-- exact Android/Windows USB API implementation;
+- exact Windows AOA bootstrap driver implementation;
 - final HIDMaestro integration wrapper;
 - final discovery mechanism;
 - exact state rate adaptation policy;
