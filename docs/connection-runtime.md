@@ -46,6 +46,36 @@ selection.
 A shared `TransportLifecycle` instance may bridge control/authentication and
 realtime components so they expose one coherent state.
 
+## Dynamic transport registration
+
+The Windows receiver starts the virtual-controller/session runtime before any
+physical transport is required. Authenticated transports may then be attached
+or detached while that runtime remains alive.
+
+`ControllerTransportRuntime.AttachTransportAsync` registers one concrete
+transport instance per `TransportKind`, subscribes to its realtime/lifecycle
+events, connects it, and immediately makes it visible to Smart Connection.
+
+`ControllerTransportRuntime.DetachTransportAsync` first reports the
+disconnect and evaluates Smart Connection while the old candidate is still
+known. This gives a fresh READY backup a chance to take authority before the
+old transport is removed. If no safe backup can take over, input is neutralized
+and authority is cleared without destroying the virtual controller.
+
+This dynamic boundary is required because trusted Wi-Fi, Bluetooth RFCOMM, and
+USB AOA sessions are created only after their transport-specific handshake or
+secondary-session join completes.
+
+The receiver currently hosts all three candidates in one process:
+
+- Wi-Fi discovery/control remains available independently of USB;
+- Bluetooth accepts either a cold trusted reconnect or a secondary join to the
+  active logical session;
+- USB accepts the same cold-vs-secondary session split and is monitored for
+  hotplug/recovery with bounded reconnect backoff.
+
+Transport availability is therefore not a prerequisite for receiver startup.
+
 ## Warm candidates
 
 A non-authoritative transport may continue receiving fresh full-state packets.
