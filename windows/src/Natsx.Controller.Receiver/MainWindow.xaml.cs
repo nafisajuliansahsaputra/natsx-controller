@@ -257,8 +257,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        MessageBoxResult confirmation =
-            MessageBox.Show(
+        System.Windows.MessageBoxResult confirmation =
+            System.Windows.MessageBox.Show(
                 this,
                 "Forget this Android controller? It will be disconnected immediately and must be paired again before it can control this PC.",
                 "Forget trusted controller",
@@ -266,7 +266,7 @@ public partial class MainWindow : Window
                 MessageBoxImage.Warning);
 
         if (confirmation !=
-            MessageBoxResult.Yes)
+            System.Windows.MessageBoxResult.Yes)
         {
             return;
         }
@@ -496,7 +496,7 @@ public partial class MainWindow : Window
         await _runtime
             .DisposeAsync();
 
-        Application.Current
+        System.Windows.Application.Current
             .Shutdown();
     }
 }
