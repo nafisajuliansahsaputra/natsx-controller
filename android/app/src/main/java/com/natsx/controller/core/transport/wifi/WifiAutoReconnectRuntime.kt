@@ -232,7 +232,7 @@ class WifiAutoReconnectRuntime(
 
     companion object {
         const val DEFAULT_FIRST_HEARTBEAT_TIMEOUT_MILLIS = 1_500L
-        const val DEFAULT_HEARTBEAT_LOST_TIMEOUT_MILLIS = 2_000L
+        const val DEFAULT_HEARTBEAT_LOST_TIMEOUT_MILLIS = 1_250L
         const val DEFAULT_POLL_INTERVAL_MILLIS = 250L
 
         val RECONNECT_BACKOFF_MILLIS =
