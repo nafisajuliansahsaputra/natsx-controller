@@ -271,7 +271,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 - [x] Implement Bluetooth permissions/setup.
 - [ ] Implement first-time OS pairing flow.
-- [ ] Implement RFCOMM transport.
+- [x] Implement RFCOMM transport.
 - [ ] Implement trusted auto-reconnect.
 - [x] Implement protocol handshake.
 - [x] Implement health metrics appropriate to Bluetooth.
