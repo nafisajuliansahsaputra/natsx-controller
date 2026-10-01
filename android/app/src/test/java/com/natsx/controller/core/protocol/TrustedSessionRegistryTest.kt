@@ -108,6 +108,59 @@ class TrustedSessionRegistryTest {
     }
 
     @Test
+    fun removeIfSessionDoesNotDeleteNewerReplacement() {
+        TrustedSessionRegistry().use { registry ->
+            val peerId = PeerId.createRandom()
+            val oldSession = SessionId.createRandom()
+            val newSession = SessionId.createRandom()
+            val oldKey = ByteArray(32) { 5 }
+            val newKey = ByteArray(32) { 6 }
+
+            registry.replace(
+                peerId,
+                oldSession,
+                oldKey,
+            )
+
+            registry.replace(
+                peerId,
+                newSession,
+                newKey,
+            )
+
+            assertEquals(
+                false,
+                registry.removeIfSession(
+                    peerId,
+                    oldSession,
+                ),
+            )
+
+            registry.get(peerId)!!.use { current ->
+                assertEquals(
+                    newSession,
+                    current.sessionId,
+                )
+            }
+
+            assertEquals(
+                true,
+                registry.removeIfSession(
+                    peerId,
+                    newSession,
+                ),
+            )
+
+            assertNull(
+                registry.get(peerId),
+            )
+
+            oldKey.fill(0)
+            newKey.fill(0)
+        }
+    }
+
+    @Test
     fun replacementAndRemovalTrackCurrentSession() {
         TrustedSessionRegistry().use { registry ->
             val peerId = PeerId.createRandom()
