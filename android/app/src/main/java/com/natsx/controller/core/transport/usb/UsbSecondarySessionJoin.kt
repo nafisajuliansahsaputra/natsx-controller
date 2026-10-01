@@ -12,7 +12,7 @@ import java.io.OutputStream
 import java.security.GeneralSecurityException
 
 /**
- * Joins Usb to an already-active logical controller session.
+ * Joins USB Direct to an already-active logical controller session.
  *
  * No long-term trust secret is used here. The secondary transport proves
  * possession of the current session key stored in TrustedSessionRegistry.
@@ -85,10 +85,10 @@ class UsbSecondarySessionJoinClient(
                         remoteReady.peerId !=
                         receiverPeerId ||
                         remoteReady.capabilities and
-                            TransportCapabilities.BLUETOOTH == 0
+                            TransportCapabilities.USB_DIRECT == 0
                     ) {
                         throw GeneralSecurityException(
-                            "Usb secondary SESSION_READY does not match the active Windows receiver.",
+                            "USB secondary SESSION_READY does not match the active Windows receiver.",
                         )
                     }
 
@@ -99,7 +99,7 @@ class UsbSecondarySessionJoinClient(
                                 trustedSession =
                                     trustedSession,
                                 transport =
-                                    ProtocolTransport.BLUETOOTH,
+                                    ProtocolTransport.USB_DIRECT,
                                 monotonicTimestampMicros =
                                     monotonicMicros(),
                             ),
@@ -117,10 +117,10 @@ class UsbSecondarySessionJoinClient(
 
                     if (
                         remoteTransportReady.transport !=
-                        ProtocolTransport.BLUETOOTH
+                        ProtocolTransport.USB_DIRECT
                     ) {
                         throw GeneralSecurityException(
-                            "Usb secondary join received TRANSPORT_READY for a different transport.",
+                            "USB secondary join received TRANSPORT_READY for a different transport.",
                         )
                     }
 
