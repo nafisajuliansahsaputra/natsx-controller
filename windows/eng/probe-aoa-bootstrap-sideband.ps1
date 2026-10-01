@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if (-not ("Natsx.AoaBootstrap.SidebandProbeNative" -as [type])) {
+if (-not ("Natsx.AoaBootstrap.SidebandProbeNativeV4" -as [type])) {
     Add-Type -TypeDefinition @"
 using System;
 using System.ComponentModel;
@@ -14,7 +14,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Natsx.AoaBootstrap
 {
-    public static class SidebandProbeNative
+    public static class SidebandProbeNativeV4
     {
         private const uint GENERIC_READ = 0x80000000;
         private const uint GENERIC_WRITE = 0x40000000;
@@ -148,8 +148,8 @@ namespace Natsx.AoaBootstrap
 "@
 }
 
-$version = [Natsx.AoaBootstrap.SidebandProbeNative]::GetVersion()
-$status = [Natsx.AoaBootstrap.SidebandProbeNative]::GetStatus()
+$version = [Natsx.AoaBootstrap.SidebandProbeNativeV4]::GetVersion()
+$status = [Natsx.AoaBootstrap.SidebandProbeNativeV4]::GetStatus()
 
 $report = [ordered]@{
     ControlDevice = "\\.\NatsxAoaBootstrap"
