@@ -77,7 +77,10 @@ The WPF receiver project is:
 windows/src/Natsx.Controller.Receiver/
 ```
 
-The virtual Xbox backend is not yet wired into the receiver.
+The WPF receiver now starts one HIDMaestro-backed virtual Xbox controller
+independently from transport lifetime. Trusted Wi-Fi, Bluetooth, and USB
+transports attach to the shared Smart Connection runtime dynamically, so
+transport reconnect/handover does not recreate the virtual controller.
 
 ## Android development
 
