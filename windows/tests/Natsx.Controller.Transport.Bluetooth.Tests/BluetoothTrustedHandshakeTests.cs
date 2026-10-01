@@ -63,11 +63,8 @@ public sealed class BluetoothTrustedHandshakeTests
 
         using var input =
             new MemoryStream(
-                Concat(
-                    BluetoothStreamFrameCodec.Encode(
-                        challengeFrame),
-                    BluetoothStreamFrameCodec.Encode(
-                        remoteReadyFrame)));
+                BluetoothStreamFrameCodec.Encode(
+                    remoteReadyFrame));
 
         using var output =
             new MemoryStream();
@@ -94,7 +91,8 @@ public sealed class BluetoothTrustedHandshakeTests
                 peer =>
                     peer == androidPeer
                         ? trustSecret.ToArray()
-                        : null);
+                        : null,
+                challengeFrame);
 
         Assert.Equal(
             androidPeer,
