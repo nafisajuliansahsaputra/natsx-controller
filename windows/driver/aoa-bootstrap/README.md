@@ -8,12 +8,26 @@ Current scope:
 - KMDF pass-through filter skeleton;
 - private NATSX device interface;
 - version IOCTL;
+- bounded `START_AOA` IOCTL that performs only the canonical Android Open
+  Accessory endpoint-zero sequence;
 - all unknown device-control requests are forwarded to the lower stack;
-- no AOA vendor request is sent yet;
+- the receiver has a ConfigMgr/CreateFile/DeviceIoControl client for this
+  private interface;
 - no INF/install script is included yet;
 - no driver is loaded by normal application CI or runtime.
 
-The prototype exists to establish a reproducible WDK build before endpoint-zero
-USB control logic is added.
+The driver intentionally owns the privileged endpoint-zero sequence instead of
+exposing an arbitrary user-mode vendor-control API. User mode can only ask the
+filter to report its protocol version or perform the narrowly scoped NATSX AOA
+bootstrap operation.
 
-Do not install this prototype on a production machine.
+The source prototype is not sufficient to mark M9 complete. It still requires:
+
+1. a deliberately scoped install/attach strategy that does not capture
+   unrelated USB devices;
+2. physical validation on supported Windows 11 hardware;
+3. proof that the OEM MTP/PTP path still works before and after bootstrap;
+4. uninstall/reboot recovery validation;
+5. receiver integration only after those checks pass.
+
+Do not install this prototype on a production machine yet.
