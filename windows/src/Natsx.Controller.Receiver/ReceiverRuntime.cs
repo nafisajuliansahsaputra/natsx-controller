@@ -36,11 +36,14 @@ public sealed class ReceiverRuntime : IAsyncDisposable
     private WifiTrustedSession? _wifiSession;
     private UdpClient? _wifiPairingClient;
     private Task? _wifiPairingTask;
+    private Task? _diagnosticsTask;
     private WinUsbAoaAccessoryConnection? _usbConnection;
     private IDisposable? _usbSessionOwner;
     private Task? _usbMonitorTask;
     private HidMaestroVirtualGamepadBackend? _virtualGamepad;
     private ControllerTransportRuntime? _transportRuntime;
+    private string _lastHandoverReason =
+        "None";
     private bool _started;
     private bool _disposed;
 
@@ -146,6 +149,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             transportRuntime.HandoverCommitted +=
                 proposal =>
                 {
+                    _lastHandoverReason =
+                        $"{proposal.From?.ToString() ?? "None"} -> {proposal.To} ({proposal.Reason})";
+
                     Report(
                         $"Active transport: {proposal.To}.");
                     PublishDiagnostics();
@@ -167,6 +173,11 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             _transportRuntime =
                 transportRuntime;
             _started = true;
+
+            _diagnosticsTask =
+                DiagnosticsLoopAsync(
+                    lifetime.Token);
+
             PublishDiagnostics();
 
             await StartWifiHostAsync(
@@ -1826,6 +1837,30 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         return secret;
     }
 
+    private async Task DiagnosticsLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        using var timer =
+            new PeriodicTimer(
+                TimeSpan.FromMilliseconds(
+                    500));
+
+        try
+        {
+            while (await timer
+                .WaitForNextTickAsync(
+                    cancellationToken)
+                .ConfigureAwait(false))
+            {
+                PublishDiagnostics();
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
     private void Report(
         string status)
     {
@@ -1880,6 +1915,27 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 .Count ??
             0;
 
+        TransportHealthSnapshot? activeHealth =
+            null;
+        double inputRateHz =
+            0;
+
+        if (runtime is not null &&
+            active is TransportKind activeKind)
+        {
+            if (runtime.TryGetTransportHealthSnapshot(
+                    activeKind,
+                    out TransportHealthSnapshot health))
+            {
+                activeHealth =
+                    health;
+            }
+
+            inputRateHz =
+                runtime.GetInputRateHz(
+                    activeKind);
+        }
+
         DiagnosticsChanged?.Invoke(
             new ReceiverDiagnosticsSnapshot(
                 SmartAutoState:
@@ -1899,7 +1955,20 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                         ? "Ready"
                         : "Unavailable",
                 TrustedControllerCount:
-                    trustedControllerCount));
+                    trustedControllerCount,
+                RoundTripTime:
+                    activeHealth?.RoundTripTime,
+                Jitter:
+                    activeHealth?.Jitter,
+                PacketLossPercent:
+                    activeHealth?.PacketLossPercent,
+                InputRateHz:
+                    inputRateHz,
+                ReconnectCount:
+                    runtime?.ReconnectCount ??
+                    0,
+                RecentHandoverReason:
+                    _lastHandoverReason));
     }
 
     private async ValueTask CleanupAsync()
@@ -1911,6 +1980,27 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         _lifetime = null;
         lifetime?.Cancel();
+
+        Task? diagnosticsTask =
+            _diagnosticsTask;
+
+        _diagnosticsTask =
+            null;
+
+        if (diagnosticsTask is not null)
+        {
+            try
+            {
+                await diagnosticsTask
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch
+            {
+            }
+        }
 
         lock (_pairingGate)
         {

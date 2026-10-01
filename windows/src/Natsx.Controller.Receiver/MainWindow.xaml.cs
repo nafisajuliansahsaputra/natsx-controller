@@ -85,6 +85,37 @@ public partial class MainWindow : Window
         TrustedControllerCountText.Text =
             snapshot.TrustedControllerCount
                 .ToString();
+
+        RoundTripTimeText.Text =
+            FormatDuration(
+                snapshot.RoundTripTime);
+
+        JitterText.Text =
+            FormatDuration(
+                snapshot.Jitter);
+
+        PacketLossText.Text =
+            snapshot.PacketLossPercent is double loss
+                ? $"{loss:0.0}%"
+                : "—";
+
+        InputRateText.Text =
+            $"{snapshot.InputRateHz:0} Hz";
+
+        ReconnectCountText.Text =
+            snapshot.ReconnectCount
+                .ToString();
+
+        RecentHandoverText.Text =
+            snapshot.RecentHandoverReason;
+    }
+
+    private static string FormatDuration(
+        TimeSpan? duration)
+    {
+        return duration is TimeSpan value
+            ? $"{value.TotalMilliseconds:0.0} ms"
+            : "—";
     }
 
     private void OnPairingConfirmationChanged(

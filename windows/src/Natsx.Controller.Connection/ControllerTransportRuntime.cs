@@ -15,6 +15,8 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     private readonly TimeProvider _timeProvider;
     private readonly Dictionary<TransportKind, IControllerTransport> _transports = new();
     private readonly Dictionary<TransportKind, LatestTransportState> _latestStates = new();
+    private readonly Dictionary<TransportKind, PacketRateTracker> _packetRates = new();
+    private readonly HashSet<TransportKind> _seenTransportKinds = new();
     private readonly object _transportGate = new();
     private readonly object _connectionGate = new();
     private readonly object _stateGate = new();
@@ -23,6 +25,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     private Task? _evaluationLoop;
     private bool _started;
     private bool _suppressLifecycleReports;
+    private int _reconnectCount;
     private bool _disposed;
 
     public ControllerTransportRuntime(
@@ -91,6 +94,58 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         state =
             TransportRuntimeState.Unavailable;
         return false;
+    }
+
+    public bool TryGetTransportHealthSnapshot(
+        TransportKind kind,
+        out TransportHealthSnapshot snapshot)
+    {
+        if (TryGetTransport(
+                kind,
+                out IControllerTransport transport))
+        {
+            try
+            {
+                snapshot =
+                    transport.GetHealthSnapshot();
+                return true;
+            }
+            catch
+            {
+            }
+        }
+
+        snapshot =
+            default;
+        return false;
+    }
+
+    public double GetInputRateHz(
+        TransportKind kind)
+    {
+        lock (_stateGate)
+        {
+            if (!_packetRates.TryGetValue(
+                    kind,
+                    out PacketRateTracker? tracker))
+            {
+                return 0;
+            }
+
+            return tracker.GetRateHz(
+                _timeProvider);
+        }
+    }
+
+    public int ReconnectCount
+    {
+        get
+        {
+            lock (_transportGate)
+            {
+                return _reconnectCount;
+            }
+        }
     }
 
     public async ValueTask StartAsync(CancellationToken cancellationToken = default)
@@ -256,6 +311,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         lock (_stateGate)
         {
             _latestStates.Remove(kind);
+            _packetRates.Remove(kind);
 
             if (_session.AuthoritativeTransport == kind)
             {
@@ -400,6 +456,21 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     {
         lock (_stateGate)
         {
+            if (!_packetRates.TryGetValue(
+                    eventArgs.Transport,
+                    out PacketRateTracker? rateTracker))
+            {
+                rateTracker =
+                    new PacketRateTracker();
+
+                _packetRates[eventArgs.Transport] =
+                    rateTracker;
+            }
+
+            rateTracker.Observe(
+                eventArgs.ReceivedTimestamp,
+                _timeProvider);
+
             _latestStates[eventArgs.Transport] = new LatestTransportState(
                 eventArgs.Transport,
                 eventArgs.Sequence,
@@ -532,6 +603,12 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
                     parameterName);
             }
 
+            if (!_seenTransportKinds.Add(
+                    transport.Kind))
+            {
+                _reconnectCount++;
+            }
+
             transport.GamepadStateReceived +=
                 OnGamepadStateReceived;
             transport.StateChanged +=
@@ -588,6 +665,100 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         lock (_transportGate)
         {
             return _transports.Values.ToArray();
+        }
+    }
+
+    private sealed class PacketRateTracker
+    {
+        private static readonly TimeSpan RateWindow =
+            TimeSpan.FromMilliseconds(
+                500);
+
+        private static readonly TimeSpan StaleAfter =
+            TimeSpan.FromSeconds(
+                1);
+
+        private bool _hasPackets;
+        private long _windowStartedTimestamp;
+        private long _lastPacketTimestamp;
+        private int _windowPacketCount;
+        private double _lastRateHz;
+
+        public void Observe(
+            long timestamp,
+            TimeProvider timeProvider)
+        {
+            if (!_hasPackets)
+            {
+                _hasPackets =
+                    true;
+                _windowStartedTimestamp =
+                    timestamp;
+                _lastPacketTimestamp =
+                    timestamp;
+                _windowPacketCount =
+                    1;
+                return;
+            }
+
+            _lastPacketTimestamp =
+                timestamp;
+            _windowPacketCount++;
+
+            TimeSpan elapsed =
+                timeProvider.GetElapsedTime(
+                    _windowStartedTimestamp,
+                    timestamp);
+
+            if (elapsed < RateWindow ||
+                elapsed <= TimeSpan.Zero)
+            {
+                return;
+            }
+
+            _lastRateHz =
+                _windowPacketCount /
+                elapsed.TotalSeconds;
+
+            _windowStartedTimestamp =
+                timestamp;
+            _windowPacketCount =
+                0;
+        }
+
+        public double GetRateHz(
+            TimeProvider timeProvider)
+        {
+            if (!_hasPackets)
+            {
+                return 0;
+            }
+
+            long now =
+                timeProvider.GetTimestamp();
+
+            if (timeProvider.GetElapsedTime(
+                    _lastPacketTimestamp,
+                    now) >
+                StaleAfter)
+            {
+                return 0;
+            }
+
+            TimeSpan currentWindow =
+                timeProvider.GetElapsedTime(
+                    _windowStartedTimestamp,
+                    now);
+
+            if (_windowPacketCount > 0 &&
+                currentWindow >
+                TimeSpan.Zero)
+            {
+                return _windowPacketCount /
+                    currentWindow.TotalSeconds;
+            }
+
+            return _lastRateHz;
         }
     }
 

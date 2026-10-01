@@ -339,18 +339,20 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M12 — Receiver UX
 
+> The receiver now exposes a live, non-blocking diagnostics panel for Smart Auto state, active/backup transports, virtual-controller readiness, trusted-controller count, active-link RTT/jitter/loss, realtime input rate, cumulative reconnect count, and the most recent committed handover reason. Metrics refresh on a 500 ms diagnostics loop and remain outside the realtime input path.
+
 - [ ] Connected device status.
-- [ ] Active transport.
-- [ ] Backup transport status.
-- [ ] Virtual controller status.
-- [ ] RTT.
-- [ ] Jitter.
-- [ ] packet loss/error health.
-- [ ] Input rate.
-- [ ] Reconnect count.
-- [ ] Recent handover reason.
+- [x] Active transport.
+- [x] Backup transport status.
+- [x] Virtual controller status.
+- [x] RTT.
+- [x] Jitter.
+- [x] packet loss/error health.
+- [x] Input rate.
+- [x] Reconnect count.
+- [x] Recent handover reason.
 - [ ] Settings.
-- [ ] Diagnostics view.
+- [x] Diagnostics view.
 - [ ] Minimize to system tray.
 - [ ] Optional startup with Windows.
 - [ ] Clear error states for missing backend/permissions.

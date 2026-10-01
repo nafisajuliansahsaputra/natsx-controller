@@ -589,6 +589,106 @@ public sealed class ControllerTransportRuntimeTests
     }
 
     [Fact]
+    public async Task Diagnostics_ExposeHealthInputRateAndReconnectCount()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new FakeBackend();
+        var session = new ControllerSession();
+        ConnectionPolicy policy = ConnectionPolicy.Competitive;
+        var safety = new InputSafetyEngine(
+            session,
+            backend,
+            policy,
+            clock);
+        var manager = new SmartConnectionManager(
+            policy,
+            clock);
+
+        await using var runtime =
+            new ControllerTransportRuntime(
+                session,
+                safety,
+                manager,
+                Array.Empty<IControllerTransport>(),
+                policy,
+                clock);
+
+        await runtime.StartAsync();
+
+        var firstWifi =
+            new FakeTransport(
+                TransportKind.Wifi,
+                clock)
+            {
+                Snapshot =
+                    Healthy(
+                        TransportKind.Wifi,
+                        95),
+            };
+
+        await runtime.AttachTransportAsync(
+            firstWifi);
+
+        for (uint sequence = 1;
+            sequence <= 12;
+            sequence++)
+        {
+            clock.Advance(
+                TimeSpan.FromMilliseconds(
+                    10));
+
+            firstWifi.Publish(
+                sequence,
+                GamepadState.Neutral);
+        }
+
+        Assert.True(
+            runtime.TryGetTransportHealthSnapshot(
+                TransportKind.Wifi,
+                out TransportHealthSnapshot health));
+        Assert.Equal(
+            TimeSpan.FromMilliseconds(5),
+            health.RoundTripTime);
+        Assert.True(
+            runtime.GetInputRateHz(
+                TransportKind.Wifi) >
+            0);
+        Assert.Equal(
+            0,
+            runtime.ReconnectCount);
+
+        await runtime.DetachTransportAsync(
+            TransportKind.Wifi);
+
+        var secondWifi =
+            new FakeTransport(
+                TransportKind.Wifi,
+                clock)
+            {
+                Snapshot =
+                    Healthy(
+                        TransportKind.Wifi,
+                        95),
+            };
+
+        await runtime.AttachTransportAsync(
+            secondWifi);
+
+        Assert.Equal(
+            1,
+            runtime.ReconnectCount);
+
+        clock.Advance(
+            TimeSpan.FromSeconds(
+                2));
+
+        Assert.Equal(
+            0,
+            runtime.GetInputRateHz(
+                TransportKind.Wifi));
+    }
+
+    [Fact]
     public async Task NonAuthoritativeRealtimeState_DoesNotReachBackend()
     {
         var clock = new ManualTimeProvider();
