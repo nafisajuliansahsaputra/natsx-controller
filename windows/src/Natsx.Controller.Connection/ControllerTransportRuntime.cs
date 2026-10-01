@@ -13,8 +13,9 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     private readonly SmartConnectionManager _connectionManager;
     private readonly ConnectionPolicy _policy;
     private readonly TimeProvider _timeProvider;
-    private readonly IReadOnlyDictionary<TransportKind, IControllerTransport> _transports;
+    private readonly Dictionary<TransportKind, IControllerTransport> _transports = new();
     private readonly Dictionary<TransportKind, LatestTransportState> _latestStates = new();
+    private readonly object _transportGate = new();
     private readonly object _connectionGate = new();
     private readonly object _stateGate = new();
 
@@ -40,21 +41,12 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
 
         ArgumentNullException.ThrowIfNull(transports);
 
-        var map = new Dictionary<TransportKind, IControllerTransport>();
         foreach (IControllerTransport transport in transports)
         {
-            if (!map.TryAdd(transport.Kind, transport))
-            {
-                throw new ArgumentException(
-                    $"Only one transport instance per kind is allowed: {transport.Kind}.",
-                    nameof(transports));
-            }
-
-            transport.GamepadStateReceived += OnGamepadStateReceived;
-            transport.StateChanged += OnTransportStateChanged;
+            AddTransportCore(
+                transport,
+                nameof(transports));
         }
-
-        _transports = map;
     }
 
     public event Action<HandoverProposal>? HandoverCommitted;
@@ -97,7 +89,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         _suppressLifecycleReports = false;
         _lifetime = new CancellationTokenSource();
 
-        foreach (IControllerTransport transport in _transports.Values)
+        foreach (IControllerTransport transport in GetTransportSnapshot())
         {
             try
             {
@@ -129,9 +121,12 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        IControllerTransport[] transports =
+            GetTransportSnapshot();
+
         lock (_connectionGate)
         {
-            foreach (IControllerTransport transport in _transports.Values)
+            foreach (IControllerTransport transport in transports)
             {
                 ReportTransportHealth(transport);
             }
@@ -147,6 +142,123 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         {
             _inputSafety.Evaluate();
         }
+    }
+
+    /// <summary>
+    /// Adds a transport candidate after the runtime has been created. This is
+    /// required for authenticated Wi-Fi/Bluetooth/USB links whose concrete
+    /// session transport only exists after a trusted handshake completes.
+    /// Ownership transfers to the runtime after this method succeeds.
+    /// </summary>
+    public async ValueTask AttachTransportAsync(
+        IControllerTransport transport,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(transport);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        AddTransportCore(
+            transport,
+            nameof(transport));
+
+        if (!_started)
+        {
+            return;
+        }
+
+        try
+        {
+            if (transport.State != TransportRuntimeState.Unavailable)
+            {
+                ReportTransportHealth(transport);
+            }
+
+            await transport
+                .ConnectAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            ReportTransportHealth(transport);
+            EvaluateOnce();
+        }
+        catch
+        {
+            RemoveTransportCore(
+                transport.Kind,
+                transport);
+
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Removes and disposes a transport without stopping the controller
+    /// runtime. If the removed transport is authoritative, Smart Auto gets one
+    /// final chance to hand over to a fresh ready backup before authority is
+    /// cleared and the safety engine is neutralized.
+    /// </summary>
+    public async ValueTask<bool> DetachTransportAsync(
+        TransportKind kind,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (!TryGetTransport(
+                kind,
+                out IControllerTransport? transport))
+        {
+            return false;
+        }
+
+        try
+        {
+            await transport
+                .DisconnectAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
+            TransportFaulted?.Invoke(
+                kind,
+                exception);
+        }
+
+        ReportTransportHealth(transport);
+        EvaluateOnce();
+
+        RemoveTransportCore(
+            kind,
+            transport);
+
+        lock (_stateGate)
+        {
+            _latestStates.Remove(kind);
+
+            if (_session.AuthoritativeTransport == kind)
+            {
+                _inputSafety.ForceNeutral();
+                _session.ClearAuthority();
+            }
+        }
+
+        lock (_connectionGate)
+        {
+            if (_connectionManager.ActiveTransport == kind)
+            {
+                _connectionManager.ClearActiveTransport();
+            }
+        }
+
+        await transport
+            .DisposeAsync()
+            .ConfigureAwait(false);
+
+        return true;
     }
 
     public async ValueTask StopAsync(CancellationToken cancellationToken = default)
@@ -177,7 +289,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
             }
         }
 
-        foreach (IControllerTransport transport in _transports.Values)
+        foreach (IControllerTransport transport in GetTransportSnapshot())
         {
             try
             {
@@ -330,14 +442,14 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
 
             if (oldAuthority is TransportKind previousAuthorityKind &&
                 previousAuthorityKind != proposal.To &&
-                _transports.TryGetValue(
+                TryGetTransport(
                     previousAuthorityKind,
                     out IControllerTransport? previousTransport))
             {
                 previousTransport.SetAuthoritative(false);
             }
 
-            if (_transports.TryGetValue(
+            if (TryGetTransport(
                     proposal.To,
                     out IControllerTransport? newTransport))
             {
@@ -356,6 +468,75 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         return false;
     }
 
+    private void AddTransportCore(
+        IControllerTransport transport,
+        string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(transport);
+
+        lock (_transportGate)
+        {
+            if (!_transports.TryAdd(
+                    transport.Kind,
+                    transport))
+            {
+                throw new ArgumentException(
+                    $"Only one transport instance per kind is allowed: {transport.Kind}.",
+                    parameterName);
+            }
+
+            transport.GamepadStateReceived +=
+                OnGamepadStateReceived;
+            transport.StateChanged +=
+                OnTransportStateChanged;
+        }
+    }
+
+    private bool RemoveTransportCore(
+        TransportKind kind,
+        IControllerTransport expectedTransport)
+    {
+        lock (_transportGate)
+        {
+            if (!_transports.TryGetValue(
+                    kind,
+                    out IControllerTransport? registered) ||
+                !ReferenceEquals(
+                    registered,
+                    expectedTransport))
+            {
+                return false;
+            }
+
+            registered.GamepadStateReceived -=
+                OnGamepadStateReceived;
+            registered.StateChanged -=
+                OnTransportStateChanged;
+
+            return _transports.Remove(kind);
+        }
+    }
+
+    private bool TryGetTransport(
+        TransportKind kind,
+        out IControllerTransport? transport)
+    {
+        lock (_transportGate)
+        {
+            return _transports.TryGetValue(
+                kind,
+                out transport);
+        }
+    }
+
+    private IControllerTransport[] GetTransportSnapshot()
+    {
+        lock (_transportGate)
+        {
+            return _transports.Values.ToArray();
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -365,11 +546,18 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
 
         await StopAsync().ConfigureAwait(false);
 
-        foreach (IControllerTransport transport in _transports.Values)
+        IControllerTransport[] transports =
+            GetTransportSnapshot();
+
+        foreach (IControllerTransport transport in transports)
         {
-            transport.GamepadStateReceived -= OnGamepadStateReceived;
-            transport.StateChanged -= OnTransportStateChanged;
-            await transport.DisposeAsync().ConfigureAwait(false);
+            RemoveTransportCore(
+                transport.Kind,
+                transport);
+
+            await transport
+                .DisposeAsync()
+                .ConfigureAwait(false);
         }
 
         _disposed = true;
