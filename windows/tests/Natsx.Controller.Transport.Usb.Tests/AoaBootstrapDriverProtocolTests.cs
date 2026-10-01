@@ -60,6 +60,10 @@ public sealed class AoaBootstrapDriverProtocolTests
         Assert.Equal(
             0xA3616008u,
             AoaBootstrapDriverProtocol.GetStatusControlCode);
+
+        Assert.Equal(
+            0xA361600Cu,
+            AoaBootstrapDriverProtocol.ProbeProtocolRawControlCode);
     }
 
     [Fact]
@@ -101,6 +105,31 @@ public sealed class AoaBootstrapDriverProtocolTests
                 unchecked((int)0xC0000010),
                 1),
             AoaBootstrapDriverProtocol.ParseStatus(bytes));
+    }
+
+    [Fact]
+    public void RawProtocolProbe_ParsesReadOnlyKernelDiagnostic()
+    {
+        var bytes = new byte[24];
+
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes, 1);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), 6);
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(8), 0);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), 0);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(16), 2);
+        BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(20), 2);
+        BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(22), 0);
+
+        Assert.Equal(
+            new AoaBootstrapRawProtocolProbe(
+                1,
+                6,
+                0,
+                0,
+                2,
+                2,
+                0),
+            AoaBootstrapDriverProtocol.ParseRawProtocolProbe(bytes));
     }
 
     [Fact]
