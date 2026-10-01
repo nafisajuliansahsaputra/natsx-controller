@@ -20,6 +20,10 @@ public static class PairingCrypto
         Encoding.ASCII.GetBytes("NATSX-PAIRING-RESPONSE-V1");
     private static readonly byte[] TrustSecretInfo =
         Encoding.ASCII.GetBytes("NATSX-TRUST-SECRET-V1");
+    private static readonly byte[] AndroidConfirmContext =
+        Encoding.ASCII.GetBytes("NATSX-PAIRING-CONFIRM-ANDROID-V1");
+    private static readonly byte[] WindowsConfirmContext =
+        Encoding.ASCII.GetBytes("NATSX-PAIRING-CONFIRM-WINDOWS-V1");
 
     public static byte[] ComputePairingTranscriptHash(
         PeerId androidPeerId,
@@ -121,6 +125,72 @@ public static class PairingCrypto
         finally
         {
             CryptographicOperations.ZeroMemory(input);
+        }
+    }
+
+    public static byte[] ComputePairingConfirmationProof(
+        PairingConfirmationRole role,
+        ReadOnlySpan<byte> pairingKey,
+        ReadOnlySpan<byte> pairingTranscriptHash,
+        SessionId sessionId)
+    {
+        ValidateKey(pairingKey, nameof(pairingKey));
+        ValidateHash(pairingTranscriptHash, nameof(pairingTranscriptHash));
+
+        ReadOnlySpan<byte> context = role switch
+        {
+            PairingConfirmationRole.Android => AndroidConfirmContext,
+            PairingConfirmationRole.Windows => WindowsConfirmContext,
+            _ => throw new ArgumentOutOfRangeException(nameof(role)),
+        };
+
+        byte[] input = new byte[
+            context.Length +
+            DerivedKeySize +
+            SessionId.Size];
+
+        int offset = 0;
+        Copy(context, input, ref offset);
+        Copy(pairingTranscriptHash, input, ref offset);
+        sessionId.WriteBytes(input.AsSpan(offset, SessionId.Size));
+
+        try
+        {
+            return HmacSha256(pairingKey, input);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(input);
+        }
+    }
+
+    public static bool VerifyPairingConfirmationProof(
+        PairingConfirmationRole role,
+        ReadOnlySpan<byte> pairingKey,
+        ReadOnlySpan<byte> pairingTranscriptHash,
+        SessionId sessionId,
+        ReadOnlySpan<byte> suppliedProof)
+    {
+        if (suppliedProof.Length != DerivedKeySize)
+        {
+            return false;
+        }
+
+        byte[] expected = ComputePairingConfirmationProof(
+            role,
+            pairingKey,
+            pairingTranscriptHash,
+            sessionId);
+
+        try
+        {
+            return CryptographicOperations.FixedTimeEquals(
+                expected,
+                suppliedProof);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(expected);
         }
     }
 
@@ -232,4 +302,11 @@ public static class PairingCrypto
         source.CopyTo(destination.AsSpan(offset, source.Length));
         offset += source.Length;
     }
+}
+
+
+public enum PairingConfirmationRole
+{
+    Android,
+    Windows,
 }
