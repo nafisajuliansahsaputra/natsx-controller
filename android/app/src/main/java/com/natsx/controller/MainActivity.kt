@@ -111,6 +111,7 @@ class MainActivity : Activity() {
                     dp(12),
                     dp(8),
                 )
+                maxLines = 9
             }
 
         root.addView(
@@ -300,11 +301,18 @@ class MainActivity : Activity() {
             return
         }
 
+        val history =
+            usbRuntimeStatus.historyText()
+
         usbStatusText.text =
-            if (status.isError) {
-                "USB ERROR — ${status.message}"
+            if (history.isBlank()) {
+                if (status.isError) {
+                    "USB ERROR — ${status.message}"
+                } else {
+                    "USB — ${status.message}"
+                }
             } else {
-                "USB — ${status.message}"
+                "USB diagnostics\n$history"
             }
 
         usbStatusText.setTextColor(
