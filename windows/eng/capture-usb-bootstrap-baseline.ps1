@@ -94,9 +94,33 @@ $adbPresent = @(
         }
 ).Count -gt 0
 
+$secureBoot = $null
+if (Get-Command Confirm-SecureBootUEFI -ErrorAction SilentlyContinue) {
+    try {
+        $secureBoot = Confirm-SecureBootUEFI
+    }
+    catch {
+        $secureBoot = "unavailable: $($_.Exception.Message)"
+    }
+}
+
+$deviceGuard = $null
+try {
+    $deviceGuard = Get-CimInstance -Namespace "root\Microsoft\Windows\DeviceGuard" -ClassName "Win32_DeviceGuard" -ErrorAction Stop |
+        Select-Object VirtualizationBasedSecurityStatus, SecurityServicesConfigured, SecurityServicesRunning
+}
+catch {
+    $deviceGuard = $null
+}
+
 $report = [ordered]@{
     CapturedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
     Purpose = "NATSX USB bootstrap pre-install baseline"
+    Windows = [ordered]@{
+        Version = [System.Environment]::OSVersion.Version.ToString()
+        SecureBoot = $secureBoot
+        DeviceGuard = $deviceGuard
+    }
     Target = [ordered]@{
         Status = $device.Status
         Class = $device.Class
