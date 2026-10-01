@@ -276,6 +276,12 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
             .DisposeAsync()
             .ConfigureAwait(false);
 
+        // A failed pre-removal handover can happen when both warm transports
+        // carried the same session-global state revision. Once the old
+        // transport is gone, immediately re-evaluate remaining candidates
+        // instead of waiting for the periodic health tick.
+        EvaluateOnce();
+
         return true;
     }
 
@@ -430,19 +436,42 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
                 return false;
             }
 
+            TransportKind? oldAuthority =
+                _session.AuthoritativeTransport;
+
+            bool accepted;
+
             if (_session.LastAcceptedSequence is uint previousSequence &&
-                !SequenceNumber.IsNewer(candidate.Sequence, previousSequence))
+                candidate.Sequence == previousSequence)
             {
-                return false;
+                accepted =
+                    _inputSafety
+                        .TryAdoptEquivalentState(
+                            proposal.To,
+                            candidate.Sequence,
+                            candidate.State);
+            }
+            else
+            {
+                if (_session.LastAcceptedSequence is uint lastAccepted &&
+                    !SequenceNumber.IsNewer(
+                        candidate.Sequence,
+                        lastAccepted))
+                {
+                    return false;
+                }
+
+                _session.SetAuthoritativeTransport(
+                    proposal.To);
+
+                accepted =
+                    _inputSafety.TryAccept(
+                        proposal.To,
+                        candidate.Sequence,
+                        candidate.State);
             }
 
-            TransportKind? oldAuthority = _session.AuthoritativeTransport;
-            _session.SetAuthoritativeTransport(proposal.To);
-
-            if (!_inputSafety.TryAccept(
-                    proposal.To,
-                    candidate.Sequence,
-                    candidate.State))
+            if (!accepted)
             {
                 if (oldAuthority is TransportKind previousAuthority)
                 {
