@@ -70,6 +70,15 @@ jobs:
       - name: Restore
         run: dotnet restore windows/Natsx.Controller.slnx
 
+      - name: Validate clean HIDMaestro auto-bootstrap
+        shell: pwsh
+        run: |
+          Remove-Item windows/lib/HIDMaestro -Recurse -Force -ErrorAction SilentlyContinue
+          dotnet build windows/src/Natsx.Controller.VirtualGamepad/Natsx.Controller.VirtualGamepad.csproj --configuration Release --no-restore
+          if (-not (Test-Path windows/lib/HIDMaestro/HIDMaestro.Core.dll)) {
+            throw "HIDMaestro auto-bootstrap did not materialize HIDMaestro.Core.dll."
+          }
+
       - name: Build
         run: dotnet build windows/Natsx.Controller.slnx --configuration Release --no-restore
 
