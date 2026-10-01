@@ -105,6 +105,16 @@ class TrustedSessionRegistry : Closeable {
         }
     }
 
+    fun hasAnyActiveSession(): Boolean {
+        check(!closed) {
+            "Trusted session registry is closed."
+        }
+
+        return synchronized(gate) {
+            sessions.isNotEmpty()
+        }
+    }
+
     fun getBySessionId(
         sessionId: SessionId,
     ): TrustedSessionRegistration? {
