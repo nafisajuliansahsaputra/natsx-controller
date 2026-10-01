@@ -377,8 +377,6 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                         completion.Session;
                     remotePeerId =
                         completion.RemotePeerId;
-                    uplinkOnly =
-                        true;
                     break;
                 }
 
@@ -1329,6 +1327,8 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                         completion.Session;
                     remotePeerId =
                         completion.RemotePeerId;
+                    uplinkOnly =
+                        true;
                     break;
                 }
 
