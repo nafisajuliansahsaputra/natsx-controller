@@ -6,7 +6,8 @@ Windows bootstrap boundary.
 Current scope:
 
 - KMDF pass-through filter skeleton;
-- private NATSX device interface;
+- sideband control device `\\.\NatsxAoaBootstrap` for user-mode IOCTLs,
+  so custom control requests do not depend on WPD/WUDF forwarding;
 - reserved driver service name: `NatsxAoaBootstrap`;
 - version IOCTL;
 - bounded `START_AOA` IOCTL that performs only the canonical Android Open
@@ -32,8 +33,14 @@ Current scope:
 
 The driver intentionally owns the privileged endpoint-zero sequence instead of
 exposing an arbitrary user-mode vendor-control API. User mode can only ask the
-filter to report its protocol version or perform the narrowly scoped NATSX AOA
-bootstrap operation.
+sideband control device to report its protocol version or perform the narrowly
+scoped NATSX AOA bootstrap operation.
+
+The sideband change is deliberate: the physical OPPO A58 no-ADB stack is
+`WpdUpFltr -> WUDFRd -> WINUSB -> ACPI -> USBHUB3`, and the direct user-mode
+WinUSB probe fails at `WinUsb_Initialize` with `ERROR_INVALID_FUNCTION`.
+Keeping custom IOCTLs off the PnP data stack avoids depending on upper WPD/WUDF
+drivers to forward requests they do not own.
 
 The source prototype is not sufficient to mark M9 complete. It still requires:
 
