@@ -924,6 +924,27 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         _lifetime = null;
         lifetime?.Cancel();
 
+        BluetoothRfcommServiceHost? bluetoothHost =
+            _bluetoothHost;
+
+        _bluetoothHost = null;
+
+        if (bluetoothHost is not null)
+        {
+            bluetoothHost.ConnectionReceived -=
+                OnBluetoothConnectionReceived;
+
+            try
+            {
+                await bluetoothHost
+                    .DisposeAsync()
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+            }
+        }
+
         WifiDiscoveryResponder? wifiDiscovery =
             _wifiDiscovery;
 
@@ -965,6 +986,12 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
                 _transportRuntime = null;
             }
+
+            _bluetoothSessionOwner?.Dispose();
+            _bluetoothSessionOwner = null;
+
+            _bluetoothSocket?.Dispose();
+            _bluetoothSocket = null;
 
             _wifiSession?.Dispose();
             _wifiSession = null;
@@ -1012,6 +1039,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         _sessionRegistry?.Dispose();
         _sessionRegistry = null;
+        _trustServices = null;
 
         lifetime?.Dispose();
     }
