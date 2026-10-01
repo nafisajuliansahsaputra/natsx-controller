@@ -6,6 +6,7 @@ public static class AoaBootstrapDriverProtocol
 {
     public const uint ProtocolVersion = 1;
     public const uint MinimumSupportedDriverBuild = 2;
+    public const string ServiceName = "NatsxAoaBootstrap";
 
     public static readonly Guid DeviceInterfaceGuid =
         new("54E7A3A1-01F0-41B8-B397-75E2A6D42C11");
