@@ -984,9 +984,15 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                         TransportKind.Usb,
                         out TransportRuntimeState state))
                 {
-                    if (state is
-                        TransportRuntimeState.Failed or
-                        TransportRuntimeState.Unavailable)
+                    bool physicallyPresent =
+                        await IsCurrentUsbAccessoryPresentAsync(
+                                cancellationToken)
+                            .ConfigureAwait(false);
+
+                    if (!physicallyPresent ||
+                        state is
+                            TransportRuntimeState.Failed or
+                            TransportRuntimeState.Unavailable)
                     {
                         await DeactivateUsbCandidateAsync(
                                 runtime)
@@ -998,12 +1004,14 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                             null;
 
                         Report(
-                            "USB Direct disconnected. Smart Auto is using the best remaining transport.");
+                            runtime.ActiveTransport is TransportKind fallback
+                                ? $"USB Direct disconnected. Active transport: {fallback}."
+                                : "USB Direct disconnected. Waiting for the best backup transport.");
                     }
                     else
                     {
                         await Task.Delay(
-                                TimeSpan.FromMilliseconds(500),
+                                TimeSpan.FromMilliseconds(250),
                                 cancellationToken)
                             .ConfigureAwait(false);
 
@@ -1042,9 +1050,6 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                     {
                         lastDiagnostic =
                             exception.Message;
-
-                        Report(
-                            $"USB Direct waiting: {exception.Message}");
                     }
                 }
 
@@ -1090,6 +1095,34 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 }
             }
         }
+    }
+
+    private async ValueTask<bool> IsCurrentUsbAccessoryPresentAsync(
+        CancellationToken cancellationToken)
+    {
+        WinUsbAoaAccessoryConnection? connection =
+            _usbConnection;
+
+        if (connection is null)
+        {
+            return false;
+        }
+
+        var backend =
+            new WinUsbAoaAccessoryBackend();
+
+        IReadOnlyList<WinUsbAoaAccessoryDevice> devices =
+            await backend
+                .EnumerateAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        return devices.Any(
+            candidate =>
+                string.Equals(
+                    candidate.DeviceId,
+                    connection.Identity.DeviceId,
+                    StringComparison.OrdinalIgnoreCase));
     }
 
     private async ValueTask DeactivateUsbCandidateAsync(
@@ -1151,9 +1184,6 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             _transportRuntime ??
             throw new InvalidOperationException(
                 "Controller transport runtime is not started.");
-
-        Report(
-            "Checking USB Direct…");
 
         var accessoryBackend =
             new WinUsbAoaAccessoryBackend();
