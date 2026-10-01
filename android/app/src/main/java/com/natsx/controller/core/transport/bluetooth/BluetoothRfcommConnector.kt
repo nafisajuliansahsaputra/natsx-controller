@@ -162,6 +162,12 @@ class BluetoothRfcommConnector(
             require(permissionGate.isBluetoothEnabled()) {
                 "Bluetooth is disabled."
             }
+            require(
+                device.bondState ==
+                    BluetoothDevice.BOND_BONDED,
+            ) {
+                "Bluetooth receiver is not OS-bonded. Complete pairing first."
+            }
 
             val manager =
                 context.getSystemService(

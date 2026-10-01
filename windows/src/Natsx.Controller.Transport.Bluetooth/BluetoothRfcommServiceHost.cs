@@ -18,6 +18,14 @@ public sealed class BluetoothRfcommServiceHost : IAsyncDisposable
         _provider is not null &&
         _listener is not null;
 
+    public ValueTask StartPairingModeAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return StartAsync(
+            radioDiscoverable: true,
+            cancellationToken);
+    }
+
     public async ValueTask StartAsync(
         bool radioDiscoverable = false,
         CancellationToken cancellationToken = default)
