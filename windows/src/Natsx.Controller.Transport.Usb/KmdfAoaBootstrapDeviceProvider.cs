@@ -185,7 +185,9 @@ internal sealed class KmdfAoaBootstrapDevice :
             {
                 throw new BootstrapTargetNotReadyException(
                     status.AttachedTargetCount,
-                    status.ReadyUsbTargetCount);
+                    status.ReadyUsbTargetCount,
+                    status.LastUsbTargetCreateStatus,
+                    status.UsbTargetCreateAttemptCount);
             }
 
             return new KmdfAoaBootstrapDevice(
@@ -330,9 +332,14 @@ internal sealed class BootstrapTargetNotReadyException :
 {
     public BootstrapTargetNotReadyException(
         uint attachedTargetCount,
-        uint readyUsbTargetCount)
+        uint readyUsbTargetCount,
+        int lastUsbTargetCreateStatus,
+        uint usbTargetCreateAttemptCount)
         : base(
-            $"The NATSX AOA bootstrap driver is loaded, but the USB target is not uniquely ready. Attached={attachedTargetCount}, Ready={readyUsbTargetCount}.")
+            $"The NATSX AOA bootstrap driver is loaded, but the USB target is not uniquely ready. " +
+            $"Attached={attachedTargetCount}, Ready={readyUsbTargetCount}, " +
+            $"LastCreateStatus=0x{unchecked((uint)lastUsbTargetCreateStatus):X8}, " +
+            $"CreateAttempts={usbTargetCreateAttemptCount}.")
     {
     }
 }
