@@ -13,6 +13,9 @@ public sealed class AoaBootstrapDriverProtocolTests
         Assert.Equal(
             2u,
             AoaBootstrapDriverProtocol.MinimumSupportedDriverBuild);
+        Assert.Equal(
+            "NatsxAoaBootstrap",
+            AoaBootstrapDriverProtocol.ServiceName);
     }
 
     [Fact]
