@@ -178,7 +178,7 @@ NatsxEvtDeviceAdd(
     NatsxGetDeviceContext(device)->UsbDevice =
         WDF_NO_HANDLE;
     NatsxGetDeviceContext(device)->LastUsbTargetCreateStatus =
-        STATUS_NOT_ATTEMPTED;
+        STATUS_SUCCESS;
     NatsxGetDeviceContext(device)->UsbTargetCreateAttemptCount =
         0;
 
@@ -382,7 +382,7 @@ NatsxEvtControlIoDeviceControl(
             &response->ReadyUsbTargetCount);
 
         response->LastUsbTargetCreateStatus =
-            STATUS_NOT_ATTEMPTED;
+            STATUS_SUCCESS;
         response->UsbTargetCreateAttemptCount =
             0;
 
