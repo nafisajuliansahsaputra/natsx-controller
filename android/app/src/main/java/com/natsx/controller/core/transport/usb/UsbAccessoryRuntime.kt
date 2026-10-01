@@ -96,7 +96,19 @@ class UsbAccessoryRuntime(
         }
 
         executor.execute {
-            disconnectBlocking(accessory)
+            runCatching {
+                disconnectBlocking(accessory)
+            }.onFailure { exception ->
+                val detail =
+                    exception.message
+                        ?.takeIf { it.isNotBlank() }
+                        ?: exception::class.java.simpleName
+
+                status.publish(
+                    "USB detach cleanup recovered: $detail",
+                    isError = true,
+                )
+            }
         }
     }
 
@@ -658,11 +670,18 @@ class UsbAccessoryRuntime(
 
         if (oldSender != null) {
             broadcaster.removeSink(oldSender)
-            oldSender.close()
+            runCatching {
+                oldSender.close()
+            }
         }
 
-        oldSession?.close()
-        oldConnection?.close()
+        runCatching {
+            oldSession?.close()
+        }
+
+        runCatching {
+            oldConnection?.close()
+        }
 
         if (oldConnection != null) {
             status.publish(
@@ -676,8 +695,11 @@ class UsbAccessoryRuntime(
             return
         }
 
-        // Run cleanup synchronously after preventing new work.
-        disconnectBlocking(null)
+        // Run cleanup synchronously after preventing new work. Cleanup must
+        // never crash the process during a physical cable detach.
+        runCatching {
+            disconnectBlocking(null)
+        }
         executor.shutdownNow()
     }
 }
