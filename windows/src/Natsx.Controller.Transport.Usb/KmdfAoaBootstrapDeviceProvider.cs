@@ -52,55 +52,25 @@ public sealed class KmdfAoaBootstrapDeviceProvider :
             return ValueTask.FromResult(empty);
         }
 
-        IReadOnlyList<string> paths =
-            AoaBootstrapDeviceInterfaceEnumerator.EnumeratePresentPaths();
-
-        var devices =
-            new List<IUsbAoaBootstrapDevice>(paths.Count);
-
-        IOException? lastOpenFailure = null;
-
         try
         {
-            foreach (string path in paths)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
+            IUsbAoaBootstrapDevice device =
+                KmdfAoaBootstrapDevice.OpenSidebandControl();
 
-                try
+            IReadOnlyList<IUsbAoaBootstrapDevice> devices =
+                new[]
                 {
-                    devices.Add(
-                        KmdfAoaBootstrapDevice.Open(path));
-                }
-                catch (IOException exception)
-                {
-                    // A device can disappear while ConfigMgr is enumerating.
-                    // Keep trying other interfaces, but do not misreport a
-                    // persistent driver/open failure as a charge-only cable.
-                    lastOpenFailure = exception;
-                }
-            }
+                    device,
+                };
 
-            if (devices.Count == 0 &&
-                paths.Count > 0 &&
-                lastOpenFailure is not null)
-            {
-                throw lastOpenFailure;
-            }
-
-            return ValueTask.FromResult<IReadOnlyList<IUsbAoaBootstrapDevice>>(
-                devices);
+            return ValueTask.FromResult(devices);
         }
-        catch
+        catch (BootstrapControlDeviceMissingException)
         {
-            foreach (IUsbAoaBootstrapDevice device in devices)
-            {
-                device.DisposeAsync()
-                    .AsTask()
-                    .GetAwaiter()
-                    .GetResult();
-            }
+            IReadOnlyList<IUsbAoaBootstrapDevice> empty =
+                Array.Empty<IUsbAoaBootstrapDevice>();
 
-            throw;
+            return ValueTask.FromResult(empty);
         }
     }
 }
@@ -113,17 +83,21 @@ internal sealed class KmdfAoaBootstrapDevice :
     private const uint FileShareRead = 0x00000001;
     private const uint FileShareWrite = 0x00000002;
     private const uint OpenExisting = 3;
+
+    private const int ErrorFileNotFound = 2;
+    private const int ErrorPathNotFound = 3;
     private const int ErrorAccessDenied = 5;
+    private const int ErrorNotSupported = 50;
 
     private readonly SafeFileHandle _handle;
     private bool _disposed;
 
     private KmdfAoaBootstrapDevice(
-        string devicePath,
         SafeFileHandle handle,
         AoaBootstrapDriverVersion driverVersion)
     {
-        DeviceId = devicePath;
+        DeviceId =
+            AoaBootstrapDriverProtocol.ControlDevicePath;
         _handle = handle;
         DriverVersion = driverVersion;
     }
@@ -136,14 +110,11 @@ internal sealed class KmdfAoaBootstrapDevice :
 
     public AoaBootstrapDriverVersion DriverVersion { get; }
 
-    public static KmdfAoaBootstrapDevice Open(
-        string devicePath)
+    public static KmdfAoaBootstrapDevice OpenSidebandControl()
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(devicePath);
-
         SafeFileHandle handle =
             NativeMethods.CreateFileW(
-                devicePath,
+                AoaBootstrapDriverProtocol.ControlDevicePath,
                 GenericRead | GenericWrite,
                 FileShareRead | FileShareWrite,
                 IntPtr.Zero,
@@ -156,14 +127,19 @@ internal sealed class KmdfAoaBootstrapDevice :
             int error = Marshal.GetLastWin32Error();
             handle.Dispose();
 
+            if (error is ErrorFileNotFound or ErrorPathNotFound)
+            {
+                throw new BootstrapControlDeviceMissingException();
+            }
+
             if (error == ErrorAccessDenied)
             {
                 throw new UnauthorizedAccessException(
-                    "Access to the NATSX AOA bootstrap driver interface was denied.");
+                    "Access to the NATSX AOA bootstrap sideband control device was denied.");
             }
 
             throw CreateIoException(
-                "Could not open the NATSX AOA bootstrap driver interface.",
+                "Could not open the NATSX AOA bootstrap sideband control device.",
                 error);
         }
 
@@ -182,7 +158,6 @@ internal sealed class KmdfAoaBootstrapDevice :
                 .ValidateCompatibility(version);
 
             return new KmdfAoaBootstrapDevice(
-                devicePath,
                 handle,
                 version);
         }
@@ -251,17 +226,17 @@ internal sealed class KmdfAoaBootstrapDevice :
             if (error == ErrorAccessDenied)
             {
                 throw new UnauthorizedAccessException(
-                    "The NATSX AOA bootstrap driver denied the request.");
+                    "The NATSX AOA bootstrap sideband control device denied the request.");
             }
 
-            if (error == 50)
+            if (error == ErrorNotSupported)
             {
                 throw new NotSupportedException(
                     "The connected Android device does not support the requested AOA bootstrap operation.");
             }
 
             throw CreateIoException(
-                "The NATSX AOA bootstrap driver request failed.",
+                "The NATSX AOA bootstrap sideband request failed.",
                 error);
         }
 
@@ -319,125 +294,12 @@ internal sealed class KmdfAoaBootstrapDevice :
     }
 }
 
-internal static class AoaBootstrapDeviceInterfaceEnumerator
+internal sealed class BootstrapControlDeviceMissingException :
+    IOException
 {
-    private const int CrSuccess = 0;
-    private const int CrBufferSmall = 0x1A;
-    private const uint PresentInterfacesOnly = 0;
-
-    public static IReadOnlyList<string> EnumeratePresentPaths()
+    public BootstrapControlDeviceMissingException()
+        : base(
+            "The NATSX AOA bootstrap sideband control device is not present.")
     {
-        Guid interfaceGuid =
-            AoaBootstrapDriverProtocol.DeviceInterfaceGuid;
-
-        for (int attempt = 0; attempt < 3; attempt++)
-        {
-            int result =
-                NativeMethods.CM_Get_Device_Interface_List_SizeW(
-                    out uint requiredCharacters,
-                    ref interfaceGuid,
-                    null,
-                    PresentInterfacesOnly);
-
-            if (result != CrSuccess)
-            {
-                throw CreateConfigManagerException(
-                    "Could not query NATSX AOA bootstrap interface list size.",
-                    result);
-            }
-
-            if (requiredCharacters <= 1)
-            {
-                return Array.Empty<string>();
-            }
-
-            var buffer =
-                new char[requiredCharacters];
-
-            result =
-                NativeMethods.CM_Get_Device_Interface_ListW(
-                    ref interfaceGuid,
-                    null,
-                    buffer,
-                    (uint)buffer.Length,
-                    PresentInterfacesOnly);
-
-            if (result == CrBufferSmall)
-            {
-                continue;
-            }
-
-            if (result != CrSuccess)
-            {
-                throw CreateConfigManagerException(
-                    "Could not enumerate NATSX AOA bootstrap interfaces.",
-                    result);
-            }
-
-            return ParseMultiString(buffer);
-        }
-
-        throw new IOException(
-            "NATSX AOA bootstrap interface list changed repeatedly during enumeration.");
-    }
-
-    private static IReadOnlyList<string> ParseMultiString(
-        char[] buffer)
-    {
-        var results =
-            new List<string>();
-
-        int start = 0;
-
-        for (int index = 0; index < buffer.Length; index++)
-        {
-            if (buffer[index] != '\0')
-            {
-                continue;
-            }
-
-            if (index == start)
-            {
-                break;
-            }
-
-            results.Add(
-                new string(
-                    buffer,
-                    start,
-                    index - start));
-
-            start = index + 1;
-        }
-
-        return results;
-    }
-
-    private static IOException CreateConfigManagerException(
-        string message,
-        int configManagerResult) =>
-        new(
-            $"{message} Configuration Manager result: 0x{configManagerResult:X8}.");
-
-    private static class NativeMethods
-    {
-        [DllImport(
-            "cfgmgr32.dll",
-            CharSet = CharSet.Unicode)]
-        internal static extern int CM_Get_Device_Interface_List_SizeW(
-            out uint pulLen,
-            ref Guid interfaceClassGuid,
-            string? deviceId,
-            uint flags);
-
-        [DllImport(
-            "cfgmgr32.dll",
-            CharSet = CharSet.Unicode)]
-        internal static extern int CM_Get_Device_Interface_ListW(
-            ref Guid interfaceClassGuid,
-            string? deviceId,
-            [Out] char[] buffer,
-            uint bufferLength,
-            uint flags);
     }
 }
