@@ -14,13 +14,16 @@ Current scope:
 - all unknown device-control requests are forwarded to the lower stack;
 - the receiver has a ConfigMgr/CreateFile/DeviceIoControl client for this
   private interface;
-- a **source-only** OPPO A58 extension-INF observation draft is included for
-  `USB\\VID_22D9&PID_2765&REV_0404`, captured while ADB was present;
-  it is intentionally not wired into the install/package build until a second
-  capture with USB debugging disabled confirms the no-ADB normal-mode ID;
-- that INF attaches `NatsxAoaBootstrap` as a declarative lower filter to the
-  composite parent only, not to the MTP (`MI_00`) or ADB (`MI_01`) child;
-- ADB may be present on the test phone but is not used or required by NATSX;
+- the no-ADB OPPO A58 target is now confirmed as
+  `USB\\VID_22D9&PID_2764&REV_0404`, class `WPD`, service
+  `WUDFWpdMtp`, with the USB root hub as its parent;
+- a **source-only** extension-INF draft now matches that exact ADB-off device
+  revision and declares `NatsxAoaBootstrap` as a device-specific lower filter;
+- the earlier ADB-on `PID_2765` composite layout is recorded only as a
+  diagnostic comparison and is not a NATSX dependency;
+- the INF remains intentionally outside the install/package build until the
+  existing filter-stack metadata is captured and the lower-filter position is
+  validated against the real WPD stack;
 - no driver is loaded by normal application runtime unless the prototype
   package is explicitly installed for physical validation.
 
@@ -31,10 +34,10 @@ bootstrap operation.
 
 The source prototype is not sufficient to mark M9 complete. It still requires:
 
-1. physical validation of the current OPPO A58-scoped declarative
-   `AddFilter` / extension-INF package on the observed hardware;
-2. confirmation that lower-filter attachment to the composite parent can issue
-   the bounded AOA control sequence while `usbccgp` and MTP remain healthy;
+1. capture the existing upper/lower/compound filter metadata for the ADB-off
+   OPPO A58 WPD device;
+2. validate that the device-specific lower-filter placement can issue the
+   bounded AOA control sequence while `WUDFWpdMtp` remains healthy;
 3. proof that the OEM MTP/PTP path still works before and after bootstrap;
 4. uninstall/reboot recovery validation;
 5. receiver integration only after those checks pass.
