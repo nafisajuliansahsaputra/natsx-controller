@@ -16,6 +16,31 @@ MTP/WPD or USB devices cannot be captured.
 - A recovery path for removing the prototype package if validation fails.
 - Ethernet/LAN state captured before the driver is attached.
 
+## Read-only target inspection
+
+Before authoring any test INF, inspect the currently attached phone without
+changing its driver stack:
+
+```powershell
+pwsh -File windows/eng/inspect-usb-bootstrap-target.ps1
+```
+
+If the phone is not identified automatically:
+
+```powershell
+pwsh -File windows/eng/inspect-usb-bootstrap-target.ps1 -IncludeAllUsb
+```
+
+After selecting the exact phone instance, capture a machine-readable report:
+
+```powershell
+pwsh -File windows/eng/inspect-usb-bootstrap-target.ps1 -InstanceId "<device-instance-id>" -AsJson
+```
+
+The report is read-only and records the hardware IDs, compatible IDs, current
+service, parent, and current driver package needed to design a device-specific
+test attach.
+
 ## Package/attach gate
 
 The prototype may advance to install testing only when its INF/package:
