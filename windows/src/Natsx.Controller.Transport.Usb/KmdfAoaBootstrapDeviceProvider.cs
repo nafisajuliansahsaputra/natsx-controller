@@ -151,19 +151,8 @@ internal sealed class KmdfAoaBootstrapDevice :
             AoaBootstrapDriverVersion version =
                 AoaBootstrapDriverProtocol.ParseVersion(response);
 
-            if (version.ProtocolVersion !=
-                AoaBootstrapDriverProtocol.ProtocolVersion)
-            {
-                throw new InvalidOperationException(
-                    $"Unsupported NATSX AOA bootstrap driver protocol version {version.ProtocolVersion}.");
-            }
-
-            if (version.DriverBuild <
-                AoaBootstrapDriverProtocol.MinimumSupportedDriverBuild)
-            {
-                throw new InvalidOperationException(
-                    $"NATSX AOA bootstrap driver build {version.DriverBuild} is older than the minimum supported build {AoaBootstrapDriverProtocol.MinimumSupportedDriverBuild}.");
-            }
+            AoaBootstrapDriverProtocol
+                .ValidateCompatibility(version);
 
             return new KmdfAoaBootstrapDevice(
                 devicePath,
@@ -236,6 +225,12 @@ internal sealed class KmdfAoaBootstrapDevice :
             {
                 throw new UnauthorizedAccessException(
                     "The NATSX AOA bootstrap driver denied the request.");
+            }
+
+            if (error == 50)
+            {
+                throw new NotSupportedException(
+                    "The connected Android device does not support the requested AOA bootstrap operation.");
             }
 
             throw CreateIoException(
