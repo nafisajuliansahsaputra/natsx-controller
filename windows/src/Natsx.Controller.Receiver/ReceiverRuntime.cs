@@ -1175,6 +1175,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 trust.LocalPeerId,
                 offer);
 
+        Report(
+            "Sending pairing response to Android…");
+
         await WriteUsbFrameAsync(
                 connection.Output,
                 PairingFrameCodec
@@ -1182,6 +1185,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                         responder.Response),
                 cancellationToken)
             .ConfigureAwait(false);
+
+        Report(
+            "Pairing response sent. Waiting for user confirmation…");
 
         bool approved =
             await RequestPairingConfirmationAsync(
@@ -1205,6 +1211,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         PairingConfirmPayload localConfirmation =
             responder.ApproveDisplayedCode();
 
+        Report(
+            "Windows pairing code confirmed. Sending confirmation to Android…");
+
         await WriteUsbFrameAsync(
                 connection.Output,
                 PairingFrameCodec
@@ -1212,6 +1221,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                         localConfirmation),
                 cancellationToken)
             .ConfigureAwait(false);
+
+        Report(
+            "Windows pairing confirmation sent. Waiting for Android confirmation…");
 
         byte[] remoteFrame =
             await ReadUsbFrameWithTimeoutAsync(
@@ -1244,6 +1256,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 $"Expected PAIRING_CONFIRM from Android, received {remoteType}.");
         }
 
+        Report(
+            "Android pairing confirmation received. Verifying…");
+
         PairingConfirmPayload remoteConfirmation =
             PairingFrameCodec
                 .DecodeConfirm(
@@ -1258,6 +1273,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         try
         {
+            Report(
+                "Android pairing confirmation verified. Saving trust…");
+
             trust.TrustedPeers.Put(
                 new TrustedPeerRecord(
                     established.RemotePeerId,
@@ -1353,6 +1371,11 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                     packet,
                     cancellationToken)
                 .ConfigureAwait(false);
+
+            await FlushUsbOutputBestEffortAsync(
+                    output,
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
         finally
         {
@@ -1360,6 +1383,26 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 frame);
             CryptographicOperations.ZeroMemory(
                 packet);
+        }
+    }
+
+    private static async ValueTask FlushUsbOutputBestEffortAsync(
+        Stream output,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await output.FlushAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (NotImplementedException)
+        {
+            // WinRT USB output adapters may not implement FlushAsync.
+            // WriteAsync above is still the authoritative bulk transfer.
+        }
+        catch (NotSupportedException)
+        {
         }
     }
 
