@@ -12,6 +12,7 @@ import com.natsx.controller.core.trust.SharedPreferencesTrustedPeerStore
 import com.natsx.controller.core.trust.TrustedPeerStore
 import com.natsx.controller.core.protocol.PeerId
 import com.natsx.controller.core.protocol.TrustedSessionRegistry
+import com.natsx.controller.core.transport.usb.UsbRuntimeStatusCoordinator
 import com.natsx.controller.core.transport.wifi.SharedPreferencesWifiEndpointCache
 import com.natsx.controller.core.transport.wifi.WifiEndpointCache
 
@@ -32,6 +33,12 @@ class NatsxControllerApplication : Application() {
         LazyThreadSafetyMode.SYNCHRONIZED,
     ) {
         PairingConfirmationCoordinator()
+    }
+
+    val usbRuntimeStatus: UsbRuntimeStatusCoordinator by lazy(
+        LazyThreadSafetyMode.SYNCHRONIZED,
+    ) {
+        UsbRuntimeStatusCoordinator()
     }
 
     val trustedPeerStore: TrustedPeerStore by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
