@@ -26,6 +26,16 @@ public sealed class UsbSmartAutoIntegrationTests
             {
                 UsbRecoveryStability =
                     TimeSpan.FromMilliseconds(100),
+                SuspectSilence =
+                    TimeSpan.FromMilliseconds(200),
+                DegradedSilence =
+                    TimeSpan.FromMilliseconds(300),
+                FailoverSilence =
+                    TimeSpan.FromMilliseconds(400),
+                LostSilence =
+                    TimeSpan.FromMilliseconds(500),
+                NeutralizeSilence =
+                    TimeSpan.FromMilliseconds(600),
                 FastWindow =
                     TimeSpan.FromMilliseconds(50),
                 NormalWindow =
