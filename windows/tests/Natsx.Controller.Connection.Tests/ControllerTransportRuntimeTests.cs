@@ -529,10 +529,30 @@ public sealed class ControllerTransportRuntimeTests
                 sequence,
                 state);
 
-            clock.Advance(
-                policy.UsbRecoveryStability);
+            // Keep both warm transports fed with the same session-global
+            // revision while USB satisfies its stabilization window.
+            TimeSpan elapsed =
+                TimeSpan.Zero;
 
-            runtime.EvaluateOnce();
+            while (elapsed <
+                policy.UsbRecoveryStability)
+            {
+                TimeSpan step =
+                    TimeSpan.FromMilliseconds(
+                        50);
+
+                clock.Advance(step);
+                elapsed += step;
+
+                wifi.Publish(
+                    sequence,
+                    state);
+                usb.Publish(
+                    sequence,
+                    state);
+
+                runtime.EvaluateOnce();
+            }
 
             Assert.Equal(
                 TransportKind.Usb,
