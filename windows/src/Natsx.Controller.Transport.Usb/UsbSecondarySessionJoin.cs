@@ -50,6 +50,67 @@ public sealed class UsbSecondarySessionJoinServer
         _lifecycle = lifecycle;
     }
 
+    public ValueTask<UsbSecondarySessionJoinCompletion>
+        JoinUplinkOnlyAsync(
+            byte[] firstFrame,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(
+            firstFrame);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        MarkState(
+            TransportRuntimeState.Authenticating);
+
+        SessionId sessionId =
+            ReadSessionIdHint(
+                firstFrame);
+
+        using TrustedSessionRegistration registration =
+            _sessionRegistry.GetBySessionId(
+                sessionId)
+            ?? throw new CryptographicException(
+                "USB uplink does not match an active trusted controller session.");
+
+        byte[] sessionKey =
+            registration.Material
+                .CopySessionKey();
+
+        try
+        {
+            using var trustedSession =
+                new UsbTrustedSession(
+                    sessionId,
+                    sessionKey);
+
+            SessionReadyPayload remoteReady =
+                UsbControlFrameCodec
+                    .DecodeSessionReady(
+                        firstFrame,
+                        trustedSession);
+
+            ValidateRemoteReady(
+                remoteReady,
+                registration.PeerId);
+
+            MarkState(
+                TransportRuntimeState.Stabilizing);
+
+            return ValueTask.FromResult(
+                new UsbSecondarySessionJoinCompletion(
+                    registration.PeerId,
+                    new UsbTrustedSession(
+                        sessionId,
+                        sessionKey)));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(
+                sessionKey);
+        }
+    }
+
     public async ValueTask<UsbSecondarySessionJoinCompletion>
         JoinAsync(
             Stream inputStream,
