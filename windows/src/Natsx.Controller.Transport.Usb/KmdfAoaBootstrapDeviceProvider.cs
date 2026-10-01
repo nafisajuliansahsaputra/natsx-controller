@@ -1,3 +1,4 @@
+using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
@@ -7,10 +8,36 @@ namespace Natsx.Controller.Transport.Usb;
 public sealed class KmdfAoaBootstrapDeviceProvider :
     IUsbAoaBootstrapDeviceProvider
 {
-    public UsbBootstrapProviderState State =>
-        OperatingSystem.IsWindows()
-            ? UsbBootstrapProviderState.Ready
-            : UsbBootstrapProviderState.Unavailable;
+    public UsbBootstrapProviderState State
+    {
+        get
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return UsbBootstrapProviderState.Unavailable;
+            }
+
+            try
+            {
+                using RegistryKey? serviceKey =
+                    Registry.LocalMachine.OpenSubKey(
+                        $@"SYSTEM\CurrentControlSet\Services\{AoaBootstrapDriverProtocol.ServiceName}",
+                        writable: false);
+
+                return serviceKey is null
+                    ? UsbBootstrapProviderState.DriverMissing
+                    : UsbBootstrapProviderState.Ready;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UsbBootstrapProviderState.RequiresElevation;
+            }
+            catch (System.Security.SecurityException)
+            {
+                return UsbBootstrapProviderState.RequiresElevation;
+            }
+        }
+    }
 
     public ValueTask<IReadOnlyList<IUsbAoaBootstrapDevice>> EnumerateAsync(
         CancellationToken cancellationToken = default)
