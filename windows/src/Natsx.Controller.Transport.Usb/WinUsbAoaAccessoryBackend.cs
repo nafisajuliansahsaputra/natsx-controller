@@ -10,7 +10,7 @@ namespace Natsx.Controller.Transport.Usb;
 /// This backend intentionally does not perform pre-AOA bootstrap against the
 /// phone's normal MTP/PTP configuration.
 /// </summary>
-public sealed class WinUsbAoaAccessoryBackend
+public sealed class WinUsbAoaAccessoryBackend : IAoaAccessoryDataBackend
 {
     public async ValueTask<IReadOnlyList<WinUsbAoaAccessoryDevice>>
         EnumerateAsync(
