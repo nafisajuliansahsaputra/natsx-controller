@@ -5,6 +5,7 @@
   <Project Path="src/Natsx.Controller.VirtualGamepad/Natsx.Controller.VirtualGamepad.csproj" />
   <Project Path="src/Natsx.Controller.Transport.Wifi/Natsx.Controller.Transport.Wifi.csproj" />
   <Project Path="src/Natsx.Controller.Transport.Bluetooth/Natsx.Controller.Transport.Bluetooth.csproj" />
+  <Project Path="src/Natsx.Controller.Transport.Usb/Natsx.Controller.Transport.Usb.csproj" />
   <Project Path="src/Natsx.Controller.Trust.Windows/Natsx.Controller.Trust.Windows.csproj" />
   <Project Path="src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj" />
   <Project Path="tests/Natsx.Controller.Protocol.Tests/Natsx.Controller.Protocol.Tests.csproj" />
@@ -12,5 +13,6 @@
   <Project Path="tests/Natsx.Controller.VirtualGamepad.Tests/Natsx.Controller.VirtualGamepad.Tests.csproj" />
   <Project Path="tests/Natsx.Controller.Transport.Wifi.Tests/Natsx.Controller.Transport.Wifi.Tests.csproj" />
   <Project Path="tests/Natsx.Controller.Transport.Bluetooth.Tests/Natsx.Controller.Transport.Bluetooth.Tests.csproj" />
+  <Project Path="tests/Natsx.Controller.Transport.Usb.Tests/Natsx.Controller.Transport.Usb.Tests.csproj" />
   <Project Path="tests/Natsx.Controller.Trust.Windows.Tests/Natsx.Controller.Trust.Windows.Tests.csproj" />
 </Solution>
