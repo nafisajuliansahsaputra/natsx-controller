@@ -165,13 +165,10 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                     lifetime.Token)
                 .ConfigureAwait(false);
 
-            if (trustedPeers.Count == 0)
-            {
-                _wifiPairingTask =
-                    RunWifiFirstPairingAsync(
-                        trust,
-                        lifetime.Token);
-            }
+            _wifiPairingTask =
+                RunWifiFirstPairingAsync(
+                    trust,
+                    lifetime.Token);
 
             await TryStartBluetoothHostAsync(
                     lifetime.Token)
@@ -566,12 +563,11 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             client;
 
         Report(
-            "Secure LAN first-pair ready on UDP 43858.");
+            "Secure LAN pairing/recovery ready on UDP 43858.");
 
         try
         {
-            while (!cancellationToken.IsCancellationRequested &&
-                   trust.TrustedPeers.List().Count == 0)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 UdpReceiveResult offerDatagram =
                     await client
@@ -710,6 +706,21 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
                 try
                 {
+                    IReadOnlyList<TrustedPeerRecord> existingPeers =
+                        trust.TrustedPeers.List();
+
+                    foreach (TrustedPeerRecord existingPeer in existingPeers)
+                    {
+                        if (existingPeer.PeerId !=
+                            established.RemotePeerId)
+                        {
+                            trust.TrustedPeers.Remove(
+                                existingPeer.PeerId);
+                        }
+                    }
+
+                    _sessionRegistry?.Clear();
+
                     trust.TrustedPeers.Put(
                         new TrustedPeerRecord(
                             established.RemotePeerId,
@@ -729,9 +740,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 }
 
                 Report(
-                    $"LAN pairing complete. Trusted Android peer: {established.RemotePeerId}.");
-
-                return;
+                    $"LAN pairing complete. Trusted Android peer: {established.RemotePeerId}. Recovery listener remains active.");
             }
         }
         catch (OperationCanceledException)
