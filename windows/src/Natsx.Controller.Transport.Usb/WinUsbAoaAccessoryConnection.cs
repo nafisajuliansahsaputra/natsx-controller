@@ -9,12 +9,18 @@ public sealed class WinUsbAoaAccessoryConnection : IAsyncDisposable
         IDisposable owner,
         WinUsbAoaAccessoryDevice identity,
         Stream input,
-        Stream output)
+        Stream output,
+        byte bulkInPipeId,
+        byte bulkOutPipeId,
+        ushort maximumPacketSize)
     {
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
         Identity = identity ?? throw new ArgumentNullException(nameof(identity));
         Input = input ?? throw new ArgumentNullException(nameof(input));
         Output = output ?? throw new ArgumentNullException(nameof(output));
+        BulkInPipeId = bulkInPipeId;
+        BulkOutPipeId = bulkOutPipeId;
+        MaximumPacketSize = maximumPacketSize;
     }
 
     public WinUsbAoaAccessoryDevice Identity { get; }
@@ -22,6 +28,12 @@ public sealed class WinUsbAoaAccessoryConnection : IAsyncDisposable
     public Stream Input { get; }
 
     public Stream Output { get; }
+
+    public byte BulkInPipeId { get; }
+
+    public byte BulkOutPipeId { get; }
+
+    public ushort MaximumPacketSize { get; }
 
     public ValueTask DisposeAsync()
     {
