@@ -290,9 +290,6 @@ public sealed class UsbTrustedHandshakeServer
         await outputStream.WriteAsync(
             packet,
             cancellationToken).ConfigureAwait(false);
-
-        await outputStream.FlushAsync(
-            cancellationToken).ConfigureAwait(false);
     }
 
     private ulong MonotonicMicros()
