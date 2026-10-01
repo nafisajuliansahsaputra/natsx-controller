@@ -2,6 +2,7 @@ package com.natsx.controller.core.transport.usb
 
 import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
+import android.os.SystemClock
 import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
 import com.natsx.controller.core.pairing.PairingPrompt
 import com.natsx.controller.core.protocol.MessageType
@@ -17,6 +18,8 @@ import com.natsx.controller.core.session.RealtimeStateBroadcaster
 import com.natsx.controller.core.trust.TrustedPeerRecord
 import com.natsx.controller.core.trust.TrustedPeerStore
 import java.io.Closeable
+import java.io.EOFException
+import java.net.SocketTimeoutException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -217,10 +220,12 @@ class UsbAccessoryRuntime(
             )
 
             val responseFrame =
-                UsbStreamFrameCodec
-                    .readFrame(
-                        opened.input,
-                    )
+                readFrameWithTimeout(
+                    opened = opened,
+                    timeoutMillis = 20_000,
+                    stage =
+                        "Waiting for Windows pairing response",
+                )
 
             when (readMessageType(responseFrame)) {
                 MessageType.PAIRING_ABORT -> {
@@ -304,10 +309,12 @@ class UsbAccessoryRuntime(
             )
 
             val remoteFrame =
-                UsbStreamFrameCodec
-                    .readFrame(
-                        opened.input,
-                    )
+                readFrameWithTimeout(
+                    opened = opened,
+                    timeoutMillis = 120_000,
+                    stage =
+                        "Waiting for Windows pairing confirmation",
+                )
 
             status.publish(
                 "Windows pairing confirmation frame received.",
@@ -430,6 +437,98 @@ class UsbAccessoryRuntime(
         } finally {
             frame.fill(0)
             packet.fill(0)
+        }
+    }
+
+    private fun readFrameWithTimeout(
+        opened: UsbAccessoryConnection,
+        timeoutMillis: Long,
+        stage: String,
+    ): ByteArray {
+        require(timeoutMillis > 0)
+
+        val deadline =
+            SystemClock.elapsedRealtime() +
+                timeoutMillis
+
+        val prefix =
+            ByteArray(
+                UsbStreamFrameCodec
+                    .LENGTH_PREFIX_SIZE,
+            )
+
+        readExactlyWithTimeout(
+            opened = opened,
+            destination = prefix,
+            deadlineMillis = deadline,
+            stage = stage,
+        )
+
+        val frame =
+            ByteArray(
+                UsbStreamFrameCodec
+                    .decodeLengthPrefix(
+                        prefix,
+                    ),
+            )
+
+        readExactlyWithTimeout(
+            opened = opened,
+            destination = frame,
+            deadlineMillis = deadline,
+            stage = stage,
+        )
+
+        return frame
+    }
+
+    private fun readExactlyWithTimeout(
+        opened: UsbAccessoryConnection,
+        destination: ByteArray,
+        deadlineMillis: Long,
+        stage: String,
+    ) {
+        var offset = 0
+
+        while (offset < destination.size) {
+            val remaining =
+                deadlineMillis -
+                    SystemClock.elapsedRealtime()
+
+            if (remaining <= 0) {
+                throw SocketTimeoutException(
+                    "$stage timed out.",
+                )
+            }
+
+            opened.awaitReadable(
+                timeoutMillis =
+                    remaining
+                        .coerceAtMost(
+                            Int.MAX_VALUE.toLong(),
+                        )
+                        .toInt(),
+                stage = stage,
+            )
+
+            val read =
+                opened.input.read(
+                    destination,
+                    offset,
+                    destination.size - offset,
+                )
+
+            if (read < 0) {
+                throw EOFException(
+                    "$stage ended before a complete frame was received.",
+                )
+            }
+
+            if (read == 0) {
+                continue
+            }
+
+            offset += read
         }
     }
 
