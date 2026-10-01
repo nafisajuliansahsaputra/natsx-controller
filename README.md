@@ -115,12 +115,16 @@ Current build baseline:
 - targetSdk 36;
 - native Kotlin through AGP built-in Kotlin support.
 
-Build from a machine with Android SDK + Gradle 9.6 available:
+Build from Windows with the repository-pinned Gradle Wrapper:
 
-```bash
-gradle -p android :app:testDebugUnitTest
-gradle -p android :app:assembleDebug
+```powershell
+.\android\gradlew.bat -p android :app:testDebugUnitTest
+.\android\gradlew.bat -p android :app:assembleDebug
 ```
+
+The wrapper downloads the pinned Gradle 9.6.0 distribution on first use and
+verifies its SHA-256 checksum. A globally installed `gradle` command is not
+required.
 
 The repository intentionally does not require ADB as part of the final controller transport design.
 
