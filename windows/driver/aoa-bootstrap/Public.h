@@ -3,11 +3,13 @@
 #include <ntddk.h>
 
 #define NATSX_AOA_BOOTSTRAP_PROTOCOL_VERSION 1u
-#define NATSX_AOA_BOOTSTRAP_DRIVER_BUILD 3u
+#define NATSX_AOA_BOOTSTRAP_DRIVER_BUILD 4u
 
 // Retained as a stable protocol identifier for diagnostics/backward
-// compatibility. Build 3 moves user-mode IOCTL access to a sideband control
-// device rather than exposing the filter's PnP stack directly.
+// compatibility. Build 3 moved user-mode IOCTL access to a sideband control
+// device rather than exposing the filter's PnP stack directly. Build 4 keeps
+// that control plane alive independently of WDFUSBDEVICE readiness and adds a
+// read-only target-readiness diagnostic.
 // {54E7A3A1-01F0-41B8-B397-75E2A6D42C11}
 DEFINE_GUID(
     GUID_DEVINTERFACE_NATSX_AOA_BOOTSTRAP,
@@ -32,6 +34,13 @@ DEFINE_GUID(
         METHOD_BUFFERED, \
         FILE_READ_DATA | FILE_WRITE_DATA)
 
+#define IOCTL_NATSX_AOA_GET_STATUS \
+    CTL_CODE( \
+        FILE_DEVICE_NATSX_AOA_BOOTSTRAP, \
+        0x802, \
+        METHOD_BUFFERED, \
+        FILE_READ_DATA)
+
 typedef struct _NATSX_AOA_VERSION_RESPONSE {
     ULONG ProtocolVersion;
     ULONG DriverBuild;
@@ -41,3 +50,10 @@ typedef struct _NATSX_AOA_START_RESPONSE {
     USHORT AoaProtocolVersion;
     USHORT Reserved;
 } NATSX_AOA_START_RESPONSE, *PNATSX_AOA_START_RESPONSE;
+
+typedef struct _NATSX_AOA_STATUS_RESPONSE {
+    ULONG ProtocolVersion;
+    ULONG DriverBuild;
+    ULONG AttachedTargetCount;
+    ULONG ReadyUsbTargetCount;
+} NATSX_AOA_STATUS_RESPONSE, *PNATSX_AOA_STATUS_RESPONSE;
