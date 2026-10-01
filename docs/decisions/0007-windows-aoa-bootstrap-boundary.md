@@ -43,6 +43,13 @@ permanently replacing its MTP/PTP function driver.
 
 The exact driver/filter architecture remains a gated WDK prototype task.
 
+For Windows 10 1903+ the installation direction is a **device-specific
+declarative filter** using `DDInstall.Filters` / `AddFilter`, potentially
+delivered by an extension INF that augments the phone's existing base driver.
+NATSX must not register a class-wide MTP/WPD filter. Exact hardware matching,
+filter position, signing, and uninstall behavior remain subject to physical
+validation before this becomes the shipping install design.
+
 A source-level KMDF pass-through filter prototype now exists on the dedicated
 USB bootstrap branch. It exposes only a private version IOCTL and a bounded
 `START_AOA` operation; user mode does not receive a generic endpoint-zero
