@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if (-not ("Natsx.AoaBootstrap.SidebandProbeNativeV4" -as [type])) {
+if (-not ("Natsx.AoaBootstrap.SidebandProbeNativeV5" -as [type])) {
     Add-Type -TypeDefinition @"
 using System;
 using System.ComponentModel;
@@ -129,7 +129,7 @@ namespace Natsx.AoaBootstrap
                 byte[] response = SendReadOnlyIoctl(
                     handle,
                     IOCTL_NATSX_GET_STATUS,
-                    16,
+                    24,
                     "NATSX bootstrap GET_STATUS");
 
                 return new uint[]
@@ -137,7 +137,9 @@ namespace Natsx.AoaBootstrap
                     BitConverter.ToUInt32(response, 0),
                     BitConverter.ToUInt32(response, 4),
                     BitConverter.ToUInt32(response, 8),
-                    BitConverter.ToUInt32(response, 12)
+                    BitConverter.ToUInt32(response, 12),
+                    BitConverter.ToUInt32(response, 16),
+                    BitConverter.ToUInt32(response, 20)
                 };
             }
         }
@@ -159,9 +161,11 @@ $report = [ordered]@{
     DriverBuild = [uint32]$version[1]
     AttachedTargetCount = [uint32]$status[2]
     ReadyUsbTargetCount = [uint32]$status[3]
+    LastUsbTargetCreateStatusHex = ("0x{0:X8}" -f [uint32]$status[4])
+    UsbTargetCreateAttemptCount = [uint32]$status[5]
     Compatible = (
         [uint32]$version[0] -eq 1 -and
-        [uint32]$version[1] -ge 4 -and
+        [uint32]$version[1] -ge 5 -and
         [uint32]$status[0] -eq [uint32]$version[0] -and
         [uint32]$status[1] -eq [uint32]$version[1]
     )
