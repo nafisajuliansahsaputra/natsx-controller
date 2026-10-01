@@ -61,7 +61,18 @@ WORKFLOW.md
 Requirements:
 
 - Windows 10/11 for receiver/runtime work;
-- .NET 10 SDK.
+- .NET 10 SDK;
+- internet access on the first clean build so the pinned HIDMaestro v1.9.2 SDK can be bootstrapped.
+
+The HIDMaestro SDK is fetched automatically on the first Windows build when
+`windows/lib/HIDMaestro/HIDMaestro.Core.dll` is absent. The release archive is
+pinned and SHA-256 verified by `windows/eng/fetch-hidmaestro.ps1`; no global
+HIDMaestro SDK installation is required.
+
+HIDMaestro's virtual-device driver is also installed idempotently before the
+first virtual Xbox controller is created. The initial driver installation
+requires Windows elevation; once the matching driver is present, subsequent
+receiver starts do not require reinstalling it.
 
 Build and test:
 
