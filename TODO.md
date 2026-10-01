@@ -101,11 +101,11 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Implement 150 ms default neutralization policy via centralized config.
 - [x] Define `IVirtualGamepadBackend`.
 - [x] Implement HIDMaestro adapter.
-- [ ] Create one virtual Xbox 360-compatible controller.
+- [x] Create one virtual Xbox 360-compatible controller.
 - [x] Submit digital buttons.
 - [x] Submit sticks.
 - [x] Submit triggers.
-- [ ] Verify device remains alive while session transport is absent/recovering.
+- [x] Verify device remains alive while session transport is absent/recovering.
 - [x] Implement output/rumble callback boundary.
 - [ ] Add virtual-backend diagnostics.
 
@@ -376,21 +376,23 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M14 — Reliability and performance
 
+> Reliability coverage now includes deterministic duplicate/out-of-order rejection, packet-loss/failover harnesses, rapid USB flapping protection, equivalent-state make-before-break handover, safety neutralization without stopping the virtual backend, stale Android trusted-session cleanup, and a 10-cycle automated USB attach/takeover/detach/Wi-Fi-fallback soak using continuously fresh session-global sequences. Physical OPPO A58 validation has also confirmed Wi-Fi input, USB preferred takeover, USB unplug fallback back to Wi-Fi without manual reconnect, and Receiver restart recovery. Longer wall-clock soak, background/foreground, sleep/resume, resource profiling, and repeated Bluetooth/Wi-Fi toggles remain open.
+
 - [ ] 30-minute soak test.
 - [ ] 2-hour soak test.
 - [ ] repeated Wi-Fi toggle test.
 - [ ] repeated Bluetooth recovery test.
-- [ ] repeated USB reconnect test.
-- [ ] transport flapping test.
-- [ ] packet reordering test.
-- [ ] packet duplication test.
-- [ ] packet loss simulation.
+- [x] repeated USB reconnect test.
+- [x] transport flapping test.
+- [x] packet reordering test.
+- [x] packet duplication test.
+- [x] packet loss simulation.
 - [ ] Android background/foreground test.
 - [ ] screen rotation/lock behavior test.
 - [ ] Windows sleep/resume test.
-- [ ] receiver restart recovery.
+- [x] receiver restart recovery.
 - [ ] phone app restart recovery.
-- [ ] no stuck-input verification.
+- [x] no stuck-input verification.
 - [ ] allocation/profile hot input path.
 - [ ] CPU usage review.
 - [ ] battery impact review.
