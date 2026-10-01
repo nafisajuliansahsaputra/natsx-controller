@@ -41,6 +41,19 @@ The report is read-only and records the hardware IDs, compatible IDs, current
 service, parent, and current driver package needed to design a device-specific
 test attach.
 
+## Current physical target captured on 2026-10-01
+
+The first physical target is an OPPO A58 whose normal USB stack was observed as:
+
+- composite parent: `USB\\VID_22D9&PID_2765&REV_0404`;
+- parent service: `usbccgp`;
+- MTP/WPD child: `USB\\VID_22D9&PID_2765&MI_00`, service `WUDFWpdMtp`;
+- optional ADB child: `USB\\VID_22D9&PID_2765&MI_01`, service `WINUSB`.
+
+The bootstrap prototype must target the composite parent revision only. It must
+not target either child interface. The observed ADB interface is incidental to
+the test phone configuration and is not a NATSX dependency.
+
 ## Package/attach gate
 
 The prototype may advance to install testing only when its INF/package:
