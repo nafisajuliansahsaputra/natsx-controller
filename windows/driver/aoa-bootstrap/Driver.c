@@ -204,29 +204,9 @@ NatsxEvtDevicePrepareHardware(
     PDEVICE_CONTEXT context =
         NatsxGetDeviceContext(Device);
 
-    if (context->UsbDevice == WDF_NO_HANDLE) {
-        WDF_USB_DEVICE_CREATE_CONFIG usbConfig;
-
-        WDF_USB_DEVICE_CREATE_CONFIG_INIT(
-            &usbConfig,
-            USBD_CLIENT_CONTRACT_VERSION_602);
-
-        NTSTATUS status =
-            WdfUsbTargetDeviceCreateWithParameters(
-                Device,
-                &usbConfig,
-                WDF_NO_OBJECT_ATTRIBUTES,
-                &context->UsbDevice);
-
-        if (!NT_SUCCESS(status)) {
-            // A filter must not prevent the normal WPD/MTP stack from
-            // starting. The NATSX control channel simply remains absent.
-            context->UsbDevice =
-                WDF_NO_HANDLE;
-            return STATUS_SUCCESS;
-        }
-    }
-
+    // Keep the sideband control plane available whenever the filter itself
+    // is loaded. GET_VERSION is a driver-health probe and must not depend on
+    // whether this particular USB stack can expose a KMDF WDFUSBDEVICE.
     NTSTATUS status =
         NatsxEnsureControlDevice(
             WdfDeviceGetDriver(Device));
@@ -235,6 +215,30 @@ NatsxEvtDevicePrepareHardware(
         // Sideband diagnostics/bootstrap are optional from the perspective of
         // the OEM stack. Do not break MTP if the control object cannot start.
         return STATUS_SUCCESS;
+    }
+
+    if (context->UsbDevice == WDF_NO_HANDLE) {
+        WDF_USB_DEVICE_CREATE_CONFIG usbConfig;
+
+        WDF_USB_DEVICE_CREATE_CONFIG_INIT(
+            &usbConfig,
+            USBD_CLIENT_CONTRACT_VERSION_602);
+
+        status =
+            WdfUsbTargetDeviceCreateWithParameters(
+                Device,
+                &usbConfig,
+                WDF_NO_OBJECT_ATTRIBUTES,
+                &context->UsbDevice);
+
+        if (!NT_SUCCESS(status)) {
+            // Preserve the OEM WPD/MTP stack. The sideband remains available
+            // for GET_VERSION, while START_AOA will fail safely with
+            // STATUS_DEVICE_NOT_READY until a usable USB target exists.
+            context->UsbDevice =
+                WDF_NO_HANDLE;
+            return STATUS_SUCCESS;
+        }
     }
 
     return STATUS_SUCCESS;
