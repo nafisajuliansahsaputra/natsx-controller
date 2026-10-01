@@ -664,9 +664,9 @@ class UsbAccessoryRuntime(
         oldSession?.close()
         oldConnection?.close()
 
-        if (accessory != null) {
+        if (oldConnection != null) {
             status.publish(
-                "USB accessory disconnected.",
+                "USB accessory disconnected. Wi-Fi remains available.",
             )
         }
     }
