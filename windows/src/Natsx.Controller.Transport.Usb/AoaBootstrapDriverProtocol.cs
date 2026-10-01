@@ -5,7 +5,7 @@ namespace Natsx.Controller.Transport.Usb;
 public static class AoaBootstrapDriverProtocol
 {
     public const uint ProtocolVersion = 1;
-    public const uint MinimumSupportedDriverBuild = 5;
+    public const uint MinimumSupportedDriverBuild = 8;
     public const string ServiceName = "NatsxAoaBootstrap";
     public const string ControlDevicePath = @"\\.\NatsxAoaBootstrap";
 
