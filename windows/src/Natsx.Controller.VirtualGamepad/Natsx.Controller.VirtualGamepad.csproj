@@ -7,9 +7,29 @@
     <ProjectReference Include="../Natsx.Controller.Core/Natsx.Controller.Core.csproj" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <HidMaestroSdkPath>$(MSBuildThisFileDirectory)..\..\lib\HIDMaestro\HIDMaestro.Core.dll</HidMaestroSdkPath>
+    <HidMaestroFetchScript>$(MSBuildThisFileDirectory)..\..\eng\fetch-hidmaestro.ps1</HidMaestroFetchScript>
+  </PropertyGroup>
+
+  <Target
+    Name="EnsureHidMaestroSdk"
+    BeforeTargets="ResolveReferences"
+    Condition="'$(DesignTimeBuild)' != 'true' and !Exists('$(HidMaestroSdkPath)')">
+    <Message
+      Importance="high"
+      Text="HIDMaestro SDK is missing. Bootstrapping pinned SDK v1.9.2..." />
+    <Exec
+      Command="powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(HidMaestroFetchScript)&quot;"
+      WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Error
+      Condition="!Exists('$(HidMaestroSdkPath)')"
+      Text="HIDMaestro.Core.dll is still missing after bootstrap. Run windows\eng\fetch-hidmaestro.ps1 manually and inspect its diagnostic output." />
+  </Target>
+
   <ItemGroup>
     <Reference Include="HIDMaestro.Core">
-      <HintPath>$(MSBuildThisFileDirectory)..\..\lib\HIDMaestro\HIDMaestro.Core.dll</HintPath>
+      <HintPath>$(HidMaestroSdkPath)</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>
