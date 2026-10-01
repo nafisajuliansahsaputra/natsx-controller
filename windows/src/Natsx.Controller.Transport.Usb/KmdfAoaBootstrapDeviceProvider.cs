@@ -31,6 +31,8 @@ public sealed class KmdfAoaBootstrapDeviceProvider :
         var devices =
             new List<IUsbAoaBootstrapDevice>(paths.Count);
 
+        IOException? lastOpenFailure = null;
+
         try
         {
             foreach (string path in paths)
@@ -42,11 +44,20 @@ public sealed class KmdfAoaBootstrapDeviceProvider :
                     devices.Add(
                         KmdfAoaBootstrapDevice.Open(path));
                 }
-                catch (IOException)
+                catch (IOException exception)
                 {
-                    // A device can disappear while SetupAPI/ConfigMgr is
-                    // enumerating. Treat that path as stale and continue.
+                    // A device can disappear while ConfigMgr is enumerating.
+                    // Keep trying other interfaces, but do not misreport a
+                    // persistent driver/open failure as a charge-only cable.
+                    lastOpenFailure = exception;
                 }
+            }
+
+            if (devices.Count == 0 &&
+                paths.Count > 0 &&
+                lastOpenFailure is not null)
+            {
+                throw lastOpenFailure;
             }
 
             return ValueTask.FromResult<IReadOnlyList<IUsbAoaBootstrapDevice>>(
@@ -140,7 +151,8 @@ internal sealed class KmdfAoaBootstrapDevice :
             AoaBootstrapDriverVersion version =
                 AoaBootstrapDriverProtocol.ParseVersion(response);
 
-            if (version.ProtocolVersion != 1)
+            if (version.ProtocolVersion !=
+                AoaBootstrapDriverProtocol.ProtocolVersion)
             {
                 throw new InvalidOperationException(
                     $"Unsupported NATSX AOA bootstrap driver protocol version {version.ProtocolVersion}.");
