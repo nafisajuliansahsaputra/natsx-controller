@@ -108,7 +108,10 @@ public sealed class WinUsbAoaAccessoryBackend : IAoaAccessoryDataBackend
                     owner,
                     candidate,
                     owner.Input,
-                    owner.Output);
+                    owner.Output,
+                    owner.BulkInPipeId,
+                    owner.BulkOutPipeId,
+                    owner.MaximumPacketSize);
 
             owner =
                 null;
