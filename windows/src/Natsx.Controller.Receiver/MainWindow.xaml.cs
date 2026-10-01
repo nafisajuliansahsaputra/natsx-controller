@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using Natsx.Controller.Protocol;
 
@@ -7,12 +9,26 @@ public partial class MainWindow : Window
 {
     private readonly ReceiverRuntime _runtime =
         new();
+    private readonly ReceiverUserSettings _settings =
+        ReceiverUserSettings.Load();
+    private readonly ReceiverTrayIcon _trayIcon;
 
     private PeerId? _trustedControllerPeerId;
+    private bool _settingsInitialized;
+    private bool _isStarting;
+    private bool _exitRequested;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        _trayIcon =
+            new ReceiverTrayIcon();
+
+        _trayIcon.OpenRequested +=
+            OnTrayOpenRequested;
+        _trayIcon.ExitRequested +=
+            OnTrayExitRequested;
 
         _runtime.StatusChanged +=
             OnRuntimeStatusChanged;
@@ -23,26 +39,86 @@ public partial class MainWindow : Window
         _runtime.DiagnosticsChanged +=
             OnDiagnosticsChanged;
 
-        Loaded +=
-            OnLoaded;
+        StateChanged +=
+            OnWindowStateChanged;
+
+        Closing +=
+            OnClosing;
 
         Closed +=
             OnClosed;
+
+        ApplySettingsToUi();
     }
 
-    private async void OnLoaded(
-        object sender,
-        RoutedEventArgs eventArgs)
+    public async Task StartReceiverAsync()
     {
+        if (_runtime.IsStarted ||
+            _isStarting)
+        {
+            return;
+        }
+
+        _isStarting =
+            true;
+
+        RetryReceiverButton.IsEnabled =
+            false;
+
+        ErrorPanel.Visibility =
+            Visibility.Collapsed;
+
         try
         {
             await _runtime.StartAsync();
+
+            _trayIcon.UpdateStatus(
+                "Receiver ready");
+
+            StatusText.Text =
+                "Receiver ready. Smart Auto is waiting for trusted controller input.";
         }
         catch (Exception exception)
         {
+            string message =
+                DescribeStartupFailure(
+                    exception);
+
             StatusText.Text =
-                exception.Message;
+                message;
+
+            ErrorText.Text =
+                message;
+
+            ErrorPanel.Visibility =
+                Visibility.Visible;
+
+            _trayIcon.ShowError(
+                message);
         }
+        finally
+        {
+            RetryReceiverButton.IsEnabled =
+                true;
+
+            _isStarting =
+                false;
+        }
+    }
+
+    private void ApplySettingsToUi()
+    {
+        _settingsInitialized =
+            false;
+
+        StartWithWindowsCheckBox.IsChecked =
+            _settings.StartWithWindows;
+
+        CloseToTrayCheckBox.IsChecked =
+            _settings.CloseToTray;
+
+        _settingsInitialized =
+            true;
     }
 
     private void OnRuntimeStatusChanged(
@@ -52,13 +128,16 @@ public partial class MainWindow : Window
         {
             Dispatcher.Invoke(
                 () =>
-                    StatusText.Text =
-                        status);
+                    OnRuntimeStatusChanged(
+                        status));
             return;
         }
 
         StatusText.Text =
             status;
+
+        _trayIcon.UpdateStatus(
+            status);
     }
 
     private void OnDiagnosticsChanged(
@@ -119,6 +198,11 @@ public partial class MainWindow : Window
 
         RecentHandoverText.Text =
             snapshot.RecentHandoverReason;
+
+        _trayIcon.UpdateStatus(
+            snapshot.ActiveTransport == "None"
+                ? $"Smart Auto: {snapshot.SmartAutoState}"
+                : $"Active: {snapshot.ActiveTransport}");
     }
 
     private static string FormatDuration(
@@ -151,6 +235,8 @@ public partial class MainWindow : Window
                 string.Empty;
             return;
         }
+
+        ShowAndActivate();
 
         PairingCodeText.Text =
             prompt.ComparisonCode;
@@ -224,6 +310,169 @@ public partial class MainWindow : Window
             false);
     }
 
+    private async void OnRetryReceiverClicked(
+        object sender,
+        RoutedEventArgs eventArgs)
+    {
+        await StartReceiverAsync();
+    }
+
+    private void OnStartWithWindowsChanged(
+        object sender,
+        RoutedEventArgs eventArgs)
+    {
+        if (!_settingsInitialized)
+        {
+            return;
+        }
+
+        try
+        {
+            _settings.SetStartWithWindows(
+                StartWithWindowsCheckBox.IsChecked ==
+                true);
+        }
+        catch (Exception exception)
+        {
+            _settingsInitialized =
+                false;
+            StartWithWindowsCheckBox.IsChecked =
+                _settings.StartWithWindows;
+            _settingsInitialized =
+                true;
+
+            ShowSettingsError(
+                $"Could not update Windows startup: {exception.Message}");
+        }
+    }
+
+    private void OnCloseToTrayChanged(
+        object sender,
+        RoutedEventArgs eventArgs)
+    {
+        if (!_settingsInitialized)
+        {
+            return;
+        }
+
+        try
+        {
+            _settings.SetCloseToTray(
+                CloseToTrayCheckBox.IsChecked ==
+                true);
+        }
+        catch (Exception exception)
+        {
+            ShowSettingsError(
+                $"Could not save tray preference: {exception.Message}");
+        }
+    }
+
+    private void ShowSettingsError(
+        string message)
+    {
+        ErrorText.Text =
+            message;
+        ErrorPanel.Visibility =
+            Visibility.Visible;
+    }
+
+    private void OnWindowStateChanged(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        if (WindowState !=
+            WindowState.Minimized)
+        {
+            return;
+        }
+
+        Hide();
+        WindowState =
+            WindowState.Normal;
+    }
+
+    private void OnClosing(
+        object? sender,
+        CancelEventArgs eventArgs)
+    {
+        if (_exitRequested ||
+            !_settings.CloseToTray)
+        {
+            return;
+        }
+
+        eventArgs.Cancel =
+            true;
+
+        Hide();
+    }
+
+    private void OnTrayOpenRequested()
+    {
+        Dispatcher.Invoke(
+            ShowAndActivate);
+    }
+
+    private void OnTrayExitRequested()
+    {
+        Dispatcher.Invoke(
+            () =>
+            {
+                _exitRequested =
+                    true;
+                Close();
+            });
+    }
+
+    private void ShowAndActivate()
+    {
+        Show();
+
+        if (WindowState ==
+            WindowState.Minimized)
+        {
+            WindowState =
+                WindowState.Normal;
+        }
+
+        Activate();
+        Topmost =
+            true;
+        Topmost =
+            false;
+        Focus();
+    }
+
+    private static string DescribeStartupFailure(
+        Exception exception)
+    {
+        if (exception is UnauthorizedAccessException ||
+            exception is Win32Exception
+            {
+                NativeErrorCode: 5
+            })
+        {
+            return "The virtual-controller driver could not be accessed. Run the NATSX installer or Receiver as Administrator once so the driver can be installed, then retry.";
+        }
+
+        if (exception is FileNotFoundException ||
+            exception is DllNotFoundException ||
+            exception is BadImageFormatException)
+        {
+            return "A required NATSX/HIDMaestro runtime component is missing or invalid. Repair or reinstall NATSX Controller, then retry.";
+        }
+
+        if (exception.Message.Contains(
+                "HIDMaestro",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Virtual Xbox controller backend is unavailable: {exception.Message}";
+        }
+
+        return $"Receiver could not start: {exception.Message}";
+    }
+
     private async void OnClosed(
         object? sender,
         EventArgs eventArgs)
@@ -237,7 +486,17 @@ public partial class MainWindow : Window
         _runtime.DiagnosticsChanged -=
             OnDiagnosticsChanged;
 
+        _trayIcon.OpenRequested -=
+            OnTrayOpenRequested;
+        _trayIcon.ExitRequested -=
+            OnTrayExitRequested;
+
+        _trayIcon.Dispose();
+
         await _runtime
             .DisposeAsync();
+
+        Application.Current
+            .Shutdown();
     }
 }
