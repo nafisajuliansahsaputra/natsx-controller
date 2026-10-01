@@ -333,6 +333,34 @@ public sealed class BluetoothTrustedHandshakeServer
             Stream inputStream,
             Stream outputStream,
             Func<PeerId, byte[]?> trustSecretResolver,
+            byte[] firstFrame,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(inputStream);
+        ArgumentNullException.ThrowIfNull(firstFrame);
+
+        byte[] framed =
+            BluetoothStreamFrameCodec
+                .Encode(firstFrame);
+
+        using var replay =
+            new BluetoothPrefixedReadStream(
+                framed,
+                inputStream);
+
+        return await AuthenticateAsync(
+                replay,
+                outputStream,
+                trustSecretResolver,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async ValueTask<BluetoothTrustedHandshakeCompletion>
+        AuthenticateAsync(
+            Stream inputStream,
+            Stream outputStream,
+            Func<PeerId, byte[]?> trustSecretResolver,
             CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(inputStream);
