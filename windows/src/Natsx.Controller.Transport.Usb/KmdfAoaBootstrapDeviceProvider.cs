@@ -72,6 +72,13 @@ public sealed class KmdfAoaBootstrapDeviceProvider :
 
             return ValueTask.FromResult(empty);
         }
+        catch (BootstrapTargetNotReadyException)
+        {
+            IReadOnlyList<IUsbAoaBootstrapDevice> empty =
+                Array.Empty<IUsbAoaBootstrapDevice>();
+
+            return ValueTask.FromResult(empty);
+        }
     }
 }
 
@@ -156,6 +163,30 @@ internal sealed class KmdfAoaBootstrapDevice :
 
             AoaBootstrapDriverProtocol
                 .ValidateCompatibility(version);
+
+            byte[] statusResponse =
+                DeviceIoControl(
+                    handle,
+                    AoaBootstrapDriverProtocol.GetStatusControlCode,
+                    AoaBootstrapDriverProtocol.StatusResponseSize);
+
+            AoaBootstrapDriverStatus status =
+                AoaBootstrapDriverProtocol.ParseStatus(statusResponse);
+
+            if (status.ProtocolVersion != version.ProtocolVersion ||
+                status.DriverBuild != version.DriverBuild)
+            {
+                throw new IOException(
+                    "The NATSX AOA bootstrap GET_STATUS response does not match GET_VERSION.");
+            }
+
+            if (status.AttachedTargetCount != 1 ||
+                status.ReadyUsbTargetCount != 1)
+            {
+                throw new BootstrapTargetNotReadyException(
+                    status.AttachedTargetCount,
+                    status.ReadyUsbTargetCount);
+            }
 
             return new KmdfAoaBootstrapDevice(
                 handle,
@@ -291,6 +322,18 @@ internal sealed class KmdfAoaBootstrapDevice :
             uint nOutBufferSize,
             out uint lpBytesReturned,
             IntPtr lpOverlapped);
+    }
+}
+
+internal sealed class BootstrapTargetNotReadyException :
+    IOException
+{
+    public BootstrapTargetNotReadyException(
+        uint attachedTargetCount,
+        uint readyUsbTargetCount)
+        : base(
+            $"The NATSX AOA bootstrap driver is loaded, but the USB target is not uniquely ready. Attached={attachedTargetCount}, Ready={readyUsbTargetCount}.")
+    {
     }
 }
 
