@@ -203,8 +203,7 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
 
         if (inputStream is not null)
         {
-            await inputStream.DisposeAsync()
-                .ConfigureAwait(false);
+            DisposeStream(inputStream);
         }
 
         if (outputStream is not null &&
@@ -212,8 +211,7 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
                 inputStream,
                 outputStream))
         {
-            await outputStream.DisposeAsync()
-                .ConfigureAwait(false);
+            DisposeStream(outputStream);
         }
 
         var pending =
@@ -238,6 +236,22 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
         }
 
         cancellation?.Dispose();
+    }
+
+    private static void DisposeStream(Stream stream)
+    {
+        try
+        {
+            stream.Dispose();
+        }
+        catch (NotImplementedException)
+        {
+            // WinRT USB output streams may not implement FlushAsync.
+            // The owning UsbDevice tears down the native pipe lifetime.
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     private async Task ReceiveLoopAsync(
