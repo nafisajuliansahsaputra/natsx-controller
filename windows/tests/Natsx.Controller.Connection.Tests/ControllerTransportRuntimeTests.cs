@@ -234,7 +234,7 @@ public sealed class ControllerTransportRuntimeTests
             {
                 Buttons =
                     GamepadButtons.A |
-                    GamepadButtons.RB,
+                    GamepadButtons.RightShoulder,
                 RightX = 4321,
             };
 
