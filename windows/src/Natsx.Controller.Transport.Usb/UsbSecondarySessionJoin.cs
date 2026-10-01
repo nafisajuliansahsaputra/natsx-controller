@@ -25,8 +25,8 @@ public sealed class UsbSecondarySessionJoinServer
         TrustedSessionRegistry sessionRegistry,
         TransportCapabilities capabilities =
             TransportCapabilities.Wifi |
-            TransportCapabilities.UsbDirect |
-            TransportCapabilities.UsbDirectDirect,
+            TransportCapabilities.Bluetooth |
+            TransportCapabilities.UsbDirect,
         TimeProvider? timeProvider = null,
         TransportLifecycle? lifecycle = null)
     {
@@ -37,7 +37,7 @@ public sealed class UsbSecondarySessionJoinServer
                 TransportCapabilities.UsbDirect))
         {
             throw new ArgumentException(
-                "Usb secondary join must advertise Usb capability.",
+                "USB secondary join must advertise USB Direct capability.",
                 nameof(capabilities));
         }
 
@@ -64,14 +64,14 @@ public sealed class UsbSecondarySessionJoinServer
         if (!inputStream.CanRead)
         {
             throw new ArgumentException(
-                "Usb secondary-join input stream must be readable.",
+                "USB secondary-join input stream must be readable.",
                 nameof(inputStream));
         }
 
         if (!outputStream.CanWrite)
         {
             throw new ArgumentException(
-                "Usb secondary-join output stream must be writable.",
+                "USB secondary-join output stream must be writable.",
                 nameof(outputStream));
         }
 
@@ -93,7 +93,7 @@ public sealed class UsbSecondarySessionJoinServer
             _sessionRegistry.GetBySessionId(
                 sessionId)
             ?? throw new CryptographicException(
-                "Usb secondary transport does not match an active trusted controller session.");
+                "USB secondary transport does not match an active trusted controller session.");
 
         byte[] sessionKey =
             registration.Material
@@ -146,7 +146,7 @@ public sealed class UsbSecondarySessionJoinServer
                 ProtocolTransport.UsbDirect)
             {
                 throw new CryptographicException(
-                    "Usb secondary join received TRANSPORT_READY for a different transport.");
+                    "USB secondary join received TRANSPORT_READY for a different transport.");
             }
 
             await WriteFramedAsync(
@@ -187,7 +187,7 @@ public sealed class UsbSecondarySessionJoinServer
                 TransportCapabilities.UsbDirect))
         {
             throw new CryptographicException(
-                "Usb secondary SESSION_READY identity, role, or capabilities do not match the active trusted peer.");
+                "USB secondary SESSION_READY identity, role, or capabilities do not match the active trusted peer.");
         }
     }
 
@@ -198,7 +198,7 @@ public sealed class UsbSecondarySessionJoinServer
             ProtocolConstants.HeaderSize)
         {
             throw new FormatException(
-                "Usb secondary SESSION_READY is shorter than the protocol header.");
+                "USB secondary SESSION_READY is shorter than the protocol header.");
         }
 
         if (!frameBytes[..4]
@@ -206,7 +206,7 @@ public sealed class UsbSecondarySessionJoinServer
                 ProtocolConstants.Magic))
         {
             throw new FormatException(
-                "Usb secondary SESSION_READY has invalid protocol magic.");
+                "USB secondary SESSION_READY has invalid protocol magic.");
         }
 
         return SessionId.FromBytes(
