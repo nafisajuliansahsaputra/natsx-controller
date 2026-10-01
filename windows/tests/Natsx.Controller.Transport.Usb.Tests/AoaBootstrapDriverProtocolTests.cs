@@ -11,7 +11,7 @@ public sealed class AoaBootstrapDriverProtocolTests
             1u,
             AoaBootstrapDriverProtocol.ProtocolVersion);
         Assert.Equal(
-            3u,
+            4u,
             AoaBootstrapDriverProtocol.MinimumSupportedDriverBuild);
         Assert.Equal(
             "NatsxAoaBootstrap",
@@ -27,7 +27,7 @@ public sealed class AoaBootstrapDriverProtocolTests
         Assert.Throws<InvalidOperationException>(
             () =>
                 AoaBootstrapDriverProtocol.ValidateCompatibility(
-                    new AoaBootstrapDriverVersion(2, 3)));
+                    new AoaBootstrapDriverVersion(2, 4)));
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public sealed class AoaBootstrapDriverProtocolTests
     public void Compatibility_AcceptsCurrentDriver()
     {
         AoaBootstrapDriverProtocol.ValidateCompatibility(
-            new AoaBootstrapDriverVersion(1, 3));
+            new AoaBootstrapDriverVersion(1, 4));
     }
 
     [Fact]
@@ -56,6 +56,10 @@ public sealed class AoaBootstrapDriverProtocolTests
         Assert.Equal(
             0xA361E004u,
             AoaBootstrapDriverProtocol.StartAoaControlCode);
+
+        Assert.Equal(
+            0xA3616008u,
+            AoaBootstrapDriverProtocol.GetStatusControlCode);
     }
 
     [Fact]
@@ -69,11 +73,26 @@ public sealed class AoaBootstrapDriverProtocolTests
 
         BinaryPrimitives.WriteUInt32LittleEndian(
             bytes.AsSpan(4),
-            3);
+            4);
 
         Assert.Equal(
-            new AoaBootstrapDriverVersion(1, 3),
+            new AoaBootstrapDriverVersion(1, 4),
             AoaBootstrapDriverProtocol.ParseVersion(bytes));
+    }
+
+    [Fact]
+    public void StatusResponse_ParsesTargetReadiness()
+    {
+        var bytes = new byte[16];
+
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes, 1);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), 4);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(8), 1);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), 1);
+
+        Assert.Equal(
+            new AoaBootstrapDriverStatus(1, 4, 1, 1),
+            AoaBootstrapDriverProtocol.ParseStatus(bytes));
     }
 
     [Fact]
