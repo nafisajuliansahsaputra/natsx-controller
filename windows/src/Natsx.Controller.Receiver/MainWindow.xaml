@@ -31,6 +31,43 @@
                                Text="Starting receiver…" />
                 </StackPanel>
             </Border>
+
+            <Border x:Name="PairingPanel"
+                    Margin="0,20,0,0"
+                    Padding="20"
+                    BorderBrush="#33000000"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock FontSize="18"
+                               FontWeight="SemiBold"
+                               Text="Pair Android controller" />
+                    <TextBlock Margin="0,8,0,0"
+                               Opacity="0.72"
+                               Text="Confirm only if this 6-digit code matches the code shown on your phone." />
+                    <TextBlock x:Name="PairingCodeText"
+                               Margin="0,14,0,0"
+                               FontSize="36"
+                               FontWeight="Bold"
+                               Text="" />
+                    <TextBlock x:Name="PairingPeerText"
+                               Margin="0,6,0,14"
+                               Opacity="0.58"
+                               TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Width="120"
+                                Padding="12,7"
+                                Click="OnPairingConfirmClicked"
+                                Content="Confirm" />
+                        <Button Width="120"
+                                Margin="10,0,0,0"
+                                Padding="12,7"
+                                Click="OnPairingRejectClicked"
+                                Content="Reject" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </Grid>
 </Window>
