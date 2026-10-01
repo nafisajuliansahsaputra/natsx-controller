@@ -310,7 +310,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M10 — Pairing and trust
 
-> First-pair v1 is now implemented over the local LAN/Wi-Fi control path. Android initiates an ephemeral P-256 exchange, both Android and Windows display the same six-digit SAS, both users must explicitly confirm, role-bound HMAC confirmation proofs are exchanged, and only then is the derived 32-byte trust secret persisted using Android Keystore-backed storage and Windows DPAPI. Windows keeps a secure LAN re-pair/recovery listener active even when stale trust exists, so an Android reinstall/new identity can recover by a fresh SAS-confirmed pairing instead of deadlocking. After a trusted Wi-Fi session is established, USB Direct may attach as an authenticated one-way low-latency realtime uplink without depending on OEM USB downlink behavior. Remaining M10 work is trust-management UX such as a trusted-PC list and explicit Forget device action.
+> First-pair v1 is now implemented over the local LAN/Wi-Fi control path. Android initiates an ephemeral P-256 exchange, both Android and Windows display the same six-digit SAS, both users must explicitly confirm, role-bound HMAC confirmation proofs are exchanged, and only then is the derived 32-byte trust secret persisted using Android Keystore-backed storage and Windows DPAPI. Windows keeps a secure LAN re-pair/recovery listener active even when stale trust exists, so an Android reinstall/new identity can recover by a fresh SAS-confirmed pairing instead of deadlocking. After a trusted Wi-Fi session is established, USB Direct may attach as an authenticated one-way low-latency realtime uplink without depending on OEM USB downlink behavior. M10 is complete: Windows now exposes trusted-controller identity plus an explicit confirmed Forget action that revokes persisted trust and live sessions immediately, with a final trust recheck before late transport attachment to close revoke/attach races.
 
 - [x] Define first-pair user flow.
 - [x] Generate/store peer identity.
@@ -339,7 +339,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M12 — Receiver UX
 
-> The receiver now exposes a live, non-blocking diagnostics panel for Smart Auto state, active/backup transports, virtual-controller readiness, trusted-controller identity/count, active-link RTT/jitter/loss, realtime input rate, cumulative reconnect count, and the most recent committed handover reason. Metrics refresh on a 500 ms diagnostics loop and remain outside the realtime input path. The Windows trust surface now also supports an explicit confirmed Forget action that revokes the persisted peer, removes its live trusted session, disconnects current transport candidates, and rechecks trust immediately before late transport attachment to prevent a revoke/attach race.
+> M12 is functionally complete. The receiver exposes live, non-blocking Smart Auto diagnostics, trusted-controller identity/Forget management, persistent user settings, system-tray operation, optional per-user Windows startup, and actionable startup error/retry states. Minimize always hides to tray; close-to-tray defaults on so the controller engine keeps running without a visible WPF window. Diagnostics and tray updates remain outside the realtime input path.
 
 - [x] Connected device status.
 - [x] Active transport.
@@ -351,11 +351,11 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Input rate.
 - [x] Reconnect count.
 - [x] Recent handover reason.
-- [ ] Settings.
+- [x] Settings.
 - [x] Diagnostics view.
-- [ ] Minimize to system tray.
-- [ ] Optional startup with Windows.
-- [ ] Clear error states for missing backend/permissions.
+- [x] Minimize to system tray.
+- [x] Optional startup with Windows.
+- [x] Clear error states for missing backend/permissions.
 
 ---
 
