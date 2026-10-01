@@ -1,4 +1,6 @@
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using Natsx.Controller.Connection;
 using Natsx.Controller.Core;
@@ -32,6 +34,8 @@ public sealed class ReceiverRuntime : IAsyncDisposable
     private WifiTrustedControlProcessor? _wifiControlProcessor;
     private WifiDiscoveryResponder? _wifiDiscovery;
     private WifiTrustedSession? _wifiSession;
+    private UdpClient? _wifiPairingClient;
+    private Task? _wifiPairingTask;
     private WinUsbAoaAccessoryConnection? _usbConnection;
     private IDisposable? _usbSessionOwner;
     private Task? _usbMonitorTask;
@@ -86,7 +90,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         if (trustedPeers.Count == 0)
         {
             Report(
-                "No trusted controller paired yet. Connect the phone by USB to start secure pairing.");
+                "No trusted controller paired yet. Waiting for secure LAN pairing from Android.");
         }
 
         var lifetime =
@@ -160,6 +164,14 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                     sessionRegistry,
                     lifetime.Token)
                 .ConfigureAwait(false);
+
+            if (trustedPeers.Count == 0)
+            {
+                _wifiPairingTask =
+                    RunWifiFirstPairingAsync(
+                        trust,
+                        lifetime.Token);
+            }
 
             await TryStartBluetoothHostAsync(
                     lifetime.Token)
@@ -534,6 +546,248 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         }
         catch (IOException)
         {
+        }
+    }
+
+    private async Task RunWifiFirstPairingAsync(
+        WindowsTrustServices trust,
+        CancellationToken cancellationToken)
+    {
+        var client =
+            new UdpClient(
+                new IPEndPoint(
+                    IPAddress.Any,
+                    43858));
+
+        client.EnableBroadcast =
+            true;
+
+        _wifiPairingClient =
+            client;
+
+        Report(
+            "Secure LAN first-pair ready on UDP 43858.");
+
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested &&
+                   trust.TrustedPeers.List().Count == 0)
+            {
+                UdpReceiveResult offerDatagram =
+                    await client
+                        .ReceiveAsync(
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                ProtocolFrame envelope;
+
+                try
+                {
+                    envelope =
+                        ProtocolFrameCodec.Decode(
+                            offerDatagram.Buffer);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (envelope.MessageType !=
+                    MessageType.PairingOffer)
+                {
+                    continue;
+                }
+
+                PairingOfferPayload offer;
+
+                try
+                {
+                    offer =
+                        PairingFrameCodec
+                            .DecodeOffer(
+                                offerDatagram.Buffer);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                using var responder =
+                    new PairingResponderSession(
+                        trust.LocalPeerId,
+                        offer);
+
+                byte[] response =
+                    PairingFrameCodec
+                        .EncodeResponse(
+                            responder.Response);
+
+                await client
+                    .SendAsync(
+                        response,
+                        offerDatagram.RemoteEndPoint,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                Report(
+                    $"LAN pairing request from {offer.AndroidPeerId}. Waiting for matching code confirmation…");
+
+                bool approved =
+                    await RequestPairingConfirmationAsync(
+                            responder.ComparisonCode,
+                            responder.RemotePeerId,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                if (!approved)
+                {
+                    byte[] abort =
+                        PairingFrameCodec
+                            .EncodeAbort(
+                                new PairingAbortPayload(
+                                    PairingAbortReason.UserRejected));
+
+                    await client
+                        .SendAsync(
+                            abort,
+                            offerDatagram.RemoteEndPoint,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                    continue;
+                }
+
+                UdpReceiveResult remoteConfirmationDatagram =
+                    await ReceiveFromEndpointAsync(
+                            client,
+                            offerDatagram.RemoteEndPoint,
+                            TimeSpan.FromMinutes(2),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                ProtocolFrame remoteEnvelope =
+                    ProtocolFrameCodec.Decode(
+                        remoteConfirmationDatagram.Buffer);
+
+                if (remoteEnvelope.MessageType ==
+                    MessageType.PairingAbort)
+                {
+                    continue;
+                }
+
+                if (remoteEnvelope.MessageType !=
+                    MessageType.PairingConfirm)
+                {
+                    continue;
+                }
+
+                PairingConfirmPayload remoteConfirmation =
+                    PairingFrameCodec
+                        .DecodeConfirm(
+                            remoteConfirmationDatagram.Buffer);
+
+                PairingConfirmPayload localConfirmation =
+                    responder.ApproveDisplayedCode();
+
+                byte[] localConfirmationBytes =
+                    PairingFrameCodec
+                        .EncodeConfirm(
+                            localConfirmation);
+
+                await client
+                    .SendAsync(
+                        localConfirmationBytes,
+                        offerDatagram.RemoteEndPoint,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                using PairingEstablishedMaterial established =
+                    responder.AcceptRemoteConfirmation(
+                        remoteConfirmation);
+
+                byte[] secret =
+                    established.CopyTrustSecret();
+
+                try
+                {
+                    trust.TrustedPeers.Put(
+                        new TrustedPeerRecord(
+                            established.RemotePeerId,
+                            "NATSX Android Controller",
+                            (byte)(
+                                TransportCapabilities.Wifi |
+                                TransportCapabilities.Bluetooth |
+                                TransportCapabilities.UsbDirect),
+                            DateTimeOffset.UtcNow,
+                            TrustedPeerRecord.CurrentPairingVersion),
+                        secret);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(
+                        secret);
+                }
+
+                Report(
+                    $"LAN pairing complete. Trusted Android peer: {established.RemotePeerId}.");
+
+                return;
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (ObjectDisposedException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            Report(
+                $"LAN pairing failed: {exception.Message}");
+        }
+        finally
+        {
+            if (ReferenceEquals(
+                    _wifiPairingClient,
+                    client))
+            {
+                _wifiPairingClient =
+                    null;
+            }
+
+            client.Dispose();
+        }
+    }
+
+    private static async Task<UdpReceiveResult> ReceiveFromEndpointAsync(
+        UdpClient client,
+        IPEndPoint expectedEndPoint,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        using var timeoutCancellation =
+            CancellationTokenSource
+                .CreateLinkedTokenSource(
+                    cancellationToken);
+
+        timeoutCancellation.CancelAfter(
+            timeout);
+
+        while (true)
+        {
+            UdpReceiveResult result =
+                await client
+                    .ReceiveAsync(
+                        timeoutCancellation.Token)
+                    .ConfigureAwait(false);
+
+            if (result.RemoteEndPoint.Equals(
+                    expectedEndPoint))
+            {
+                return result;
+            }
         }
     }
 
@@ -1538,6 +1792,35 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         PairingConfirmationChanged?.Invoke(
             null);
+
+        UdpClient? wifiPairingClient =
+            _wifiPairingClient;
+
+        _wifiPairingClient =
+            null;
+
+        wifiPairingClient?.Dispose();
+
+        Task? wifiPairingTask =
+            _wifiPairingTask;
+
+        _wifiPairingTask =
+            null;
+
+        if (wifiPairingTask is not null)
+        {
+            try
+            {
+                await wifiPairingTask
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch
+            {
+            }
+        }
 
         Task? usbMonitor =
             _usbMonitorTask;
