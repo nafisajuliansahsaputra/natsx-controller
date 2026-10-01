@@ -11,7 +11,7 @@ public sealed class AoaBootstrapDriverProtocolTests
             1u,
             AoaBootstrapDriverProtocol.ProtocolVersion);
         Assert.Equal(
-            5u,
+            8u,
             AoaBootstrapDriverProtocol.MinimumSupportedDriverBuild);
         Assert.Equal(
             "NatsxAoaBootstrap",
@@ -27,7 +27,7 @@ public sealed class AoaBootstrapDriverProtocolTests
         Assert.Throws<InvalidOperationException>(
             () =>
                 AoaBootstrapDriverProtocol.ValidateCompatibility(
-                    new AoaBootstrapDriverVersion(2, 5)));
+                    new AoaBootstrapDriverVersion(2, 8)));
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public sealed class AoaBootstrapDriverProtocolTests
     public void Compatibility_AcceptsCurrentDriver()
     {
         AoaBootstrapDriverProtocol.ValidateCompatibility(
-            new AoaBootstrapDriverVersion(1, 5));
+            new AoaBootstrapDriverVersion(1, 8));
     }
 
     [Fact]
@@ -77,10 +77,10 @@ public sealed class AoaBootstrapDriverProtocolTests
 
         BinaryPrimitives.WriteUInt32LittleEndian(
             bytes.AsSpan(4),
-            5);
+            8);
 
         Assert.Equal(
-            new AoaBootstrapDriverVersion(1, 5),
+            new AoaBootstrapDriverVersion(1, 8),
             AoaBootstrapDriverProtocol.ParseVersion(bytes));
     }
 
@@ -113,7 +113,7 @@ public sealed class AoaBootstrapDriverProtocolTests
         var bytes = new byte[24];
 
         BinaryPrimitives.WriteUInt32LittleEndian(bytes, 1);
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), 6);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), 8);
         BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(8), 0);
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), 0);
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(16), 2);
@@ -123,7 +123,7 @@ public sealed class AoaBootstrapDriverProtocolTests
         Assert.Equal(
             new AoaBootstrapRawProtocolProbe(
                 1,
-                6,
+                8,
                 0,
                 0,
                 2,
