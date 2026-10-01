@@ -154,6 +154,19 @@ The output is still **not installable as-is** because it is not signed. Static
 validation is intentionally separated from kernel-driver signing and physical
 installation.
 
+A guarded install harness exists at
+`windows/driver/aoa-bootstrap/install-oppo-a58-test-filter.ps1`. Without
+`-Install` it is preflight-only. It verifies the manifest hashes, exact
+hardware revision, no-ADB WPD/MTP state, and signing artifacts. An actual
+install additionally requires elevation, an explicit
+`-IUnderstandThisRestartsTheUsbDevice` switch, a valid signed driver/catalog,
+and records a baseline plus install state before allowing later AOA testing.
+
+A matching rollback harness exists at
+`windows/driver/aoa-bootstrap/uninstall-oppo-a58-test-filter.ps1`. It uses the
+recorded published INF name, deliberately avoids `pnputil /force`, and
+verifies that the phone returns to the normal `WUDFWpdMtp / wpdmtp.inf` state.
+
 ## Package/attach gate
 
 The prototype may advance to install testing only when its INF/package:
