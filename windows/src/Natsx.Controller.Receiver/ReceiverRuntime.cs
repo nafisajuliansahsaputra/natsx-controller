@@ -158,6 +158,360 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         }
     }
 
+    private async ValueTask TryStartBluetoothHostAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await StartBluetoothHostCoreAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Report(
+                $"Bluetooth unavailable: {exception.Message} Wi-Fi and USB remain available.");
+        }
+    }
+
+    private async ValueTask StartBluetoothHostCoreAsync(
+        CancellationToken cancellationToken)
+    {
+        Report(
+            "Starting trusted Bluetooth RFCOMM service…");
+
+        var host =
+            new BluetoothRfcommServiceHost();
+
+        host.ConnectionReceived +=
+            OnBluetoothConnectionReceived;
+
+        _bluetoothHost =
+            host;
+
+        try
+        {
+            await host
+                .StartAsync(
+                    radioDiscoverable: false,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            host.ConnectionReceived -=
+                OnBluetoothConnectionReceived;
+
+            await host
+                .DisposeAsync()
+                .ConfigureAwait(false);
+
+            _bluetoothHost = null;
+
+            throw;
+        }
+
+        Report(
+            "Bluetooth RFCOMM service ready.");
+    }
+
+    private async void OnBluetoothConnectionReceived(
+        object? sender,
+        BluetoothRfcommConnectionEventArgs eventArgs)
+    {
+        StreamSocket? socket =
+            eventArgs.Socket;
+        Stream? inputStream =
+            null;
+        Stream? outputStream =
+            null;
+        IDisposable? sessionOwner =
+            null;
+        bool gateEntered =
+            false;
+        bool streamOwnershipTransferred =
+            false;
+
+        try
+        {
+            CancellationTokenSource? lifetime =
+                _lifetime;
+            WindowsTrustServices? trust =
+                _trustServices;
+            TrustedSessionRegistry? sessionRegistry =
+                _sessionRegistry;
+            ControllerTransportRuntime? runtime =
+                _transportRuntime;
+
+            if (lifetime is null ||
+                trust is null ||
+                sessionRegistry is null ||
+                runtime is null ||
+                lifetime.IsCancellationRequested)
+            {
+                return;
+            }
+
+            inputStream =
+                socket.InputStream
+                    .AsStreamForRead(
+                        bufferSize: 0);
+
+            outputStream =
+                socket.OutputStream
+                    .AsStreamForWrite(
+                        bufferSize: 0);
+
+            byte[] firstFrame =
+                await BluetoothStreamFrameCodec
+                    .ReadFrameAsync(
+                        inputStream,
+                        lifetime.Token)
+                    .ConfigureAwait(false);
+
+            MessageType messageType =
+                ReadBluetoothInitialMessageType(
+                    firstFrame);
+
+            var lifecycle =
+                new TransportLifecycle(
+                    TransportRuntimeState.Connecting);
+
+            BluetoothTrustedSession trustedSession;
+            PeerId remotePeerId;
+
+            switch (messageType)
+            {
+                case MessageType.AuthChallenge:
+                {
+                    var handshakeServer =
+                        new BluetoothTrustedHandshakeServer(
+                            trust.LocalPeerId,
+                            lifecycle: lifecycle,
+                            sessionRegistry: sessionRegistry);
+
+                    BluetoothTrustedHandshakeCompletion completion =
+                        await handshakeServer
+                            .AuthenticateAsync(
+                                inputStream,
+                                outputStream,
+                                peerId =>
+                                    ResolveTrustSecret(
+                                        trust,
+                                        peerId),
+                                firstFrame,
+                                lifetime.Token)
+                            .ConfigureAwait(false);
+
+                    sessionOwner =
+                        completion;
+                    trustedSession =
+                        completion.Session;
+                    remotePeerId =
+                        completion.RemotePeerId;
+                    break;
+                }
+
+                case MessageType.SessionReady:
+                {
+                    var joinServer =
+                        new BluetoothSecondarySessionJoinServer(
+                            trust.LocalPeerId,
+                            sessionRegistry,
+                            lifecycle: lifecycle);
+
+                    BluetoothSecondarySessionJoinCompletion completion =
+                        await joinServer
+                            .JoinAsync(
+                                inputStream,
+                                outputStream,
+                                firstFrame,
+                                lifetime.Token)
+                            .ConfigureAwait(false);
+
+                    sessionOwner =
+                        completion;
+                    trustedSession =
+                        completion.Session;
+                    remotePeerId =
+                        completion.RemotePeerId;
+                    break;
+                }
+
+                default:
+                    throw new FormatException(
+                        $"Unsupported initial Bluetooth control message: {messageType}.");
+            }
+
+            await _transportMutationGate
+                .WaitAsync(
+                    lifetime.Token)
+                .ConfigureAwait(false);
+
+            gateEntered =
+                true;
+
+            await runtime
+                .DetachTransportAsync(
+                    TransportKind.Bluetooth,
+                    lifetime.Token)
+                .ConfigureAwait(false);
+
+            _bluetoothSessionOwner?.Dispose();
+            _bluetoothSessionOwner =
+                null;
+
+            _bluetoothSocket?.Dispose();
+            _bluetoothSocket =
+                null;
+
+            var transport =
+                new BluetoothControllerTransport(
+                    trustedSession,
+                    lifecycle,
+                    connectionPolicy: _policy);
+
+            bool registered =
+                false;
+
+            try
+            {
+                await runtime
+                    .AttachTransportAsync(
+                        transport,
+                        lifetime.Token)
+                    .ConfigureAwait(false);
+
+                registered =
+                    true;
+
+                await transport
+                    .AttachAuthenticatedStreamAsync(
+                        inputStream,
+                        outputStream,
+                        lifetime.Token)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                if (registered)
+                {
+                    await runtime
+                        .DetachTransportAsync(
+                            TransportKind.Bluetooth,
+                            CancellationToken.None)
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    await transport
+                        .DisposeAsync()
+                        .ConfigureAwait(false);
+                }
+
+                throw;
+            }
+
+            _bluetoothSessionOwner =
+                sessionOwner;
+            sessionOwner =
+                null;
+
+            _bluetoothSocket =
+                socket;
+            socket =
+                null;
+
+            streamOwnershipTransferred =
+                true;
+
+            Report(
+                $"Trusted Bluetooth session ready: {remotePeerId}.");
+        }
+        catch (OperationCanceledException)
+            when (_lifetime is null ||
+                  _lifetime.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            Report(
+                $"Bluetooth session failed: {exception.Message}");
+        }
+        finally
+        {
+            if (!streamOwnershipTransferred)
+            {
+                await DisposeStreamQuietlyAsync(
+                        outputStream)
+                    .ConfigureAwait(false);
+
+                await DisposeStreamQuietlyAsync(
+                        inputStream)
+                    .ConfigureAwait(false);
+            }
+
+            sessionOwner?.Dispose();
+            socket?.Dispose();
+
+            if (gateEntered)
+            {
+                _transportMutationGate.Release();
+            }
+        }
+    }
+
+    private static MessageType ReadBluetoothInitialMessageType(
+        ReadOnlySpan<byte> frame)
+    {
+        if (frame.Length <
+            ProtocolConstants.HeaderSize)
+        {
+            throw new FormatException(
+                "Initial Bluetooth frame is shorter than the protocol header.");
+        }
+
+        if (!frame[..ProtocolConstants.Magic.Length]
+            .SequenceEqual(
+                ProtocolConstants.Magic))
+        {
+            throw new FormatException(
+                "Initial Bluetooth frame has invalid protocol magic.");
+        }
+
+        return (MessageType)frame[6];
+    }
+
+    private static async ValueTask DisposeStreamQuietlyAsync(
+        Stream? stream)
+    {
+        if (stream is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await stream
+                .DisposeAsync()
+                .ConfigureAwait(false);
+        }
+        catch (NotImplementedException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (IOException)
+        {
+        }
+    }
+
     private async ValueTask StartWifiHostAsync(
         WindowsTrustServices trust,
         TrustedSessionRegistry sessionRegistry,
