@@ -14,7 +14,7 @@
 
   <Target
     Name="EnsureHidMaestroSdk"
-    BeforeTargets="ResolveReferences"
+    BeforeTargets="PrepareForBuild"
     Condition="'$(DesignTimeBuild)' != 'true' and !Exists('$(HidMaestroSdkPath)')">
     <Message
       Importance="high"
