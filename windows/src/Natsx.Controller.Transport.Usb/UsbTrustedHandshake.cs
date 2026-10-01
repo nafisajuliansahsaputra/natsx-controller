@@ -318,6 +318,18 @@ public sealed class UsbTrustedHandshakeServer
         await outputStream.WriteAsync(
             packet,
             cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await outputStream.FlushAsync(
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (NotImplementedException)
+        {
+        }
+        catch (NotSupportedException)
+        {
+        }
     }
 
     private ulong MonotonicMicros()
