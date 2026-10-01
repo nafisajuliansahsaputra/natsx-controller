@@ -117,6 +117,43 @@ when a filter can sit underneath another driver that may reject unknown IOCTLs.
 The PnP filter stack remains pass-through; user-mode control requests no longer
 depend on traversing WPD/WUDF first.
 
+## Baseline capture before package installation
+
+Before any filter package is installed, capture the exact phone stack and
+Ethernet/LAN routing state in one machine-readable snapshot:
+
+```powershell
+.\windows\eng\capture-usb-bootstrap-baseline.ps1 -OutputPath .\usb-bootstrap-baseline.json
+```
+
+The script is read-only. It refuses to run against a device that is not the
+validated OPPO A58 no-ADB target `USB\\VID_22D9&PID_2764&REV_0404` with
+`WUDFWpdMtp` / `wpdmtp.inf`. It also records whether an ADB device is
+present, the effective PnP stack, adapters, and IPv4/IPv6 routes.
+
+## Static package gate
+
+The physical package must first be materialized and pass Windows Driver INF
+validation without touching the local device:
+
+```powershell
+.\windows\driver\aoa-bootstrap\build-oppo-a58-test-package.ps1
+```
+
+This builder:
+
+- requires the exact OPPO A58 `VID/PID/REV` match;
+- refuses PID-only, class-wide, compatible-ID, or ADB-on `PID_2765` targeting;
+- requires declarative `DDInstall.Filters / AddFilter`;
+- materializes the KMDF version token;
+- copies only the KMDF binary and INF into a physical-validation package;
+- runs `InfVerif /w /v`;
+- writes SHA-256 hashes and target metadata to `package-manifest.json`.
+
+The output is still **not installable as-is** because it is not signed. Static
+validation is intentionally separated from kernel-driver signing and physical
+installation.
+
 ## Package/attach gate
 
 The prototype may advance to install testing only when its INF/package:
