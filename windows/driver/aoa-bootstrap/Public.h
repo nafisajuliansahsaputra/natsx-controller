@@ -3,8 +3,11 @@
 #include <ntddk.h>
 
 #define NATSX_AOA_BOOTSTRAP_PROTOCOL_VERSION 1u
-#define NATSX_AOA_BOOTSTRAP_DRIVER_BUILD 2u
+#define NATSX_AOA_BOOTSTRAP_DRIVER_BUILD 3u
 
+// Retained as a stable protocol identifier for diagnostics/backward
+// compatibility. Build 3 moves user-mode IOCTL access to a sideband control
+// device rather than exposing the filter's PnP stack directly.
 // {54E7A3A1-01F0-41B8-B397-75E2A6D42C11}
 DEFINE_GUID(
     GUID_DEVINTERFACE_NATSX_AOA_BOOTSTRAP,
