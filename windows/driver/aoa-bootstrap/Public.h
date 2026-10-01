@@ -3,13 +3,15 @@
 #include <ntddk.h>
 
 #define NATSX_AOA_BOOTSTRAP_PROTOCOL_VERSION 1u
-#define NATSX_AOA_BOOTSTRAP_DRIVER_BUILD 4u
+#define NATSX_AOA_BOOTSTRAP_DRIVER_BUILD 5u
 
 // Retained as a stable protocol identifier for diagnostics/backward
 // compatibility. Build 3 moved user-mode IOCTL access to a sideband control
 // device rather than exposing the filter's PnP stack directly. Build 4 keeps
 // that control plane alive independently of WDFUSBDEVICE readiness and adds a
-// read-only target-readiness diagnostic.
+// read-only target-readiness diagnostic. Build 5 exposes the exact NTSTATUS
+// and attempt count from WdfUsbTargetDeviceCreateWithParameters so physical
+// failures can be diagnosed without sending START_AOA.
 // {54E7A3A1-01F0-41B8-B397-75E2A6D42C11}
 DEFINE_GUID(
     GUID_DEVINTERFACE_NATSX_AOA_BOOTSTRAP,
@@ -56,4 +58,6 @@ typedef struct _NATSX_AOA_STATUS_RESPONSE {
     ULONG DriverBuild;
     ULONG AttachedTargetCount;
     ULONG ReadyUsbTargetCount;
+    NTSTATUS LastUsbTargetCreateStatus;
+    ULONG UsbTargetCreateAttemptCount;
 } NATSX_AOA_STATUS_RESPONSE, *PNATSX_AOA_STATUS_RESPONSE;
