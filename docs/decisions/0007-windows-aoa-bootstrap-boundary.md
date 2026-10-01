@@ -61,8 +61,21 @@ until its attach/install scope and physical behavior are validated.
 Do not claim a fully driverless automatic AOA bootstrap on stock Windows.
 
 Microsoft's user-mode `Windows.Devices.Usb` / WinUSB APIs operate on devices
-that are already exposed through WinUSB. A normal Android MTP interface cannot
-be assumed to satisfy that requirement.
+that are exposed through WinUSB. A normal Android MTP interface cannot be
+assumed to provide an application-usable WinUSB handle merely because
+`Winusb.sys` appears in its kernel stack.
+
+The first OPPO A58 no-ADB capture is useful because its effective stack is
+`WpdUpFltr -> WUDFRd -> WINUSB -> ACPI -> USBHUB3`. Before mutating that
+stack with another kernel filter, NATSX now performs a bounded user-mode probe
+against the existing `GUID_DEVINTERFACE_USB_DEVICE` path. The probe attempts
+`WinUsb_Initialize` and sends only AOA `GET_PROTOCOL` (request 51). It never
+sends the AOA identity strings or `START_ACCESSORY`.
+
+A successful probe would reopen the driverless bootstrap design for that
+specific Windows/MTP stack. A failed probe keeps the kernel bootstrap boundary
+in place. Neither result may be generalized to other Android vendors without
+their own validation.
 
 ### Rejected bootstrap shortcuts
 
