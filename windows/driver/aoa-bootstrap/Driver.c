@@ -416,7 +416,7 @@ NatsxEnsureControlDevice(
 
     DECLARE_CONST_UNICODE_STRING(
         controlSecurity,
-        L"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGW;;;WD)(A;;GR;;;RC)");
+        L"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGW;;;AU)");
 
     PWDFDEVICE_INIT controlInit =
         WdfControlDeviceInitAllocate(
