@@ -78,7 +78,7 @@ $report = foreach ($device in $devices) {
         ($hardwareText -match "(?i)android|mtp|adb") -or
         ($compatibleText -match "(?i)android|mtp|adb")
 
-    $isUsbInstance = $device.InstanceId -like "USB\\*"
+    $isUsbInstance = $device.InstanceId -like "USB\*"
 
     if (
         -not [string]::IsNullOrWhiteSpace($InstanceId) -or
