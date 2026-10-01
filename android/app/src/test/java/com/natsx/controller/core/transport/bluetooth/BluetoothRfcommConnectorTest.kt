@@ -3,7 +3,11 @@ package com.natsx.controller.core.transport.bluetooth
 import com.natsx.controller.core.gamepad.GamepadButtons
 import com.natsx.controller.core.gamepad.GamepadState
 import com.natsx.controller.core.protocol.PeerId
+import com.natsx.controller.core.protocol.FrameFlags
+import com.natsx.controller.core.protocol.GamepadStateCodec
+import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.PeerRole
+import com.natsx.controller.core.protocol.ProtocolFrameCodec
 import com.natsx.controller.core.protocol.ProtocolTransport
 import com.natsx.controller.core.protocol.SessionId
 import com.natsx.controller.core.protocol.SessionReadyPayload
@@ -123,16 +127,37 @@ class BluetoothRfcommConnectorTest {
                     transportReady.transport,
                 )
 
-                val realtime =
-                    BluetoothRealtimeFrameCodec
-                        .decodeGamepadState(
+                val realtimeFrame =
+                    ProtocolFrameCodec.decode(
+                        frameBytes =
                             BluetoothStreamFrameCodec
                                 .readFrame(emitted),
-                            verifier,
-                        )
+                        authenticationKey =
+                            verifier.authenticationKey(),
+                    )
 
-                assertEquals(77u, realtime.sequence)
-                assertEquals(state, realtime.state)
+                assertEquals(
+                    MessageType.GAMEPAD_STATE,
+                    realtimeFrame.messageType,
+                )
+                assertTrue(
+                    realtimeFrame.flags and
+                        FrameFlags.AUTHENTICATED != 0,
+                )
+                assertEquals(
+                    sessionId,
+                    realtimeFrame.sessionId,
+                )
+                assertEquals(
+                    77u,
+                    realtimeFrame.sequence,
+                )
+                assertEquals(
+                    state,
+                    GamepadStateCodec.decode(
+                        realtimeFrame.payload,
+                    ),
+                )
             }
 
             link.close()
