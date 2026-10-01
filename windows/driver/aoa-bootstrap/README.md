@@ -7,6 +7,7 @@ Current scope:
 
 - KMDF pass-through filter skeleton;
 - private NATSX device interface;
+- reserved driver service name: `NatsxAoaBootstrap`;
 - version IOCTL;
 - bounded `START_AOA` IOCTL that performs only the canonical Android Open
   Accessory endpoint-zero sequence;
