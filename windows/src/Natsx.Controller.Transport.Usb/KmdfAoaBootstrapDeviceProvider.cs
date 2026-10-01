@@ -158,6 +158,13 @@ internal sealed class KmdfAoaBootstrapDevice :
                     $"Unsupported NATSX AOA bootstrap driver protocol version {version.ProtocolVersion}.");
             }
 
+            if (version.DriverBuild <
+                AoaBootstrapDriverProtocol.MinimumSupportedDriverBuild)
+            {
+                throw new InvalidOperationException(
+                    $"NATSX AOA bootstrap driver build {version.DriverBuild} is older than the minimum supported build {AoaBootstrapDriverProtocol.MinimumSupportedDriverBuild}.");
+            }
+
             return new KmdfAoaBootstrapDevice(
                 devicePath,
                 handle,
