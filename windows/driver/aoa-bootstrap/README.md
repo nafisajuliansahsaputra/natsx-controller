@@ -14,8 +14,13 @@ Current scope:
 - all unknown device-control requests are forwarded to the lower stack;
 - the receiver has a ConfigMgr/CreateFile/DeviceIoControl client for this
   private interface;
-- no INF/install script is included yet;
-- no driver is loaded by normal application CI or runtime.
+- an OPPO A58-only extension-INF prototype is now included for the observed
+  normal-mode composite parent `USB\\VID_22D9&PID_2765&REV_0404`;
+- that INF attaches `NatsxAoaBootstrap` as a declarative lower filter to the
+  composite parent only, not to the MTP (`MI_00`) or ADB (`MI_01`) child;
+- ADB may be present on the test phone but is not used or required by NATSX;
+- no driver is loaded by normal application runtime unless the prototype
+  package is explicitly installed for physical validation.
 
 The driver intentionally owns the privileged endpoint-zero sequence instead of
 exposing an arbitrary user-mode vendor-control API. User mode can only ask the
@@ -24,10 +29,10 @@ bootstrap operation.
 
 The source prototype is not sufficient to mark M9 complete. It still requires:
 
-1. a device-specific declarative `AddFilter` / extension-INF attach strategy
-   that matches only explicitly supported Android hardware and never registers
-   a class-wide MTP/WPD filter;
-2. physical validation on supported Windows 11 hardware;
+1. physical validation of the current OPPO A58-scoped declarative
+   `AddFilter` / extension-INF package on the observed hardware;
+2. confirmation that lower-filter attachment to the composite parent can issue
+   the bounded AOA control sequence while `usbccgp` and MTP remain healthy;
 3. proof that the OEM MTP/PTP path still works before and after bootstrap;
 4. uninstall/reboot recovery validation;
 5. receiver integration only after those checks pass.
