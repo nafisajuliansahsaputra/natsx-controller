@@ -281,6 +281,15 @@ public sealed class BluetoothControllerTransport : IControllerTransport
                         frame.Sequence,
                         frame.State,
                         _timeProvider.GetTimestamp()));
+
+                // READY means Smart Connection can safely select this
+                // transport. Publish/cache the fresh full-state first so the
+                // runtime never observes READY without a handover snapshot.
+                if (State == TransportRuntimeState.Stabilizing)
+                {
+                    _lifecycle.SetState(
+                        TransportRuntimeState.Ready);
+                }
             }
         }
         catch (OperationCanceledException)

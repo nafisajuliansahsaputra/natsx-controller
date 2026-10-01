@@ -275,11 +275,11 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Implement trusted auto-reconnect.
 - [x] Implement protocol handshake.
 - [x] Implement health metrics appropriate to Bluetooth.
-- [ ] Integrate with Smart Connection Manager.
+- [x] Integrate with Smart Connection Manager.
 - [x] Support READY/warm standby.
-- [ ] Wi-Fi -> Bluetooth failover.
-- [ ] Bluetooth -> recovered Wi-Fi handback.
-- [ ] Verify anti-flapping rules.
+- [x] Wi-Fi -> Bluetooth failover.
+- [x] Bluetooth -> recovered Wi-Fi handback.
+- [x] Verify anti-flapping rules.
 
 **Exit criteria:** Wi-Fi may be disabled mid-session and gameplay resumes automatically over Bluetooth when the link is ready.
 
