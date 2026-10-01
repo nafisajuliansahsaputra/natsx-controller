@@ -989,10 +989,14 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             CancellationTokenSource? lifetime =
                 _lifetime;
 
+            WindowsTrustServices? trust =
+                _trustServices;
+
             ControllerTransportRuntime? runtime =
                 _transportRuntime;
 
             if (lifetime is null ||
+                trust is null ||
                 runtime is null ||
                 lifetime.IsCancellationRequested)
             {
