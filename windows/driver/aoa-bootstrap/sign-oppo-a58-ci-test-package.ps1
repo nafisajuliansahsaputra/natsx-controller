@@ -38,11 +38,19 @@ function Find-WdkTool {
 
     $matches = @(
         Get-ChildItem -Path $roots -Filter $Name -File -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.DirectoryName -match "(?i)[\\/]x64(?:[\\/]|$)" } |
-            Sort-Object FullName -Descending
+            Sort-Object @{
+                Expression = {
+                    if ($_.DirectoryName -match "(?i)[\\/]x64(?:[\\/]|$)") { 0 }
+                    elseif ($_.DirectoryName -match "(?i)[\\/]x86(?:[\\/]|$)") { 1 }
+                    else { 2 }
+                }
+            }, FullName
     )
 
     if ($matches.Count -eq 0) { return $null }
+
+    # Some WDK tools (including Inf2Cat in certain NuGet layouts) are shipped
+    # only under x86 even when they validate x64 driver packages.
     return $matches[0].FullName
 }
 
