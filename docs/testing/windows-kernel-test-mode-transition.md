@@ -140,18 +140,19 @@ bcdedit /set testsigning on
 
 Restart Windows.
 
-After reboot, verify with:
+After reboot, run the dedicated aggregate gate:
 
 ```powershell
-.\windows\eng\inspect-driver-signing-posture.ps1 -AsJson
+.\windows\eng\verify-test-signing-enabled-gate.ps1 `
+  -PackageDirectory "<artifact>\artifacts\oppo-a58-test-package" `
+  -AsJson
 ```
 
-Expected test-lab posture:
-
-- Secure Boot disabled;
-- TESTSIGNING on;
-- HVCI still enabled/running;
-- BitLocker protection still suspended.
+Proceed only when `ReadyForPhysicalFilterInstallGate` is `true`. The gate
+requires Secure Boot disabled, TESTSIGNING on, VBS/HVCI still running,
+BitLocker protection still suspended while the volume remains fully encrypted,
+the OPPO A58 still in the exact healthy no-ADB WPD/MTP state, and the exact
+trusted CI package signatures still valid and manifest-bound.
 
 ## Phase F - trust only the artifact's ephemeral public test certificate
 
