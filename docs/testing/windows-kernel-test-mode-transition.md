@@ -66,6 +66,22 @@ Stop if:
 - the machine does not have a usable BitLocker recovery method available;
 - an unexpected USB/network change is already present.
 
+Before Phase C, run the aggregate read-only gate:
+
+```powershell
+.\windows\eng\preflight-windows-test-mode-transition.ps1 `
+  -PackageDirectory "<artifact>\artifacts\oppo-a58-test-package" `
+  -AsJson
+```
+
+Proceed only when `ReadyForBitLockerSuspendGate` is `true` and every
+individual check is `true`. This gate verifies the exact phone target, no ADB,
+valid/trusted artifact signatures, Secure Boot currently enabled, TESTSIGNING
+currently off, VBS/HVCI running, and BitLocker protection/encryption state.
+
+The signing-posture inspector intentionally reports only BitLocker status and
+protector types; it does not emit recovery passwords.
+
 ## Phase C - suspend BitLocker before firmware changes
 
 The system drive must remain encrypted; only protection is suspended.
