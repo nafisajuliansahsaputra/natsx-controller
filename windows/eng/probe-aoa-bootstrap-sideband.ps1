@@ -14,7 +14,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Natsx.AoaBootstrap
 {
-    public static class SidebandProbeNativeV4
+    public static class SidebandProbeNativeV5
     {
         private const uint GENERIC_READ = 0x80000000;
         private const uint GENERIC_WRITE = 0x40000000;
@@ -150,8 +150,8 @@ namespace Natsx.AoaBootstrap
 "@
 }
 
-$version = [Natsx.AoaBootstrap.SidebandProbeNativeV4]::GetVersion()
-$status = [Natsx.AoaBootstrap.SidebandProbeNativeV4]::GetStatus()
+$version = [Natsx.AoaBootstrap.SidebandProbeNativeV5]::GetVersion()
+$status = [Natsx.AoaBootstrap.SidebandProbeNativeV5]::GetStatus()
 
 $report = [ordered]@{
     ControlDevice = "\\.\NatsxAoaBootstrap"
