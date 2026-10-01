@@ -36,6 +36,11 @@ public sealed class HidMaestroVirtualGamepadBackend : IVirtualGamepadBackend
 
         try
         {
+            // HIDMaestro's driver installation is idempotent. The first
+            // installation requires elevation; subsequent calls are a cheap
+            // compatibility/version check and keep controller creation behind
+            // one stable backend boundary.
+            context.InstallDriver();
             context.LoadDefaultProfiles();
 
             HMProfile profile = context.GetProfile(ProfileId)
