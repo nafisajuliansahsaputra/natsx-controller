@@ -302,6 +302,8 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] USB disconnect -> immediate best-backup takeover.
 - [ ] Verify Windows Ethernet/LAN route remains unaffected.
 
+> Current physical blocker: pre-AOA Windows endpoint-zero bootstrap. Post-AOA AOA data mode already uses scoped Microsoft WinUSB; the bootstrap implementation must be validated separately and must not replace the normal phone driver manually.
+
 **Exit criteria:** USB can be plugged/unplugged during a running controller session and Smart Auto moves transports without manual reconnect.
 
 ---
