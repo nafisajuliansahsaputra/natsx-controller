@@ -74,14 +74,40 @@ unspecified when the base stack does not expose named filter levels. Do not
 install the source INF until the effective stack is captured and the prototype
 has a deliberate ordering/compatibility plan.
 
-Capture the exact effective stack with:
+The captured effective stack is:
+
+```text
+WpdUpFltr
+WUDFRd
+WINUSB
+ACPI
+USBHUB3
+```
+
+That confirms that the inbox MTP stack already contains WinUSB below the WPD
+function stack. Before installing any NATSX filter, run the safe user-mode
+probe below to answer a narrower question: can the existing USB device
+interface be opened with WinUSB and service AOA GET_PROTOCOL directly?
 
 ```powershell
-.\windows\eng\inspect-usb-bootstrap-target.ps1 `
-  -InstanceId "USB\VID_22D9&PID_2764\W4U4SCSSGMIBLJ8H" `
-  -IncludePnpUtilStack `
-  -AsJson
+dotnet run --project windows/tools/Natsx.Controller.UsbProbe -- `
+  --instance-id "USB\VID_22D9&PID_2764\W4U4SCSSGMIBLJ8H"
 ```
+
+The probe sends only AOA request 51 (GET_PROTOCOL). It does **not** send AOA
+identity strings and does **not** send START_ACCESSORY, so it will not
+intentionally switch the phone into accessory mode.
+
+Interpretation:
+
+- if `winusb-initialize` fails, the inbox WinUSB lower filter is not directly
+  usable through this device interface and the kernel bootstrap boundary
+  remains necessary;
+- if initialization succeeds but `aoa-get-protocol` fails, user-mode access
+  exists but does not provide the endpoint-zero path AOA needs;
+- if the probe returns a non-zero AOA protocol version, do not install the
+  NATSX filter yet; the driverless bootstrap path should be promoted into a
+  bounded prototype and tested before accepting any kernel-stack mutation.
 
 ## Package/attach gate
 
