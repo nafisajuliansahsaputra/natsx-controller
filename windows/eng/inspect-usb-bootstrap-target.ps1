@@ -2,6 +2,7 @@
 param(
     [string]$InstanceId,
     [switch]$IncludeAllUsb,
+    [switch]$IncludePnpUtilStack,
     [switch]$AsJson
 )
 
@@ -45,8 +46,7 @@ if (-not (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue)) {
 $devices =
     if ([string]::IsNullOrWhiteSpace($InstanceId)) {
         # Filter to USB device nodes before querying properties. The old implementation
-        # queried eight properties for every present PnP device, which could take a very
-        # long time on systems with many device nodes.
+        # queried every present PnP device first and could take a long time.
         @(
             Get-PnpDevice -PresentOnly |
                 Where-Object { $_.InstanceId -like "USB\*" }
@@ -122,6 +122,29 @@ if ($report.Count -eq 0) {
     Write-Warning "No likely Android USB data device was found."
     Write-Warning "Confirm the phone is connected with a data-capable cable, then retry with -IncludeAllUsb if necessary."
     exit 2
+}
+
+if ($IncludePnpUtilStack) {
+    if ([string]::IsNullOrWhiteSpace($InstanceId)) {
+        throw "-IncludePnpUtilStack requires -InstanceId so stack inspection remains explicitly scoped."
+    }
+
+    $pnpUtil = Join-Path $env:SystemRoot "System32\pnputil.exe"
+    if (-not (Test-Path $pnpUtil)) {
+        throw "PnPUtil is unavailable at $pnpUtil."
+    }
+
+    $stackOutput = & $pnpUtil /enum-devices /instanceid $InstanceId /stack /drivers /services 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "PnPUtil stack inspection failed with exit code $LASTEXITCODE.`n$($stackOutput -join [Environment]::NewLine)"
+    }
+
+    $stackText = $stackOutput -join [Environment]::NewLine
+    $report = @(
+        $report | ForEach-Object {
+            $_ | Add-Member -NotePropertyName PnpUtilStack -NotePropertyValue $stackText -PassThru
+        }
+    )
 }
 
 if ($AsJson) {
