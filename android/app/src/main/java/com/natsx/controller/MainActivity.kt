@@ -58,7 +58,14 @@ class MainActivity : Activity() {
         stateStore = app.gamepadStateStore
         pairingConfirmation = app.pairingConfirmation
         usbRuntimeStatus = app.usbRuntimeStatus
-        controllerView = ControllerSurfaceView(this, stateStore)
+        controllerView =
+            ControllerSurfaceView(
+                context = this,
+                stateStore = stateStore,
+                hapticLevel = {
+                    app.hapticSettings.level
+                },
+            )
 
         setContentView(
             buildRootView(),

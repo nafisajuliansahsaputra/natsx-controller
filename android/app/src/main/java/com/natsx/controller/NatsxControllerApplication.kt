@@ -2,6 +2,8 @@ package com.natsx.controller
 
 import android.app.Application
 import com.natsx.controller.core.gamepad.GamepadStateStore
+import com.natsx.controller.core.haptics.AndroidHapticEngine
+import com.natsx.controller.core.haptics.HapticSettings
 import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
 import com.natsx.controller.core.session.ControllerRealtimePublisher
 import com.natsx.controller.core.session.RealtimeStateBroadcaster
@@ -23,6 +25,10 @@ class NatsxControllerApplication : Application() {
 
     private val connectionPreferences by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         getSharedPreferences("natsx_connection_v1", MODE_PRIVATE)
+    }
+
+    private val hapticPreferences by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        getSharedPreferences("natsx_haptics_v1", MODE_PRIVATE)
     }
 
     val localPeerId: PeerId by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -54,6 +60,23 @@ class NatsxControllerApplication : Application() {
 
     val gamepadStateStore: GamepadStateStore by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         GamepadStateStore()
+    }
+
+    val hapticSettings: HapticSettings by lazy(
+        LazyThreadSafetyMode.SYNCHRONIZED,
+    ) {
+        HapticSettings(
+            hapticPreferences,
+        )
+    }
+
+    val hapticEngine: AndroidHapticEngine by lazy(
+        LazyThreadSafetyMode.SYNCHRONIZED,
+    ) {
+        AndroidHapticEngine(
+            applicationContext,
+            hapticSettings,
+        )
     }
 
     val sessionSequence: SessionSequence by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {

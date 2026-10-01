@@ -12,12 +12,16 @@ import com.natsx.controller.core.gamepad.DpadState
 import com.natsx.controller.core.gamepad.GamepadButtons
 import com.natsx.controller.core.gamepad.GamepadState
 import com.natsx.controller.core.gamepad.GamepadStateStore
+import com.natsx.controller.core.haptics.HapticLevel
 import com.natsx.controller.core.input.AnalogStickProcessor
 import kotlin.math.min
 
 class ControllerSurfaceView(
     context: Context,
     private val stateStore: GamepadStateStore,
+    private val hapticLevel: () -> HapticLevel = {
+        HapticLevel.MEDIUM
+    },
 ) : View(context) {
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
@@ -127,8 +131,34 @@ class ControllerSurfaceView(
         activePointers[pointerId] = target.id
         activate(target.id, x, y)
 
-        if (target.id != ControlId.LEFT_STICK && target.id != ControlId.RIGHT_STICK) {
-            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        if (
+            target.id != ControlId.LEFT_STICK &&
+            target.id != ControlId.RIGHT_STICK
+        ) {
+            performTouchHaptic()
+        }
+    }
+
+    private fun performTouchHaptic() {
+        val feedback =
+            when (hapticLevel()) {
+                HapticLevel.OFF ->
+                    null
+
+                HapticLevel.LOW ->
+                    HapticFeedbackConstants.CLOCK_TICK
+
+                HapticLevel.MEDIUM ->
+                    HapticFeedbackConstants.KEYBOARD_TAP
+
+                HapticLevel.HIGH ->
+                    HapticFeedbackConstants.LONG_PRESS
+            }
+
+        if (feedback != null) {
+            performHapticFeedback(
+                feedback,
+            )
         }
     }
 

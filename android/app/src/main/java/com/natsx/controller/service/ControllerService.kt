@@ -145,6 +145,8 @@ class ControllerService : Service() {
                 broadcaster = app.realtimeBroadcaster,
                 pairingConfirmation = app.pairingConfirmation,
                 status = app.usbRuntimeStatus,
+                rumbleSink =
+                    app.hapticEngine::handleGameRumble,
             )
 
         registerUsbReceiver()
@@ -193,6 +195,10 @@ class ControllerService : Service() {
 
         if (::realtimePublisher.isInitialized) {
             realtimePublisher.close()
+        }
+
+        if (::app.isInitialized) {
+            app.hapticEngine.stopGameRumble()
         }
 
         super.onDestroy()
@@ -335,6 +341,8 @@ class ControllerService : Service() {
                 receiverPeerId = receiverPeerId,
                 trustedPeerStore = app.trustedPeerStore,
                 sessionRegistry = app.trustedSessionRegistry,
+                rumbleSink =
+                    app.hapticEngine::handleGameRumble,
             )
 
         val runtime =

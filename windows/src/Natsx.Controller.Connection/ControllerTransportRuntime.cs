@@ -18,6 +18,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     private readonly Dictionary<TransportKind, LatestTransportState> _latestStates = new();
     private readonly Dictionary<TransportKind, PacketRateTracker> _packetRates = new();
     private readonly HashSet<TransportKind> _seenTransportKinds = new();
+    private readonly object _rumbleStateGate = new();
     private readonly Channel<RumbleState> _rumbleQueue =
         Channel.CreateBounded<RumbleState>(
             new BoundedChannelOptions(1)
@@ -34,6 +35,8 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     private CancellationTokenSource? _lifetime;
     private Task? _evaluationLoop;
     private Task? _rumbleLoop;
+    private Task? _rumbleRefreshLoop;
+    private RumbleState _lastRumble;
     private bool _started;
     private bool _suppressLifecycleReports;
     private int _reconnectCount;
@@ -175,6 +178,12 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
             return false;
         }
 
+        lock (_rumbleStateGate)
+        {
+            _lastRumble =
+                rumble;
+        }
+
         return _rumbleQueue.Writer
             .TryWrite(
                 rumble);
@@ -224,6 +233,9 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
                 _lifetime.Token);
         _rumbleLoop =
             RumbleLoopAsync(
+                _lifetime.Token);
+        _rumbleRefreshLoop =
+            RumbleRefreshLoopAsync(
                 _lifetime.Token);
     }
 
@@ -391,9 +403,12 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         CancellationTokenSource? lifetime = _lifetime;
         Task? loop = _evaluationLoop;
         Task? rumbleLoop = _rumbleLoop;
+        Task? rumbleRefreshLoop =
+            _rumbleRefreshLoop;
         _lifetime = null;
         _evaluationLoop = null;
         _rumbleLoop = null;
+        _rumbleRefreshLoop = null;
 
         lifetime?.Cancel();
 
@@ -417,6 +432,29 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
             catch (OperationCanceledException)
             {
             }
+        }
+
+        if (rumbleRefreshLoop is not null)
+        {
+            try
+            {
+                await rumbleRefreshLoop
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        lock (_rumbleStateGate)
+        {
+            _lastRumble =
+                default;
+        }
+
+        while (_rumbleQueue.Reader.TryRead(
+            out _))
+        {
         }
 
         foreach (IControllerTransport transport in GetTransportSnapshot())
@@ -449,6 +487,48 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         }
 
         lifetime?.Dispose();
+    }
+
+    private async Task RumbleRefreshLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        using var timer =
+            new PeriodicTimer(
+                TimeSpan.FromMilliseconds(
+                    500),
+                _timeProvider);
+
+        try
+        {
+            while (await timer
+                .WaitForNextTickAsync(
+                    cancellationToken)
+                .ConfigureAwait(false))
+            {
+                RumbleState rumble;
+
+                lock (_rumbleStateGate)
+                {
+                    rumble =
+                        _lastRumble;
+                }
+
+                if (
+                    rumble.LowFrequencyMotor == 0 &&
+                    rumble.HighFrequencyMotor == 0
+                )
+                {
+                    continue;
+                }
+
+                _rumbleQueue.Writer.TryWrite(
+                    rumble);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
     }
 
     private async Task RumbleLoopAsync(
