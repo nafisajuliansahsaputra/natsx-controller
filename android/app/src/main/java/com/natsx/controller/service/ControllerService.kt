@@ -18,11 +18,29 @@ import com.natsx.controller.core.session.ControllerRealtimePublisher
 import com.natsx.controller.core.transport.usb.UsbAccessoryConnector
 import com.natsx.controller.core.transport.usb.UsbAccessoryIdentity
 import com.natsx.controller.core.transport.usb.UsbAccessoryRuntime
+import com.natsx.controller.core.transport.wifi.TrustedReceiverHelloProbe
+import com.natsx.controller.core.transport.wifi.TrustedWifiRealtimeLinkFactory
+import com.natsx.controller.core.transport.wifi.WifiAutoReconnectRuntime
+import com.natsx.controller.core.transport.wifi.WifiDiscoveryClient
+import com.natsx.controller.core.transport.wifi.WifiEndpointResolver
+import com.natsx.controller.core.transport.wifi.WifiFirstPairingClient
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class ControllerService : Service() {
+    private lateinit var app: NatsxControllerApplication
     private lateinit var realtimePublisher: ControllerRealtimePublisher
     private lateinit var usbManager: UsbManager
     private lateinit var usbRuntime: UsbAccessoryRuntime
+    private val connectionExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "natsx-connection-bootstrap").apply {
+                isDaemon = true
+            }
+        }
+    private val connectionBootstrapStarted = AtomicBoolean(false)
+    @Volatile
+    private var wifiRuntime: WifiAutoReconnectRuntime? = null
 
     private val usbReceiver =
         object : BroadcastReceiver() {
@@ -72,7 +90,7 @@ class ControllerService : Service() {
     override fun onCreate() {
         super.onCreate()
 
-        val app = application as NatsxControllerApplication
+        app = application as NatsxControllerApplication
         realtimePublisher = ControllerRealtimePublisher(
             stateStore = app.gamepadStateStore,
             broadcaster = app.realtimeBroadcaster,
@@ -94,7 +112,7 @@ class ControllerService : Service() {
             )
 
         registerUsbReceiver()
-        connectUsbIfPresent()
+        ensureConnectionBootstrap()
 
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.createNotificationChannel(
@@ -116,11 +134,15 @@ class ControllerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        connectUsbIfPresent()
+        ensureConnectionBootstrap()
         return START_STICKY
     }
 
     override fun onDestroy() {
+        wifiRuntime?.close()
+        wifiRuntime = null
+        connectionExecutor.shutdownNow()
+
         if (::usbRuntime.isInitialized) {
             usbRuntime.close()
         }
@@ -134,6 +156,167 @@ class ControllerService : Service() {
         }
 
         super.onDestroy()
+    }
+
+    private fun ensureConnectionBootstrap() {
+        if (!connectionBootstrapStarted.compareAndSet(false, true)) {
+            return
+        }
+
+        connectionExecutor.execute {
+            try {
+                bootstrapTrustedConnection()
+            } finally {
+                if (wifiRuntime == null) {
+                    connectionBootstrapStarted.set(false)
+                }
+            }
+        }
+    }
+
+    private fun bootstrapTrustedConnection() {
+        var retryIndex = 0
+
+        while (!Thread.currentThread().isInterrupted) {
+            try {
+                val peers =
+                    app.trustedPeerStore.list()
+
+                val peer =
+                    when {
+                        peers.isEmpty() -> {
+                            app.usbRuntimeStatus.publish(
+                                "No trusted PC yet. Secure pairing is using LAN/Wi-Fi…",
+                            )
+
+                            WifiFirstPairingClient(
+                                localPeerId = app.localPeerId,
+                                trustedPeerStore = app.trustedPeerStore,
+                                pairingConfirmation = app.pairingConfirmation,
+                            ).pair().also {
+                                app.usbRuntimeStatus.publish(
+                                    "LAN pairing complete. Establishing trusted Wi-Fi session…",
+                                )
+                            }
+                        }
+
+                        peers.size == 1 ->
+                            peers.single()
+
+                        else -> {
+                            app.usbRuntimeStatus.publish(
+                                "Multiple trusted PCs found. Receiver selection is required.",
+                                isError = true,
+                            )
+                            return
+                        }
+                    }
+
+                startTrustedWifi(peer.peerId)
+
+                if (waitForTrustedSession(peer.peerId)) {
+                    app.usbRuntimeStatus.publish(
+                        "Trusted Wi-Fi session active. Attaching USB as low-latency uplink…",
+                    )
+
+                    connectUsbIfPresent()
+                } else {
+                    app.usbRuntimeStatus.publish(
+                        "Wi-Fi trust is saved; waiting for receiver session. USB will attach after reconnect.",
+                    )
+                }
+
+                return
+            } catch (exception: Exception) {
+                val detail =
+                    exception.message
+                        ?.takeIf { it.isNotBlank() }
+                        ?: exception::class.java.simpleName
+
+                app.usbRuntimeStatus.publish(
+                    "LAN connection retry: $detail",
+                    isError = true,
+                )
+
+                val delay =
+                    RETRY_BACKOFF_MILLIS[
+                        retryIndex.coerceAtMost(
+                            RETRY_BACKOFF_MILLIS.lastIndex,
+                        )
+                    ]
+
+                retryIndex += 1
+
+                try {
+                    Thread.sleep(delay)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return
+                }
+            }
+        }
+    }
+
+    private fun startTrustedWifi(
+        receiverPeerId: com.natsx.controller.core.protocol.PeerId,
+    ) {
+        if (wifiRuntime != null) {
+            return
+        }
+
+        val resolver =
+            WifiEndpointResolver(
+                receiverPeerId = receiverPeerId,
+                endpointCache = app.wifiEndpointCache,
+                endpointProbe =
+                    TrustedReceiverHelloProbe(
+                        localPeerId = app.localPeerId,
+                        expectedReceiverPeerId = receiverPeerId,
+                    ),
+                discovery =
+                    WifiDiscoveryClient(
+                        localPeerId = app.localPeerId,
+                    ),
+            )
+
+        val linkFactory =
+            TrustedWifiRealtimeLinkFactory(
+                localPeerId = app.localPeerId,
+                receiverPeerId = receiverPeerId,
+                trustedPeerStore = app.trustedPeerStore,
+                sessionRegistry = app.trustedSessionRegistry,
+            )
+
+        val runtime =
+            WifiAutoReconnectRuntime(
+                broadcaster = app.realtimeBroadcaster,
+                endpointProvider = resolver,
+                linkFactory = linkFactory,
+            )
+
+        wifiRuntime = runtime
+        runtime.start()
+    }
+
+    private fun waitForTrustedSession(
+        receiverPeerId: com.natsx.controller.core.protocol.PeerId,
+    ): Boolean {
+        repeat(80) {
+            app.trustedSessionRegistry
+                .get(receiverPeerId)
+                ?.use {
+                    return true
+                }
+
+            try {
+                Thread.sleep(100)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return false
+            }
+        }
+
+        return false
     }
 
     private fun registerUsbReceiver() {
@@ -161,9 +344,6 @@ class ControllerService : Service() {
     }
 
     private fun connectUsbIfPresent() {
-        val app =
-            application as NatsxControllerApplication
-
         val accessory =
             UsbAccessoryConnector.findNatsxAccessory(
                 usbManager,
@@ -224,5 +404,13 @@ class ControllerService : Service() {
         const val NOTIFICATION_ID = 1001
         const val ACTION_USB_PERMISSION =
             "com.natsx.controller.action.USB_PERMISSION"
+
+        val RETRY_BACKOFF_MILLIS =
+            longArrayOf(
+                1_000,
+                2_000,
+                4_000,
+                8_000,
+            )
     }
 }
