@@ -29,6 +29,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
     private WifiTrustedSession? _wifiSession;
     private WinUsbAoaAccessoryConnection? _usbConnection;
     private IDisposable? _usbSessionOwner;
+    private Task? _usbMonitorTask;
     private HidMaestroVirtualGamepadBackend? _virtualGamepad;
     private ControllerTransportRuntime? _transportRuntime;
     private bool _started;
@@ -140,11 +141,11 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                     lifetime.Token)
                 .ConfigureAwait(false);
 
-            await TryStartUsbCandidateAsync(
+            _usbMonitorTask =
+                UsbMonitorLoopAsync(
                     trust,
                     sessionRegistry,
-                    lifetime.Token)
-                .ConfigureAwait(false);
+                    lifetime.Token);
 
             Report(
                 "Receiver ready. Smart Auto is waiting for trusted controller input.");
@@ -670,29 +671,188 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         }
     }
 
-    private async ValueTask TryStartUsbCandidateAsync(
+    private async Task UsbMonitorLoopAsync(
         WindowsTrustServices trust,
         TrustedSessionRegistry sessionRegistry,
         CancellationToken cancellationToken)
     {
-        try
+        int failureCount =
+            0;
+        string? lastDiagnostic =
+            null;
+
+        while (!cancellationToken.IsCancellationRequested)
         {
-            await StartUsbCandidateCoreAsync(
-                    trust,
-                    sessionRegistry,
-                    cancellationToken)
-                .ConfigureAwait(false);
+            try
+            {
+                ControllerTransportRuntime? runtime =
+                    _transportRuntime;
+
+                if (runtime is null)
+                {
+                    break;
+                }
+
+                if (runtime.TryGetTransportState(
+                        TransportKind.Usb,
+                        out TransportRuntimeState state))
+                {
+                    if (state is
+                        TransportRuntimeState.Failed or
+                        TransportRuntimeState.Unavailable)
+                    {
+                        await DeactivateUsbCandidateAsync(
+                                runtime)
+                            .ConfigureAwait(false);
+
+                        failureCount =
+                            0;
+                        lastDiagnostic =
+                            null;
+
+                        Report(
+                            "USB Direct disconnected. Smart Auto is using the best remaining transport.");
+                    }
+                    else
+                    {
+                        await Task.Delay(
+                                TimeSpan.FromMilliseconds(500),
+                                cancellationToken)
+                            .ConfigureAwait(false);
+
+                        continue;
+                    }
+                }
+
+                try
+                {
+                    await StartUsbCandidateCoreAsync(
+                            trust,
+                            sessionRegistry,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                    failureCount =
+                        0;
+                    lastDiagnostic =
+                        null;
+
+                    continue;
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception exception)
+                {
+                    failureCount++;
+
+                    if (!string.Equals(
+                            lastDiagnostic,
+                            exception.Message,
+                            StringComparison.Ordinal))
+                    {
+                        lastDiagnostic =
+                            exception.Message;
+
+                        Report(
+                            $"USB Direct waiting: {exception.Message}");
+                    }
+                }
+
+                await Task.Delay(
+                        GetUsbRetryDelay(
+                            failureCount),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception exception)
+            {
+                failureCount++;
+
+                if (!string.Equals(
+                        lastDiagnostic,
+                        exception.Message,
+                        StringComparison.Ordinal))
+                {
+                    lastDiagnostic =
+                        exception.Message;
+
+                    Report(
+                        $"USB monitor recovered from an error: {exception.Message}");
+                }
+
+                try
+                {
+                    await Task.Delay(
+                            GetUsbRetryDelay(
+                                failureCount),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+            }
         }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
+    }
+
+    private async ValueTask DeactivateUsbCandidateAsync(
+        ControllerTransportRuntime runtime)
+    {
+        await runtime
+            .DetachTransportAsync(
+                TransportKind.Usb,
+                CancellationToken.None)
+            .ConfigureAwait(false);
+
+        _usbSessionOwner?.Dispose();
+        _usbSessionOwner =
+            null;
+
+        WinUsbAoaAccessoryConnection? connection =
+            _usbConnection;
+
+        _usbConnection =
+            null;
+
+        if (connection is not null)
         {
-            throw;
+            try
+            {
+                await connection
+                    .DisposeAsync()
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+            }
         }
-        catch (Exception exception)
-        {
-            Report(
-                $"USB Direct unavailable: {exception.Message} Wi-Fi remains available.");
-        }
+    }
+
+    private static TimeSpan GetUsbRetryDelay(
+        int failureCount)
+    {
+        int seconds =
+            failureCount switch
+            {
+                <= 1 => 1,
+                2 => 2,
+                3 => 4,
+                4 => 8,
+                _ => 10,
+            };
+
+        return TimeSpan.FromSeconds(
+            seconds);
     }
 
     private async ValueTask StartUsbCandidateCoreAsync(
@@ -1027,6 +1187,27 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         _lifetime = null;
         lifetime?.Cancel();
+
+        Task? usbMonitor =
+            _usbMonitorTask;
+
+        _usbMonitorTask =
+            null;
+
+        if (usbMonitor is not null)
+        {
+            try
+            {
+                await usbMonitor
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch
+            {
+            }
+        }
 
         BluetoothRfcommServiceHost? bluetoothHost =
             _bluetoothHost;
