@@ -1,0 +1,37 @@
+; NATSX Controller - Android Open Accessory WinUSB binding
+; Development package. Production release must provide a signed CAT package.
+
+[Version]
+Signature="$Windows NT$"
+Class=USBDevice
+ClassGuid={88BAE032-5A81-49f0-BC3D-A4FF138216D6}
+Provider=%ProviderName%
+DriverVer=10/01/2026,1.0.0.0
+CatalogFile=NatsxAoaWinUsb.cat
+PnpLockdown=1
+
+[Manufacturer]
+%ProviderName%=NatsxDevices,NTamd64
+
+[NatsxDevices.NTamd64]
+%AccessoryOnly%=WinUSB_Install, USB\VID_18D1&PID_2D00
+%AccessoryWithAdb%=WinUSB_Install, USB\VID_18D1&PID_2D01&MI_00
+
+[WinUSB_Install]
+Include=winusb.inf
+Needs=WINUSB.NT
+
+[WinUSB_Install.Services]
+Include=winusb.inf
+Needs=WINUSB.NT.Services
+
+[WinUSB_Install.HW]
+AddReg=WinUSB_AddReg
+
+[WinUSB_AddReg]
+HKR,,DeviceInterfaceGUIDs,0x10000,"{4D501A6D-7D41-4F1B-91A8-CC2D5D718C21}"
+
+[Strings]
+ProviderName="NATSX"
+AccessoryOnly="NATSX Android Open Accessory"
+AccessoryWithAdb="NATSX Android Open Accessory (data interface)"
