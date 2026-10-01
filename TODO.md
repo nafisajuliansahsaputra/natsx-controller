@@ -289,7 +289,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 - [x] Validate final Android USB accessory/direct data approach.
 - [ ] Validate Windows-side USB implementation.
-- [ ] Record ADR for exact USB design.
+- [x] Record ADR for exact USB design.
 - [ ] Implement direct USB transport.
 - [ ] No USB tethering.
 - [ ] No ADB requirement.
