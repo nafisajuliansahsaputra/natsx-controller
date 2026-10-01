@@ -14,9 +14,10 @@ Current scope:
 - all unknown device-control requests are forwarded to the lower stack;
 - the receiver has a ConfigMgr/CreateFile/DeviceIoControl client for this
   private interface;
-- a **source-only** OPPO A58 extension-INF prototype is now included for the
-  observed normal-mode composite parent `USB\\VID_22D9&PID_2765&REV_0404`;
-  it is intentionally not wired into the install/package build yet;
+- a **source-only** OPPO A58 extension-INF observation draft is included for
+  `USB\\VID_22D9&PID_2765&REV_0404`, captured while ADB was present;
+  it is intentionally not wired into the install/package build until a second
+  capture with USB debugging disabled confirms the no-ADB normal-mode ID;
 - that INF attaches `NatsxAoaBootstrap` as a declarative lower filter to the
   composite parent only, not to the MTP (`MI_00`) or ADB (`MI_01`) child;
 - ADB may be present on the test phone but is not used or required by NATSX;
