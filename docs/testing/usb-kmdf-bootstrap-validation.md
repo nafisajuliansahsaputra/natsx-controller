@@ -137,19 +137,20 @@ The first captured machine baseline confirms:
 - ADB is absent;
 - the effective stack remains `WpdUpFltr -> WUDFRd -> WINUSB -> ACPI -> USBHUB3`;
 - Ethernet is up and is the active physical LAN path at capture time;
-- VBS is reported as running and security service code `2` is configured/running;
-- Secure Boot could not be determined from the original non-elevated capture.
+- Secure Boot is enabled;
+- VBS/HVCI is running and the HVCI registry policy is enabled;
+- BCD TESTSIGNING is currently off;
+- the system drive is fully encrypted with BitLocker protection enabled.
 
-Before deciding how to test-sign the kernel driver, run the dedicated read-only
-signing-posture inspector from an **elevated** PowerShell:
+The signing-posture inspector remains available as a read-only recheck:
 
 ```powershell
 .\windows\eng\inspect-driver-signing-posture.ps1 -AsJson
 ```
 
-It reads Secure Boot, VBS/HVCI state, current BCD test-signing state, and
-BitLocker status. It does not modify boot configuration, firmware settings,
-certificates, or driver policy.
+Do not commit or paste raw BitLocker key-protector data into repository files
+or issue logs. The validation record only needs protection/encryption state,
+not recovery secrets.
 
 ## Static package gate
 
