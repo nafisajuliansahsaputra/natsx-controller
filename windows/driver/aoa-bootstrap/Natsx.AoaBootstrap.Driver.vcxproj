@@ -52,6 +52,9 @@
       <TreatWarningAsError>true</TreatWarningAsError>
       <AdditionalOptions>/guard:cf %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
+    <DriverSign>
+      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+    </DriverSign>
   </ItemDefinitionGroup>
 
   <ItemGroup>
