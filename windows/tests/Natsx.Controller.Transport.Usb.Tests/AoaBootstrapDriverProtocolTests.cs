@@ -16,6 +16,31 @@ public sealed class AoaBootstrapDriverProtocolTests
     }
 
     [Fact]
+    public void Compatibility_RejectsUnknownProtocolVersion()
+    {
+        Assert.Throws<InvalidOperationException>(
+            () =>
+                AoaBootstrapDriverProtocol.ValidateCompatibility(
+                    new AoaBootstrapDriverVersion(2, 2)));
+    }
+
+    [Fact]
+    public void Compatibility_RejectsObsoleteDriverBuild()
+    {
+        Assert.Throws<InvalidOperationException>(
+            () =>
+                AoaBootstrapDriverProtocol.ValidateCompatibility(
+                    new AoaBootstrapDriverVersion(1, 1)));
+    }
+
+    [Fact]
+    public void Compatibility_AcceptsCurrentDriver()
+    {
+        AoaBootstrapDriverProtocol.ValidateCompatibility(
+            new AoaBootstrapDriverVersion(1, 2));
+    }
+
+    [Fact]
     public void ControlCodes_MatchKernelCtlCodeLayout()
     {
         Assert.Equal(
