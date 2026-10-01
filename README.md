@@ -20,15 +20,14 @@ Already implemented in the current development branch:
 - eFootball-inspired default layout;
 - Android and Windows CI.
 
+The current development branch already includes the stable Xbox 360 virtual backend, trusted Wi-Fi/Bluetooth/USB Direct transports, Smart Auto handover/reconnect, secure local pairing, live diagnostics, trusted-device management, and background system-tray receiver operation.
+
 Still under active development:
 
-- virtual Xbox 360 backend integration;
-- Wi-Fi discovery/pairing/streaming;
-- Bluetooth RFCOMM;
-- USB Direct;
-- full Smart Auto transport orchestration;
-- rumble path;
-- installer and release packaging.
+- rumble/haptics output path;
+- remaining Android production UX/settings;
+- extended soak/performance hardening;
+- installer, release signing, and final packaging.
 
 See `TODO.md` for the full roadmap.
 
@@ -98,6 +97,12 @@ Run the receiver during development with:
 ```powershell
 dotnet run --project windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release
 ```
+
+The receiver can keep running without a visible window. Minimizing sends it to
+the system tray, closing the window keeps it in the tray by default, and the
+tray menu provides Open and Exit actions. The Receiver settings panel can
+enable per-user Windows startup; startup launches with `--background` so the
+runtime can come online directly in the tray.
 
 ### First pairing
 
