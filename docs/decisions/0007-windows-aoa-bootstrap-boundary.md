@@ -72,10 +72,19 @@ against the existing `GUID_DEVINTERFACE_USB_DEVICE` path. The probe attempts
 `WinUsb_Initialize` and sends only AOA `GET_PROTOCOL` (request 51). It never
 sends the AOA identity strings or `START_ACCESSORY`.
 
-A successful probe would reopen the driverless bootstrap design for that
-specific Windows/MTP stack. A failed probe keeps the kernel bootstrap boundary
-in place. Neither result may be generalized to other Android vendors without
-their own validation.
+The OPPO A58 no-ADB probe failed at `WinUsb_Initialize` with Win32 error 1
+(`ERROR_INVALID_FUNCTION`). For this validated Windows/MTP stack, the inbox
+WinUSB lower filter is therefore not directly usable as the NATSX user-mode
+AOA bootstrap path. The kernel bootstrap boundary remains required.
+
+Because that kernel filter may sit beneath WPD/WUDF components that reject
+unknown custom IOCTLs, the prototype's user-mode control channel is now a
+separate KMDF sideband control device (`\\.\NatsxAoaBootstrap`). The filter
+itself remains pass-through in the PnP stack and performs only the bounded AOA
+endpoint-zero sequence when commanded through that sideband channel.
+
+This conclusion is device/stack-specific and must not be generalized to other
+Android vendors without their own validation.
 
 ### Rejected bootstrap shortcuts
 
