@@ -310,13 +310,15 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M10 — Pairing and trust
 
-- [ ] Define first-pair user flow.
+> First-pair v1 is now implemented over the physically attached USB accessory path. Android initiates an ephemeral P-256 exchange, both Android and Windows display the same six-digit SAS, both users must explicitly confirm, role-bound HMAC confirmation proofs are exchanged, and only then is the derived 32-byte trust secret persisted using Android Keystore-backed storage and Windows DPAPI. The same open USB link then continues directly into the normal trusted reconnect handshake. Remaining M10 work is trust-management UX (trusted PC list, Forget device, reset/recovery) and physical first-pair validation.
+
+- [x] Define first-pair user flow.
 - [x] Generate/store peer identity.
 - [x] Protect long-term trust material using platform secure storage.
-- [ ] Implement pairing code/confirmation flow.
-- [ ] Bind trust to the intended device.
-- [ ] Reject untrusted LAN state packets.
-- [ ] Reject stale session packets.
+- [x] Implement pairing code/confirmation flow.
+- [x] Bind trust to the intended device.
+- [x] Reject untrusted LAN state packets.
+- [x] Reject stale session packets.
 - [ ] Add “Forget device”.
 - [ ] Add pairing reset/recovery.
 
@@ -357,7 +359,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M13 — Android UX
 
-- [ ] Pairing screen.
+- [x] Pairing screen.
 - [ ] Trusted PC list.
 - [ ] Smart Auto connection status.
 - [ ] Gameplay screen.
