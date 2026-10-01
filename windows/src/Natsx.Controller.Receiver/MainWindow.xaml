@@ -160,14 +160,36 @@
                                    Text="None" />
                     </StackPanel>
 
-                    <StackPanel Grid.Row="5"
-                                Grid.ColumnSpan="2">
-                        <TextBlock Opacity="0.58"
-                                   Text="Trusted Android controllers" />
-                        <TextBlock x:Name="TrustedControllerCountText"
-                                   Margin="0,4,0,0"
-                                   Text="0" />
-                    </StackPanel>
+                    <Grid Grid.Row="5"
+                          Grid.ColumnSpan="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0"
+                                    Margin="0,0,16,0">
+                            <TextBlock Opacity="0.58"
+                                       Text="Trusted Android controller" />
+                            <TextBlock x:Name="TrustedControllerText"
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Text="None" />
+                            <TextBlock x:Name="TrustedControllerCountText"
+                                       Margin="0,3,0,0"
+                                       Opacity="0.58"
+                                       Text="0 trusted" />
+                        </StackPanel>
+
+                        <Button x:Name="ForgetControllerButton"
+                                Grid.Column="1"
+                                MinWidth="110"
+                                Padding="12,7"
+                                VerticalAlignment="Center"
+                                Click="OnForgetControllerClicked"
+                                Content="Forget"
+                                IsEnabled="False" />
+                    </Grid>
                 </Grid>
             </Border>
 

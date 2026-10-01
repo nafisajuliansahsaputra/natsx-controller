@@ -1,4 +1,5 @@
 using System.Windows;
+using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Receiver;
 
@@ -6,6 +7,8 @@ public partial class MainWindow : Window
 {
     private readonly ReceiverRuntime _runtime =
         new();
+
+    private PeerId? _trustedControllerPeerId;
 
     public MainWindow()
     {
@@ -82,9 +85,17 @@ public partial class MainWindow : Window
         VirtualControllerText.Text =
             snapshot.VirtualControllerStatus;
 
+        _trustedControllerPeerId =
+            snapshot.TrustedControllerPeerId;
+
+        TrustedControllerText.Text =
+            snapshot.TrustedControllerDisplay;
+
         TrustedControllerCountText.Text =
-            snapshot.TrustedControllerCount
-                .ToString();
+            $"{snapshot.TrustedControllerCount} trusted";
+
+        ForgetControllerButton.IsEnabled =
+            snapshot.TrustedControllerPeerId is not null;
 
         RoundTripTimeText.Text =
             FormatDuration(
@@ -149,6 +160,52 @@ public partial class MainWindow : Window
 
         PairingPanel.Visibility =
             Visibility.Visible;
+    }
+
+    private async void OnForgetControllerClicked(
+        object sender,
+        RoutedEventArgs eventArgs)
+    {
+        if (_trustedControllerPeerId is not PeerId peerId)
+        {
+            return;
+        }
+
+        MessageBoxResult confirmation =
+            MessageBox.Show(
+                this,
+                "Forget this Android controller? It will be disconnected immediately and must be paired again before it can control this PC.",
+                "Forget trusted controller",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+        if (confirmation !=
+            MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        ForgetControllerButton.IsEnabled =
+            false;
+
+        try
+        {
+            bool forgotten =
+                await _runtime
+                    .ForgetTrustedControllerAsync(
+                        peerId);
+
+            if (!forgotten)
+            {
+                StatusText.Text =
+                    "The selected controller is no longer in the trusted list.";
+            }
+        }
+        catch (Exception exception)
+        {
+            StatusText.Text =
+                $"Could not forget controller: {exception.Message}";
+        }
     }
 
     private void OnPairingConfirmClicked(

@@ -73,6 +73,93 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             false;
     }
 
+    public async ValueTask<bool> ForgetTrustedControllerAsync(
+        PeerId peerId,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(
+            _disposed,
+            this);
+
+        WindowsTrustServices? trust =
+            _trustServices;
+
+        if (trust is null)
+        {
+            return false;
+        }
+
+        bool exists =
+            trust.TrustedPeers
+                .List()
+                .Any(
+                    record =>
+                        record.PeerId ==
+                        peerId);
+
+        if (!exists)
+        {
+            return false;
+        }
+
+        trust.TrustedPeers.Remove(
+            peerId);
+
+        _sessionRegistry?.Remove(
+            peerId);
+
+        ControllerTransportRuntime? runtime =
+            _transportRuntime;
+
+        if (runtime is not null)
+        {
+            await _transportMutationGate
+                .WaitAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            try
+            {
+                await DeactivateUsbCandidateAsync(
+                        runtime)
+                    .ConfigureAwait(false);
+
+                await runtime
+                    .DetachTransportAsync(
+                        TransportKind.Wifi,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                _wifiSession?.Dispose();
+                _wifiSession =
+                    null;
+
+                await runtime
+                    .DetachTransportAsync(
+                        TransportKind.Bluetooth,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                _bluetoothSessionOwner?.Dispose();
+                _bluetoothSessionOwner =
+                    null;
+
+                _bluetoothSocket?.Dispose();
+                _bluetoothSocket =
+                    null;
+            }
+            finally
+            {
+                _transportMutationGate.Release();
+            }
+        }
+
+        Report(
+            $"Forgot trusted Android controller: {peerId}. Re-pairing is required before it can control this receiver again.");
+
+        return true;
+    }
+
     public async ValueTask StartAsync(
         CancellationToken cancellationToken = default)
     {
@@ -410,6 +497,14 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
             gateEntered =
                 true;
+
+            if (!IsPeerTrusted(
+                    trust,
+                    remotePeerId))
+            {
+                throw new InvalidOperationException(
+                    "Bluetooth peer trust was revoked before the transport could attach.");
+            }
 
             await runtime
                 .DetachTransportAsync(
@@ -912,6 +1007,14 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             gateEntered =
                 true;
 
+            if (!IsPeerTrusted(
+                    trust,
+                    eventArgs.RemotePeerId))
+            {
+                throw new InvalidOperationException(
+                    "Wi-Fi peer trust was revoked before the transport could attach.");
+            }
+
             if (_wifiSession is not null)
             {
                 await runtime
@@ -1397,6 +1500,14 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                         $"Unsupported initial USB control message: {messageType}.");
             }
 
+            if (!IsPeerTrusted(
+                    trust,
+                    remotePeerId))
+            {
+                throw new InvalidOperationException(
+                    "USB peer trust was revoked before the transport could attach.");
+            }
+
             transport =
                 new UsbControllerTransport(
                     trustedSession,
@@ -1809,6 +1920,18 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         return (MessageType)frame[6];
     }
 
+    private static bool IsPeerTrusted(
+        WindowsTrustServices trust,
+        PeerId peerId)
+    {
+        return trust.TrustedPeers
+            .List()
+            .Any(
+                record =>
+                    record.PeerId ==
+                    peerId);
+    }
+
     private static byte[]? ResolveTrustSecret(
         WindowsTrustServices trust,
         PeerId peerId)
@@ -1908,12 +2031,18 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             }
         }
 
-        int trustedControllerCount =
+        IReadOnlyList<TrustedPeerRecord> trustedControllers =
             _trustServices?
                 .TrustedPeers
-                .List()
-                .Count ??
-            0;
+                .List() ??
+            Array.Empty<TrustedPeerRecord>();
+
+        int trustedControllerCount =
+            trustedControllers.Count;
+
+        TrustedPeerRecord? primaryTrustedController =
+            trustedControllers
+                .FirstOrDefault();
 
         TransportHealthSnapshot? activeHealth =
             null;
@@ -1956,6 +2085,13 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                         : "Unavailable",
                 TrustedControllerCount:
                     trustedControllerCount,
+                TrustedControllerPeerId:
+                    primaryTrustedController?
+                        .PeerId,
+                TrustedControllerDisplay:
+                    primaryTrustedController is null
+                        ? "None"
+                        : $"{primaryTrustedController.DisplayName ?? "NATSX Android Controller"} ({primaryTrustedController.PeerId})",
                 RoundTripTime:
                     activeHealth?.RoundTripTime,
                 Jitter:

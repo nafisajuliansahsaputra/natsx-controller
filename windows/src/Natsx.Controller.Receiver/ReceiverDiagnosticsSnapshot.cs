@@ -1,3 +1,5 @@
+using Natsx.Controller.Protocol;
+
 namespace Natsx.Controller.Receiver;
 
 public sealed record ReceiverDiagnosticsSnapshot(
@@ -6,6 +8,8 @@ public sealed record ReceiverDiagnosticsSnapshot(
     string BackupTransports,
     string VirtualControllerStatus,
     int TrustedControllerCount,
+    PeerId? TrustedControllerPeerId,
+    string TrustedControllerDisplay,
     TimeSpan? RoundTripTime,
     TimeSpan? Jitter,
     double? PacketLossPercent,

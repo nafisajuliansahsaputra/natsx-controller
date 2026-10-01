@@ -319,7 +319,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Bind trust to the intended device.
 - [x] Reject untrusted LAN state packets.
 - [x] Reject stale session packets.
-- [ ] Add “Forget device”.
+- [x] Add “Forget device”.
 - [x] Add pairing reset/recovery.
 
 ---
@@ -339,9 +339,9 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M12 — Receiver UX
 
-> The receiver now exposes a live, non-blocking diagnostics panel for Smart Auto state, active/backup transports, virtual-controller readiness, trusted-controller count, active-link RTT/jitter/loss, realtime input rate, cumulative reconnect count, and the most recent committed handover reason. Metrics refresh on a 500 ms diagnostics loop and remain outside the realtime input path.
+> The receiver now exposes a live, non-blocking diagnostics panel for Smart Auto state, active/backup transports, virtual-controller readiness, trusted-controller identity/count, active-link RTT/jitter/loss, realtime input rate, cumulative reconnect count, and the most recent committed handover reason. Metrics refresh on a 500 ms diagnostics loop and remain outside the realtime input path. The Windows trust surface now also supports an explicit confirmed Forget action that revokes the persisted peer, removes its live trusted session, disconnects current transport candidates, and rechecks trust immediately before late transport attachment to prevent a revoke/attach race.
 
-- [ ] Connected device status.
+- [x] Connected device status.
 - [x] Active transport.
 - [x] Backup transport status.
 - [x] Virtual controller status.
