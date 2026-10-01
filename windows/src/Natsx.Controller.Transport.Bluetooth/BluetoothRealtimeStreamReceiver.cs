@@ -356,13 +356,6 @@ public sealed class BluetoothRealtimeStreamReceiver : IAsyncDisposable
                 Interlocked.Increment(
                     ref _acceptedFrames);
 
-                if (_lifecycle.State ==
-                    TransportRuntimeState.Stabilizing)
-                {
-                    _lifecycle.SetState(
-                        TransportRuntimeState.Ready);
-                }
-
                 _latestState.Writer.TryWrite(state);
             }
         }
