@@ -498,6 +498,87 @@ public sealed class SmartConnectionManagerTests
         Assert.False(manager.IsCircuitOpen(TransportKind.Wifi));
     }
 
+    [Fact]
+    public void RapidPreferenceFlapping_DoesNotOscillateAuthority()
+    {
+        var clock = new ManualTimeProvider();
+        var manager =
+            new SmartConnectionManager(
+                timeProvider: clock);
+
+        manager.Report(
+            Snapshot(
+                TransportKind.Wifi,
+                95));
+
+        HandoverProposal initial =
+            Assert.IsType<HandoverProposal>(
+                manager.Evaluate());
+
+        manager.Commit(initial);
+
+        Assert.Equal(
+            TransportKind.Wifi,
+            manager.ActiveTransport);
+
+        // USB repeatedly appears and disappears before its stabilization
+        // window completes. Smart Auto must not flap away from healthy Wi-Fi.
+        for (int index = 0; index < 20; index++)
+        {
+            manager.Report(
+                Snapshot(
+                    TransportKind.Usb,
+                    100));
+
+            clock.Advance(
+                TimeSpan.FromMilliseconds(
+                    20));
+
+            manager.Report(
+                Snapshot(
+                    TransportKind.Usb,
+                    0,
+                    TransportHealthGrade.Lost,
+                    TransportRuntimeState.Unavailable));
+
+            manager.Report(
+                Snapshot(
+                    TransportKind.Wifi,
+                    95));
+
+            Assert.Null(
+                manager.Evaluate());
+
+            Assert.Equal(
+                TransportKind.Wifi,
+                manager.ActiveTransport);
+        }
+
+        // A genuinely stable USB candidate still becomes preferred.
+        manager.Report(
+            Snapshot(
+                TransportKind.Usb,
+                100));
+
+        clock.Advance(
+            ConnectionPolicy
+                .Competitive
+                .UsbRecoveryStability);
+
+        manager.Report(
+            Snapshot(
+                TransportKind.Usb,
+                100));
+
+        HandoverProposal toUsb =
+            Assert.IsType<HandoverProposal>(
+                manager.Evaluate());
+
+        Assert.Equal(
+            TransportKind.Usb,
+            toUsb.To);
+    }
+
     private static TransportHealthSnapshot Snapshot(
         TransportKind transport,
         int score,
