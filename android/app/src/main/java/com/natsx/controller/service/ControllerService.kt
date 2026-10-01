@@ -89,6 +89,7 @@ class ControllerService : Service() {
                 trustedPeerStore = app.trustedPeerStore,
                 sessionRegistry = app.trustedSessionRegistry,
                 broadcaster = app.realtimeBroadcaster,
+                pairingConfirmation = app.pairingConfirmation,
             )
 
         registerUsbReceiver()
