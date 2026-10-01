@@ -876,23 +876,65 @@ NatsxProbeAoaProtocolRawUrb(
         WDF_REL_TIMEOUT_IN_MS(
             AOA_CONTROL_TIMEOUT_MS));
 
+    PDEVICE_OBJECT physicalDevice =
+        WdfDeviceWdmGetPhysicalDevice(
+            Device);
+
+    if (physicalDevice == NULL) {
+        return STATUS_DEVICE_NOT_READY;
+    }
+
+    WDFIOTARGET physicalTarget =
+        WDF_NO_HANDLE;
+
     NTSTATUS status =
-        WdfIoTargetSendInternalIoctlOthersSynchronously(
-            WdfDeviceGetIoTarget(Device),
-            WDF_NO_HANDLE,
-            IOCTL_INTERNAL_USB_SUBMIT_URB,
-            &urbDescriptor,
-            NULL,
-            NULL,
-            &sendOptions,
-            NULL);
+        WdfIoTargetCreate(
+            Device,
+            WDF_NO_OBJECT_ATTRIBUTES,
+            &physicalTarget);
+
+    if (!NT_SUCCESS(status)) {
+        return status;
+    }
+
+    WDF_IO_TARGET_OPEN_PARAMS openParams;
+    WDF_IO_TARGET_OPEN_PARAMS_INIT_EXISTING_DEVICE(
+        &openParams,
+        physicalDevice);
+
+    status =
+        WdfIoTargetOpen(
+            physicalTarget,
+            &openParams);
+
+    if (NT_SUCCESS(status)) {
+        status =
+            WdfIoTargetSendInternalIoctlOthersSynchronously(
+                physicalTarget,
+                WDF_NO_HANDLE,
+                IOCTL_INTERNAL_USB_SUBMIT_URB,
+                &urbDescriptor,
+                NULL,
+                NULL,
+                &sendOptions,
+                NULL);
+
+        WdfIoTargetClose(
+            physicalTarget);
+    }
 
     *UsbStatus =
         (ULONG)urb.UrbHeader.Status;
-    *BytesTransferred =
-        urb.UrbControlVendorClassRequest.TransferBufferLength;
-    *AoaProtocolVersion =
-        protocolVersion;
+
+    if (NT_SUCCESS(status)) {
+        *BytesTransferred =
+            urb.UrbControlVendorClassRequest.TransferBufferLength;
+        *AoaProtocolVersion =
+            protocolVersion;
+    }
+
+    WdfObjectDelete(
+        physicalTarget);
 
     return status;
 }
