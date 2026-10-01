@@ -90,6 +90,7 @@ class ControllerService : Service() {
                 sessionRegistry = app.trustedSessionRegistry,
                 broadcaster = app.realtimeBroadcaster,
                 pairingConfirmation = app.pairingConfirmation,
+                status = app.usbRuntimeStatus,
             )
 
         registerUsbReceiver()
@@ -160,11 +161,20 @@ class ControllerService : Service() {
     }
 
     private fun connectUsbIfPresent() {
+        val app =
+            application as NatsxControllerApplication
+
         val accessory =
             UsbAccessoryConnector.findNatsxAccessory(
                 usbManager,
             )
-                ?: return
+
+        if (accessory == null) {
+            app.usbRuntimeStatus.publish(
+                "NATSX USB accessory not detected.",
+            )
+            return
+        }
 
         if (
             UsbAccessoryConnector.hasPermission(
@@ -172,9 +182,16 @@ class ControllerService : Service() {
                 accessory,
             )
         ) {
+            app.usbRuntimeStatus.publish(
+                "USB permission granted. Connecting…",
+            )
             usbRuntime.connect(accessory)
             return
         }
+
+        app.usbRuntimeStatus.publish(
+            "Waiting for Android USB permission…",
+        )
 
         val flags =
             PendingIntent.FLAG_UPDATE_CURRENT or
