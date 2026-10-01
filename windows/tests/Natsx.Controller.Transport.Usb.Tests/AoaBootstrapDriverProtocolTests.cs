@@ -11,7 +11,7 @@ public sealed class AoaBootstrapDriverProtocolTests
             1u,
             AoaBootstrapDriverProtocol.ProtocolVersion);
         Assert.Equal(
-            4u,
+            5u,
             AoaBootstrapDriverProtocol.MinimumSupportedDriverBuild);
         Assert.Equal(
             "NatsxAoaBootstrap",
@@ -27,7 +27,7 @@ public sealed class AoaBootstrapDriverProtocolTests
         Assert.Throws<InvalidOperationException>(
             () =>
                 AoaBootstrapDriverProtocol.ValidateCompatibility(
-                    new AoaBootstrapDriverVersion(2, 4)));
+                    new AoaBootstrapDriverVersion(2, 5)));
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public sealed class AoaBootstrapDriverProtocolTests
     public void Compatibility_AcceptsCurrentDriver()
     {
         AoaBootstrapDriverProtocol.ValidateCompatibility(
-            new AoaBootstrapDriverVersion(1, 4));
+            new AoaBootstrapDriverVersion(1, 5));
     }
 
     [Fact]
@@ -73,25 +73,33 @@ public sealed class AoaBootstrapDriverProtocolTests
 
         BinaryPrimitives.WriteUInt32LittleEndian(
             bytes.AsSpan(4),
-            4);
+            5);
 
         Assert.Equal(
-            new AoaBootstrapDriverVersion(1, 4),
+            new AoaBootstrapDriverVersion(1, 5),
             AoaBootstrapDriverProtocol.ParseVersion(bytes));
     }
 
     [Fact]
     public void StatusResponse_ParsesTargetReadiness()
     {
-        var bytes = new byte[16];
+        var bytes = new byte[24];
 
         BinaryPrimitives.WriteUInt32LittleEndian(bytes, 1);
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), 4);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), 5);
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(8), 1);
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), 1);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), 0);
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(16), unchecked((int)0xC0000010));
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(20), 1);
 
         Assert.Equal(
-            new AoaBootstrapDriverStatus(1, 4, 1, 1),
+            new AoaBootstrapDriverStatus(
+                1,
+                5,
+                1,
+                0,
+                unchecked((int)0xC0000010),
+                1),
             AoaBootstrapDriverProtocol.ParseStatus(bytes));
     }
 
