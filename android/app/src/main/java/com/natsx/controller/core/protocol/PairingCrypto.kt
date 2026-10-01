@@ -17,6 +17,10 @@ object PairingCrypto {
     private val sasContext = ascii("NATSX-SAS-V1")
     private val pairingResponseContext = ascii("NATSX-PAIRING-RESPONSE-V1")
     private val trustSecretInfo = ascii("NATSX-TRUST-SECRET-V1")
+    private val androidConfirmContext =
+        ascii("NATSX-PAIRING-CONFIRM-ANDROID-V1")
+    private val windowsConfirmContext =
+        ascii("NATSX-PAIRING-CONFIRM-WINDOWS-V1")
 
     fun computePairingTranscriptHash(
         androidPeerId: PeerId,
@@ -108,6 +112,62 @@ object PairingCrypto {
         }
     }
 
+    fun computePairingConfirmationProof(
+        role: PairingConfirmationRole,
+        pairingKey: ByteArray,
+        pairingTranscriptHash: ByteArray,
+        sessionId: SessionId,
+    ): ByteArray {
+        validateKey(pairingKey)
+        validateHash(pairingTranscriptHash)
+
+        val context =
+            when (role) {
+                PairingConfirmationRole.ANDROID ->
+                    androidConfirmContext
+                PairingConfirmationRole.WINDOWS ->
+                    windowsConfirmContext
+            }
+
+        val input =
+            context +
+                pairingTranscriptHash +
+                sessionId.toByteArray()
+
+        return try {
+            hmacSha256(pairingKey, input)
+        } finally {
+            input.fill(0)
+        }
+    }
+
+    fun verifyPairingConfirmationProof(
+        role: PairingConfirmationRole,
+        pairingKey: ByteArray,
+        pairingTranscriptHash: ByteArray,
+        sessionId: SessionId,
+        suppliedProof: ByteArray,
+    ): Boolean {
+        if (suppliedProof.size != DERIVED_KEY_SIZE) return false
+
+        val expected =
+            computePairingConfirmationProof(
+                role,
+                pairingKey,
+                pairingTranscriptHash,
+                sessionId,
+            )
+
+        return try {
+            java.security.MessageDigest.isEqual(
+                expected,
+                suppliedProof,
+            )
+        } finally {
+            expected.fill(0)
+        }
+    }
+
     fun deriveTrustSecret(
         pairingKey: ByteArray,
         pairingTranscriptHash: ByteArray,
@@ -176,4 +236,10 @@ object PairingCrypto {
 
     private fun ascii(text: String): ByteArray =
         text.toByteArray(StandardCharsets.US_ASCII)
+}
+
+
+enum class PairingConfirmationRole {
+    ANDROID,
+    WINDOWS,
 }
