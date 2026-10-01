@@ -543,6 +543,7 @@ public sealed class ControllerTransportRuntimeTests
 
                 clock.Advance(step);
                 elapsed += step;
+                sequence += 1;
 
                 wifi.Publish(
                     sequence,
