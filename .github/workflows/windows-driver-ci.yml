@@ -8,10 +8,12 @@ on:
       - "fix/**"
     paths:
       - "windows/driver/aoa-bootstrap/**"
+      - "windows/driver/aoa-winusb/**"
       - ".github/workflows/windows-driver-ci.yml"
   pull_request:
     paths:
       - "windows/driver/aoa-bootstrap/**"
+      - "windows/driver/aoa-winusb/**"
       - ".github/workflows/windows-driver-ci.yml"
 
 permissions:
@@ -35,7 +37,7 @@ jobs:
         shell: powershell
         run: |
           $errors = @()
-          Get-ChildItem windows/driver/aoa-bootstrap -Filter *.ps1 -File | ForEach-Object {
+          Get-ChildItem windows/driver/aoa-bootstrap, windows/driver/aoa-winusb -Filter *.ps1 -File | ForEach-Object {
             $tokens = $null
             $parseErrors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile(
@@ -74,6 +76,22 @@ jobs:
       - name: Test-sign OPPO A58 validation package
         shell: powershell
         run: .\windows\driver\aoa-bootstrap\sign-oppo-a58-ci-test-package.ps1
+
+      - name: Prepare and validate AOA WinUSB test package
+        shell: powershell
+        run: .\windows\driver\aoa-winusb\build-test-package.ps1
+
+      - name: Test-sign AOA WinUSB validation package
+        shell: powershell
+        run: .\windows\driver\aoa-winusb\sign-ci-test-package.ps1
+
+      - name: Upload AOA WinUSB validation package
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-aoa-winusb-driver-x64
+          path: windows/driver/aoa-winusb/artifacts/test-package/**
+          if-no-files-found: error
 
       - name: Upload driver prototype
         if: success()
