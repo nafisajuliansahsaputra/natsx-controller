@@ -576,9 +576,14 @@ public sealed class ControllerTransportRuntimeTests
             Assert.True(
                 backend.IsStarted);
 
+            // A physical detach is a hard failure signal by design.
+            // Let the anti-flap penalty window expire before the next
+            // deliberate reconnect cycle; rapid replug behavior is covered
+            // separately by the transport-flapping regression.
             clock.Advance(
+                policy.FailurePenaltyWindow +
                 TimeSpan.FromMilliseconds(
-                    100));
+                    1));
         }
     }
 
