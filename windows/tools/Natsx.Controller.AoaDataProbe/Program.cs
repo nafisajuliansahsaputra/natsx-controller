@@ -32,6 +32,9 @@ var report = new
     Opened = false,
     BulkInReadable = false,
     BulkOutWritable = false,
+    BulkInPipeId = (string?)null,
+    BulkOutPipeId = (string?)null,
+    MaximumPacketSize = (ushort?)null,
     OpenedDevice = (WinUsbAoaAccessoryDevice?)null,
 };
 
@@ -81,6 +84,9 @@ var successReport = new
     Opened = true,
     BulkInReadable = connection.Input.CanRead,
     BulkOutWritable = connection.Output.CanWrite,
+    BulkInPipeId = $"0x{connection.BulkInPipeId:X2}",
+    BulkOutPipeId = $"0x{connection.BulkOutPipeId:X2}",
+    MaximumPacketSize = connection.MaximumPacketSize,
     OpenedDevice = connection.Identity,
 };
 
