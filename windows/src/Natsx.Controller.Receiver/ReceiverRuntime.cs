@@ -931,6 +931,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 "Android accessory re-enumerated, but the NATSX WinUSB bulk interface could not be opened.");
         }
 
+        Report(
+            $"Native WinUSB data plane ready: IN=0x{connection.BulkInPipeId:X2}, OUT=0x{connection.BulkOutPipeId:X2}, MPS={connection.MaximumPacketSize}.");
+
         IDisposable? sessionOwner =
             null;
         UsbControllerTransport? transport =
