@@ -1,0 +1,74 @@
+; NATSX AOA bootstrap prototype extension INF
+; TARGET: OPPO A58 normal-mode composite USB parent observed on 2026-10-01.
+; This is intentionally device/revision-specific and must never be generalized
+; to a class-wide MTP/WPD/USB filter.
+;
+; Observed parent:
+;   USB\VID_22D9&PID_2765&REV_0404
+;   base service: usbccgp
+;
+; Child interfaces observed:
+;   MI_00 = MTP/WPD
+;   MI_01 = ADB/WinUSB
+;
+; NATSX attaches to the composite parent, not either child interface. The ADB
+; child may exist on the test phone but is not used or required by NATSX.
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = Extension
+ClassGuid   = {e2f84ce7-8efa-411c-aa69-97454ca4cb57}
+Provider    = %ProviderName%
+ExtensionId = {6F2E4A6C-3C21-4B18-9D6B-4F7D0F99D9C1}
+DriverVer   = 10/01/2026,0.1.0.0
+CatalogFile = Natsx.AoaBootstrap.OPPOA58.Extension.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+Natsx.AoaBootstrap.Driver.sys = 1
+
+[Manufacturer]
+%ProviderName% = NatsxModels,NTamd64.10.0...22000
+
+[NatsxModels.NTamd64.10.0...22000]
+%DeviceDesc% = NatsxAoaBootstrap_Install, USB\VID_22D9&PID_2765&REV_0404
+
+[NatsxAoaBootstrap_Install.NT]
+CopyFiles = NatsxAoaBootstrap_CopyFiles
+
+[NatsxAoaBootstrap_Install.NT.Services]
+AddService = NatsxAoaBootstrap,,NatsxAoaBootstrap_Service
+
+[NatsxAoaBootstrap_Install.NT.Filters]
+AddFilter = NatsxAoaBootstrap,0,NatsxAoaBootstrap_Filter
+
+[NatsxAoaBootstrap_Filter]
+FilterPosition = Lower
+
+[NatsxAoaBootstrap_Install.NT.Wdf]
+KmdfService = NatsxAoaBootstrap,NatsxAoaBootstrap_Wdf
+
+[NatsxAoaBootstrap_Wdf]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[NatsxAoaBootstrap_CopyFiles]
+Natsx.AoaBootstrap.Driver.sys
+
+[NatsxAoaBootstrap_Service]
+DisplayName   = %ServiceDesc%
+ServiceType   = 1
+StartType     = 3
+ErrorControl  = 1
+ServiceBinary = %13%\Natsx.AoaBootstrap.Driver.sys
+
+[Strings]
+ProviderName = "NATSX"
+DeviceDesc   = "NATSX AOA bootstrap filter for OPPO A58"
+ServiceDesc  = "NATSX AOA bootstrap filter"
+DiskName     = "NATSX AOA bootstrap prototype package"
