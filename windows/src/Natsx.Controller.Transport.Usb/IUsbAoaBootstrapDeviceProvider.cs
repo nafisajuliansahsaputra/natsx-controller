@@ -1,12 +1,15 @@
 namespace Natsx.Controller.Transport.Usb;
 
-public interface IUsbAoaBootstrapDevice : IUsbControlTransferDevice, IAsyncDisposable
+public interface IUsbAoaBootstrapDevice : IAsyncDisposable
 {
     string DeviceId { get; }
 
     ushort VendorId { get; }
 
     ushort ProductId { get; }
+
+    ValueTask<ushort> StartAccessoryModeAsync(
+        CancellationToken cancellationToken = default);
 }
 
 public interface IUsbAoaBootstrapDeviceProvider
