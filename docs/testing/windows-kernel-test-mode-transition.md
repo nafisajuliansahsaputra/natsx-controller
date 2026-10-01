@@ -119,6 +119,17 @@ Do not:
 
 Boot back into Windows.
 
+Before changing BCD, run:
+
+```powershell
+.\windows\eng\verify-secure-boot-disabled-gate.ps1 -AsJson
+```
+
+Proceed only when `ReadyForTestSigningEnableGate` is `true`. The expected
+state is: Secure Boot disabled, TESTSIGNING still off, VBS/HVCI still running,
+BitLocker protection still suspended, and the system drive still fully
+encrypted.
+
 ## Phase E - enable Windows TESTSIGNING
 
 From elevated PowerShell:
