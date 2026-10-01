@@ -63,11 +63,8 @@ public sealed class UsbTrustedHandshakeTests
 
         using var input =
             new MemoryStream(
-                Concat(
-                    UsbStreamFrameCodec.Encode(
-                        challengeFrame),
-                    UsbStreamFrameCodec.Encode(
-                        remoteReadyFrame)));
+                UsbStreamFrameCodec.Encode(
+                    remoteReadyFrame));
 
         using var output =
             new MemoryStream();
@@ -94,7 +91,8 @@ public sealed class UsbTrustedHandshakeTests
                 peer =>
                     peer == androidPeer
                         ? trustSecret.ToArray()
-                        : null);
+                        : null,
+                challengeFrame);
 
         Assert.Equal(
             androidPeer,
