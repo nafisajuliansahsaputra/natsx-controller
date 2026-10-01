@@ -148,12 +148,11 @@ class UsbAccessoryRuntime(
                             .isEmpty()
                     ) {
                         status.publish(
-                            "No trusted PC yet. Starting secure pairing…",
+                            "No trusted PC yet. Pair over LAN first; USB will attach automatically after trust is established.",
                         )
 
-                        performFirstPairing(
-                            opened,
-                        )
+                        opened.close()
+                        return
                     } else {
                         opened.close()
                         return
@@ -565,8 +564,7 @@ class UsbAccessoryRuntime(
                 localPeerId = localPeerId,
                 receiverPeerId = peer.peerId,
                 sessionRegistry = sessionRegistry,
-            ).join(
-                inputStream = opened.input,
+            ).joinUplinkOnly(
                 outputStream = opened.output,
             )
         }
