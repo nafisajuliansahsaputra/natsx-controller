@@ -4,13 +4,11 @@ public sealed class UsbAoaBootstrapCoordinator
 {
     private readonly IAoaAccessoryDataBackend _accessoryBackend;
     private readonly IUsbAoaBootstrapDeviceProvider _bootstrapProvider;
-    private readonly AndroidOpenAccessoryNegotiator _negotiator;
     private readonly UsbBootstrapPolicy _policy;
 
     public UsbAoaBootstrapCoordinator(
         IAoaAccessoryDataBackend accessoryBackend,
         IUsbAoaBootstrapDeviceProvider bootstrapProvider,
-        AndroidOpenAccessoryNegotiator? negotiator = null,
         UsbBootstrapPolicy? policy = null)
     {
         _accessoryBackend =
@@ -19,9 +17,6 @@ public sealed class UsbAoaBootstrapCoordinator
         _bootstrapProvider =
             bootstrapProvider ??
             throw new ArgumentNullException(nameof(bootstrapProvider));
-        _negotiator =
-            negotiator ??
-            new AndroidOpenAccessoryNegotiator();
         _policy =
             policy ??
             UsbBootstrapPolicy.Default;
@@ -55,10 +50,29 @@ public sealed class UsbAoaBootstrapCoordinator
             return providerFailure;
         }
 
-        IReadOnlyList<IUsbAoaBootstrapDevice> candidates =
-            await _bootstrapProvider
-                .EnumerateAsync(cancellationToken)
-                .ConfigureAwait(false);
+        IReadOnlyList<IUsbAoaBootstrapDevice> candidates;
+
+        try
+        {
+            candidates =
+                await _bootstrapProvider
+                    .EnumerateAsync(cancellationToken)
+                    .ConfigureAwait(false);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return new UsbBootstrapResult(
+                UsbBootstrapStatus.BootstrapRequiresElevation,
+                Diagnostic: exception.Message);
+        }
+        catch (Exception exception) when (
+            exception is IOException or
+            InvalidOperationException)
+        {
+            return new UsbBootstrapResult(
+                UsbBootstrapStatus.BootstrapFailed,
+                Diagnostic: exception.Message);
+        }
 
         if (candidates.Count == 0)
         {
@@ -78,11 +92,15 @@ public sealed class UsbAoaBootstrapCoordinator
                 try
                 {
                     ushort protocolVersion =
-                        await _negotiator
-                            .StartAccessoryModeAsync(
-                                candidate,
-                                cancellationToken)
+                        await candidate
+                            .StartAccessoryModeAsync(cancellationToken)
                             .ConfigureAwait(false);
+
+                    if (protocolVersion == 0)
+                    {
+                        throw new NotSupportedException(
+                            "Connected Android device does not advertise Android Open Accessory support.");
+                    }
 
                     WinUsbAoaAccessoryDevice? reenumerated =
                         await WaitForAccessoryAsync(
@@ -96,7 +114,7 @@ public sealed class UsbAoaBootstrapCoordinator
                             DeviceId: candidate.DeviceId,
                             AoaProtocolVersion: protocolVersion,
                             Diagnostic:
-                                "AOA START_ACCESSORY succeeded but the device did not re-enumerate into the NATSX WinUSB accessory interface before timeout.");
+                                "AOA bootstrap completed but the device did not re-enumerate into the NATSX WinUSB accessory interface before timeout.");
                     }
 
                     return new UsbBootstrapResult(
@@ -124,6 +142,13 @@ public sealed class UsbAoaBootstrapCoordinator
         {
             return new UsbBootstrapResult(
                 UsbBootstrapStatus.AoaUnsupported,
+                Diagnostic: lastFailure.Message);
+        }
+
+        if (lastFailure is UnauthorizedAccessException)
+        {
+            return new UsbBootstrapResult(
+                UsbBootstrapStatus.BootstrapRequiresElevation,
                 Diagnostic: lastFailure.Message);
         }
 
