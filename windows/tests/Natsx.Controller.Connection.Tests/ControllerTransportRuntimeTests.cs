@@ -189,6 +189,166 @@ public sealed class ControllerTransportRuntimeTests
     }
 
     [Fact]
+    public async Task AttachTransportAfterStart_CanBecomeAuthoritative()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new FakeBackend();
+        var session = new ControllerSession();
+        ConnectionPolicy policy = ConnectionPolicy.Competitive;
+        var safety = new InputSafetyEngine(
+            session,
+            backend,
+            policy,
+            clock);
+        var manager = new SmartConnectionManager(
+            policy,
+            clock);
+
+        await using var runtime =
+            new ControllerTransportRuntime(
+                session,
+                safety,
+                manager,
+                Array.Empty<IControllerTransport>(),
+                policy,
+                clock);
+
+        await runtime.StartAsync();
+
+        var wifi =
+            new FakeTransport(
+                TransportKind.Wifi,
+                clock)
+            {
+                Snapshot =
+                    Healthy(
+                        TransportKind.Wifi,
+                        95),
+            };
+
+        await runtime.AttachTransportAsync(
+            wifi);
+
+        GamepadState state =
+            GamepadState.Neutral with
+            {
+                Buttons =
+                    GamepadButtons.A |
+                    GamepadButtons.RB,
+                RightX = 4321,
+            };
+
+        wifi.Publish(
+            1,
+            state);
+        runtime.EvaluateOnce();
+
+        Assert.Equal(
+            TransportKind.Wifi,
+            runtime.ActiveTransport);
+        Assert.Equal(
+            TransportKind.Wifi,
+            session.AuthoritativeTransport);
+        Assert.True(
+            wifi.IsAuthoritative);
+        Assert.Equal(
+            state,
+            backend.LastState);
+    }
+
+    [Fact]
+    public async Task DetachActiveTransport_FailsOverToFreshReadyBackup()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new FakeBackend();
+        var session = new ControllerSession();
+        ConnectionPolicy policy = ConnectionPolicy.Competitive;
+        var safety = new InputSafetyEngine(
+            session,
+            backend,
+            policy,
+            clock);
+        var manager = new SmartConnectionManager(
+            policy,
+            clock);
+
+        var wifi =
+            new FakeTransport(
+                TransportKind.Wifi,
+                clock)
+            {
+                Snapshot =
+                    Healthy(
+                        TransportKind.Wifi,
+                        95),
+            };
+        var bluetooth =
+            new FakeTransport(
+                TransportKind.Bluetooth,
+                clock)
+            {
+                Snapshot =
+                    Healthy(
+                        TransportKind.Bluetooth,
+                        90),
+            };
+
+        await using var runtime =
+            new ControllerTransportRuntime(
+                session,
+                safety,
+                manager,
+                new IControllerTransport[]
+                {
+                    wifi,
+                    bluetooth,
+                },
+                policy,
+                clock);
+
+        await runtime.StartAsync();
+
+        wifi.Publish(
+            10,
+            GamepadState.Neutral with
+            {
+                Buttons = GamepadButtons.X,
+            });
+        bluetooth.Publish(
+            11,
+            GamepadState.Neutral with
+            {
+                Buttons = GamepadButtons.B,
+            });
+
+        runtime.EvaluateOnce();
+
+        Assert.Equal(
+            TransportKind.Wifi,
+            runtime.ActiveTransport);
+
+        bool removed =
+            await runtime.DetachTransportAsync(
+                TransportKind.Wifi);
+
+        Assert.True(removed);
+        Assert.Equal(
+            TransportKind.Bluetooth,
+            runtime.ActiveTransport);
+        Assert.Equal(
+            TransportKind.Bluetooth,
+            session.AuthoritativeTransport);
+        Assert.True(
+            bluetooth.IsAuthoritative);
+        Assert.Equal(
+            (uint)11,
+            session.LastAcceptedSequence);
+        Assert.Equal(
+            GamepadButtons.B,
+            backend.LastState?.Buttons);
+    }
+
+    [Fact]
     public async Task NonAuthoritativeRealtimeState_DoesNotReachBackend()
     {
         var clock = new ManualTimeProvider();
@@ -280,8 +440,20 @@ public sealed class ControllerTransportRuntimeTests
         public ValueTask ConnectAsync(CancellationToken cancellationToken) =>
             ValueTask.CompletedTask;
 
-        public ValueTask DisconnectAsync(CancellationToken cancellationToken) =>
-            ValueTask.CompletedTask;
+        public ValueTask DisconnectAsync(
+            CancellationToken cancellationToken)
+        {
+            Snapshot =
+                Snapshot with
+                {
+                    State = TransportRuntimeState.Unavailable,
+                    Silence = TimeSpan.MaxValue,
+                    Score = 0,
+                    Grade = TransportHealthGrade.Lost,
+                };
+
+            return ValueTask.CompletedTask;
+        }
 
         public void SetAuthoritative(bool authoritative)
         {
