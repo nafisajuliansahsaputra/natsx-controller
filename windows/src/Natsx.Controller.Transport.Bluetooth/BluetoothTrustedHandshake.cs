@@ -226,6 +226,47 @@ public static class BluetoothControlFrameCodec
             .ReadUInt64LittleEndian(frame.Payload);
     }
 
+    public static byte[] EncodeRumble(
+        BluetoothTrustedSession trustedSession,
+        RumblePayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(
+            trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.Rumble,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                RumblePayloadCodec.Encode(
+                    payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static RumblePayload DecodeRumble(
+        ReadOnlySpan<byte> frameBytes,
+        BluetoothTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.Rumble)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.Rumble}, received {frame.MessageType}.");
+        }
+
+        return RumblePayloadCodec.Decode(
+            frame.Payload);
+    }
+
     public static byte[] EncodeTransportReady(
         BluetoothTrustedSession trustedSession,
         ProtocolTransport transport,

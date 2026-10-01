@@ -98,6 +98,65 @@ public sealed class BluetoothRealtimeStreamReceiver : IAsyncDisposable
         }
     }
 
+    public async ValueTask<bool> TrySendRumbleAsync(
+        RumbleState rumble,
+        CancellationToken cancellationToken = default)
+    {
+        Stream? outputStream =
+            _outputStream;
+
+        if (outputStream is null ||
+            _receiveLoop is null)
+        {
+            return false;
+        }
+
+        byte[] frame =
+            BluetoothControlFrameCodec
+                .EncodeRumble(
+                    _trustedSession,
+                    new RumblePayload(
+                        rumble.LowFrequencyMotor,
+                        rumble.HighFrequencyMotor),
+                    GetMonotonicMicroseconds());
+
+        byte[] framed =
+            BluetoothStreamFrameCodec
+                .Encode(
+                    frame);
+
+        await _outputGate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await outputStream.WriteAsync(
+                    framed,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            await outputStream.FlushAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        finally
+        {
+            _outputGate.Release();
+        }
+    }
+
     public TransportHealthSnapshot GetHealthSnapshot(
         TransportRuntimeState state)
     {

@@ -4,7 +4,9 @@ using Natsx.Controller.Core;
 
 namespace Natsx.Controller.Transport.Wifi;
 
-public sealed class WifiControllerTransport : IControllerTransport
+public sealed class WifiControllerTransport :
+    IControllerTransport,
+    IControllerOutputTransport
 {
     private readonly WifiRealtimeReceiver _receiver;
     private readonly IPEndPoint _bindEndPoint;
@@ -137,6 +139,15 @@ public sealed class WifiControllerTransport : IControllerTransport
     public WifiDiagnosticsSnapshot GetDiagnosticsSnapshot()
     {
         return _receiver.GetDiagnosticsSnapshot(State);
+    }
+
+    public ValueTask<bool> TrySendRumbleAsync(
+        RumbleState rumble,
+        CancellationToken cancellationToken = default)
+    {
+        return _receiver.TrySendRumbleAsync(
+            rumble,
+            cancellationToken);
     }
 
     private async Task PumpStatesAsync(CancellationToken cancellationToken)

@@ -184,6 +184,42 @@ public sealed class UsbTrustedHandshakeTests
     }
 
     [Fact]
+    public void RumbleRoundTrip_PreservesMotorStrengths()
+    {
+        byte[] key =
+            Enumerable.Range(0, 32)
+                .Select(static value => (byte)value)
+                .ToArray();
+
+        using var session =
+            new UsbTrustedSession(
+                SessionId.CreateRandom(),
+                key);
+
+        var expected =
+            new RumblePayload(
+                255,
+                33);
+
+        byte[] frame =
+            UsbControlFrameCodec
+                .EncodeRumble(
+                    session,
+                    expected,
+                    123);
+
+        RumblePayload actual =
+            UsbControlFrameCodec
+                .DecodeRumble(
+                    frame,
+                    session);
+
+        Assert.Equal(
+            expected,
+            actual);
+    }
+
+    [Fact]
     public async Task Server_RejectsUntrustedPeer()
     {
         PeerId androidPeer = PeerId.CreateRandom();

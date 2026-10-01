@@ -96,6 +96,42 @@ public static class UsbControlFrameCodec
         return System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(frame.Payload);
     }
 
+    public static byte[] EncodeRumble(
+        UsbTrustedSession session,
+        RumblePayload payload,
+        ulong timestampMicros) =>
+        ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.Rumble,
+                FrameFlags.Authenticated,
+                session.SessionId,
+                0,
+                timestampMicros,
+                RumblePayloadCodec.Encode(
+                    payload)),
+            session.SessionKey);
+
+    public static RumblePayload DecodeRumble(
+        ReadOnlySpan<byte> frameBytes,
+        UsbTrustedSession session)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                session);
+
+        if (frame.MessageType !=
+            MessageType.Rumble)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.Rumble}, received {frame.MessageType}.");
+        }
+
+        return RumblePayloadCodec.Decode(
+            frame.Payload);
+    }
+
     public static byte[] EncodeTransportReady(
         UsbTrustedSession session,
         ProtocolTransport transport,

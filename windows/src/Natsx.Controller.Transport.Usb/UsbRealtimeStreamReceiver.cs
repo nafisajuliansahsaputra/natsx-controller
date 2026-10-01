@@ -98,6 +98,61 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
         }
     }
 
+    public async ValueTask<bool> TrySendRumbleAsync(
+        RumbleState rumble,
+        CancellationToken cancellationToken = default)
+    {
+        Stream? outputStream =
+            _outputStream;
+
+        if (outputStream is null ||
+            _receiveLoop is null)
+        {
+            return false;
+        }
+
+        byte[] frame =
+            UsbControlFrameCodec
+                .EncodeRumble(
+                    _trustedSession,
+                    new RumblePayload(
+                        rumble.LowFrequencyMotor,
+                        rumble.HighFrequencyMotor),
+                    GetMonotonicMicroseconds());
+
+        byte[] framed =
+            UsbStreamFrameCodec
+                .Encode(
+                    frame);
+
+        await _outputGate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await outputStream.WriteAsync(
+                    framed,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        finally
+        {
+            _outputGate.Release();
+        }
+    }
+
     public TransportHealthSnapshot GetHealthSnapshot(
         TransportRuntimeState state)
     {

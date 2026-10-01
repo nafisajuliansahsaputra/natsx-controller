@@ -184,6 +184,42 @@ public sealed class BluetoothTrustedHandshakeTests
     }
 
     [Fact]
+    public void RumbleRoundTrip_PreservesMotorStrengths()
+    {
+        byte[] key =
+            Enumerable.Range(0, 32)
+                .Select(static value => (byte)value)
+                .ToArray();
+
+        using var session =
+            new BluetoothTrustedSession(
+                SessionId.CreateRandom(),
+                key);
+
+        var expected =
+            new RumblePayload(
+                180,
+                75);
+
+        byte[] frame =
+            BluetoothControlFrameCodec
+                .EncodeRumble(
+                    session,
+                    expected,
+                    123);
+
+        RumblePayload actual =
+            BluetoothControlFrameCodec
+                .DecodeRumble(
+                    frame,
+                    session);
+
+        Assert.Equal(
+            expected,
+            actual);
+    }
+
+    [Fact]
     public async Task Server_RejectsUntrustedPeer()
     {
         PeerId androidPeer = PeerId.CreateRandom();

@@ -42,6 +42,37 @@ public sealed class WifiControlDatagramCodecTests
         Assert.Equal(123_456ul, echoed);
     }
     [Fact]
+    public void RumbleRoundTrip_PreservesMotorStrengths()
+    {
+        using var trusted =
+            new WifiTrustedSession(
+                Session,
+                Key);
+
+        var expected =
+            new RumblePayload(
+                211,
+                97);
+
+        byte[] datagram =
+            WifiControlDatagramCodec
+                .EncodeRumble(
+                    trusted,
+                    expected,
+                    456_789);
+
+        RumblePayload actual =
+            WifiControlDatagramCodec
+                .DecodeRumble(
+                    datagram,
+                    trusted);
+
+        Assert.Equal(
+            expected,
+            actual);
+    }
+
+    [Fact]
     public void SessionReadyRoundTripPreservesTrustedIdentity()
     {
         byte[] key = Enumerable.Range(0, WifiTrustedSession.SessionKeySize)

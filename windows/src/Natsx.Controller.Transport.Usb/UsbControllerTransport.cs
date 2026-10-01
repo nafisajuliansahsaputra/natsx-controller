@@ -3,7 +3,9 @@ using Natsx.Controller.Core;
 
 namespace Natsx.Controller.Transport.Usb;
 
-public sealed class UsbControllerTransport : IControllerTransport
+public sealed class UsbControllerTransport :
+    IControllerTransport,
+    IControllerOutputTransport
 {
     private readonly UsbRealtimeStreamReceiver _receiver;
     private readonly TransportLifecycle _lifecycle;
@@ -220,6 +222,15 @@ public sealed class UsbControllerTransport : IControllerTransport
     {
         return _receiver.GetHealthSnapshot(
             State);
+    }
+
+    public ValueTask<bool> TrySendRumbleAsync(
+        RumbleState rumble,
+        CancellationToken cancellationToken = default)
+    {
+        return _receiver.TrySendRumbleAsync(
+            rumble,
+            cancellationToken);
     }
 
     private async Task PumpStatesAsync(

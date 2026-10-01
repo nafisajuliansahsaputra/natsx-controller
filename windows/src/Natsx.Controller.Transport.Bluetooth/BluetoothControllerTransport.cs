@@ -4,7 +4,9 @@ using Windows.Networking.Sockets;
 
 namespace Natsx.Controller.Transport.Bluetooth;
 
-public sealed class BluetoothControllerTransport : IControllerTransport
+public sealed class BluetoothControllerTransport :
+    IControllerTransport,
+    IControllerOutputTransport
 {
     private readonly BluetoothRealtimeStreamReceiver _receiver;
     private readonly TransportLifecycle _lifecycle;
@@ -262,6 +264,15 @@ public sealed class BluetoothControllerTransport : IControllerTransport
     {
         return _receiver.GetHealthSnapshot(
             State);
+    }
+
+    public ValueTask<bool> TrySendRumbleAsync(
+        RumbleState rumble,
+        CancellationToken cancellationToken = default)
+    {
+        return _receiver.TrySendRumbleAsync(
+            rumble,
+            cancellationToken);
     }
 
     private async Task PumpStatesAsync(

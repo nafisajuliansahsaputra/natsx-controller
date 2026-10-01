@@ -106,6 +106,47 @@ public static class WifiControlDatagramCodec
         return BinaryPrimitives.ReadUInt64LittleEndian(frame.Payload);
     }
 
+    public static byte[] EncodeRumble(
+        WifiTrustedSession trustedSession,
+        RumblePayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(
+            trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.Rumble,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                RumblePayloadCodec.Encode(
+                    payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static RumblePayload DecodeRumble(
+        ReadOnlySpan<byte> datagram,
+        WifiTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                datagram,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.Rumble)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.Rumble}, received {frame.MessageType}.");
+        }
+
+        return RumblePayloadCodec.Decode(
+            frame.Payload);
+    }
+
     public static ulong DecodeHeartbeat(
         ReadOnlySpan<byte> datagram,
         WifiTrustedSession trustedSession)
