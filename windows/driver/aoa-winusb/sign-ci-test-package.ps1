@@ -88,13 +88,13 @@ try {
     }
 
     $manifest = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json
-    $manifest | Add-Member SigningMode "ephemeral-ci-test" -Force
-    $manifest | Add-Member TestCertificateSubject $cert.Subject -Force
-    $manifest | Add-Member TestCertificateThumbprint $cert.Thumbprint -Force
-    $manifest | Add-Member TestCertificateNotAfterUtc $cert.NotAfter.ToUniversalTime().ToString("O") -Force
-    $manifest | Add-Member CatalogSha256 ((Get-FileHash $catPath -Algorithm SHA256).Hash) -Force
-    $manifest | Add-Member TestCertificateSha256 ((Get-FileHash $cerPath -Algorithm SHA256).Hash) -Force
-    $manifest | Add-Member CatalogCreatedFor $osTargets -Force
+    $manifest | Add-Member -NotePropertyName SigningMode -NotePropertyValue "ephemeral-ci-test" -Force
+    $manifest | Add-Member -NotePropertyName TestCertificateSubject -NotePropertyValue $cert.Subject -Force
+    $manifest | Add-Member -NotePropertyName TestCertificateThumbprint -NotePropertyValue $cert.Thumbprint -Force
+    $manifest | Add-Member -NotePropertyName TestCertificateNotAfterUtc -NotePropertyValue $cert.NotAfter.ToUniversalTime().ToString("O") -Force
+    $manifest | Add-Member -NotePropertyName CatalogSha256 -NotePropertyValue ((Get-FileHash $catPath -Algorithm SHA256).Hash) -Force
+    $manifest | Add-Member -NotePropertyName TestCertificateSha256 -NotePropertyValue ((Get-FileHash $cerPath -Algorithm SHA256).Hash) -Force
+    $manifest | Add-Member -NotePropertyName CatalogCreatedFor -NotePropertyValue $osTargets -Force
     $manifest | ConvertTo-Json -Depth 6 | Set-Content $manifestPath -Encoding UTF8
 
     Write-Host "AOA WinUSB ephemeral CI test package signed."
