@@ -76,7 +76,10 @@ $bcdEdit = Join-Path $env:SystemRoot "System32\bcdedit.exe"
 $bcdCurrent = $null
 if (Test-Path $bcdEdit) {
     try {
-        $bcdOutput = & $bcdEdit /enum "{current}" 2>&1
+        # Enumerating all entries avoids shell/parser edge cases around the
+        # special {current} identifier and is sufficient for read-only
+        # TESTSIGNING posture inspection.
+        $bcdOutput = & $bcdEdit /enum all 2>&1
         $bcdText = $bcdOutput -join [Environment]::NewLine
         $bcdCurrent = [ordered]@{
             ExitCode = $LASTEXITCODE
@@ -105,6 +108,7 @@ if (Get-Command Get-BitLockerVolume -ErrorAction SilentlyContinue) {
 
 $report = [ordered]@{
     CapturedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
+    NeedsElevationForCompleteResult = -not $isAdmin
     IsAdministrator = $isAdmin
     WindowsVersion = [System.Environment]::OSVersion.Version.ToString()
     SecureBoot = $secureBoot
