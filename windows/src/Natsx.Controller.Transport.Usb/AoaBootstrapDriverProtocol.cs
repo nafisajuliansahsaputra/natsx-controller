@@ -16,10 +16,12 @@ public static class AoaBootstrapDriverProtocol
     public const ushort GetVersionFunction = 0x800;
     public const ushort StartAoaFunction = 0x801;
     public const ushort GetStatusFunction = 0x802;
+    public const ushort ProbeProtocolRawFunction = 0x803;
 
     public const int VersionResponseSize = 8;
     public const int StartResponseSize = 4;
     public const int StatusResponseSize = 24;
+    public const int RawProtocolProbeResponseSize = 24;
 
     public static uint GetVersionControlCode =>
         BuildControlCode(
@@ -34,6 +36,11 @@ public static class AoaBootstrapDriverProtocol
     public static uint GetStatusControlCode =>
         BuildControlCode(
             GetStatusFunction,
+            access: 1);
+
+    public static uint ProbeProtocolRawControlCode =>
+        BuildControlCode(
+            ProbeProtocolRawFunction,
             access: 1);
 
     public static void ValidateCompatibility(
@@ -82,6 +89,25 @@ public static class AoaBootstrapDriverProtocol
             BinaryPrimitives.ReadUInt32LittleEndian(bytes[12..]),
             BinaryPrimitives.ReadInt32LittleEndian(bytes[16..]),
             BinaryPrimitives.ReadUInt32LittleEndian(bytes[20..]));
+    }
+
+    public static AoaBootstrapRawProtocolProbe ParseRawProtocolProbe(
+        ReadOnlySpan<byte> bytes)
+    {
+        if (bytes.Length < RawProtocolProbeResponseSize)
+        {
+            throw new FormatException(
+                "AOA raw protocol probe response is truncated.");
+        }
+
+        return new AoaBootstrapRawProtocolProbe(
+            BinaryPrimitives.ReadUInt32LittleEndian(bytes),
+            BinaryPrimitives.ReadUInt32LittleEndian(bytes[4..]),
+            BinaryPrimitives.ReadInt32LittleEndian(bytes[8..]),
+            BinaryPrimitives.ReadUInt32LittleEndian(bytes[12..]),
+            BinaryPrimitives.ReadUInt32LittleEndian(bytes[16..]),
+            BinaryPrimitives.ReadUInt16LittleEndian(bytes[20..]),
+            BinaryPrimitives.ReadUInt16LittleEndian(bytes[22..]));
     }
 
     public static ushort ParseAoaProtocolVersion(
@@ -133,3 +159,13 @@ public readonly record struct AoaBootstrapDriverStatus(
     uint ReadyUsbTargetCount,
     int LastUsbTargetCreateStatus,
     uint UsbTargetCreateAttemptCount);
+
+
+public readonly record struct AoaBootstrapRawProtocolProbe(
+    uint ProtocolVersion,
+    uint DriverBuild,
+    int SubmitStatus,
+    uint UsbStatus,
+    uint BytesTransferred,
+    ushort AoaProtocolVersion,
+    ushort Reserved);
