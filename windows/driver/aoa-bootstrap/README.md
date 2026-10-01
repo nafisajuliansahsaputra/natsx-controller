@@ -23,8 +23,9 @@ bootstrap operation.
 
 The source prototype is not sufficient to mark M9 complete. It still requires:
 
-1. a deliberately scoped install/attach strategy that does not capture
-   unrelated USB devices;
+1. a device-specific declarative `AddFilter` / extension-INF attach strategy
+   that matches only explicitly supported Android hardware and never registers
+   a class-wide MTP/WPD filter;
 2. physical validation on supported Windows 11 hardware;
 3. proof that the OEM MTP/PTP path still works before and after bootstrap;
 4. uninstall/reboot recovery validation;
