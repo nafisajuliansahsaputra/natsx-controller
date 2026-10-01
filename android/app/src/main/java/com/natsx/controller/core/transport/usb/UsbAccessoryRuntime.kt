@@ -2,6 +2,15 @@ package com.natsx.controller.core.transport.usb
 
 import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
+import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
+import com.natsx.controller.core.pairing.PairingPrompt
+import com.natsx.controller.core.protocol.MessageType
+import com.natsx.controller.core.protocol.PairingAbortPayload
+import com.natsx.controller.core.protocol.PairingAbortReason
+import com.natsx.controller.core.protocol.PairingConfirmPayload
+import com.natsx.controller.core.protocol.PairingFrameCodec
+import com.natsx.controller.core.protocol.PairingInitiatorSession
+import com.natsx.controller.core.protocol.ProtocolConstants
 import com.natsx.controller.core.protocol.TransportCapabilities
 import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import com.natsx.controller.core.session.RealtimeStateBroadcaster
@@ -18,6 +27,7 @@ class UsbAccessoryRuntime(
     private val trustedPeerStore: TrustedPeerStore,
     private val sessionRegistry: TrustedSessionRegistry,
     private val broadcaster: RealtimeStateBroadcaster,
+    private val pairingConfirmation: PairingConfirmationCoordinator,
 ) : Closeable {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -74,9 +84,6 @@ class UsbAccessoryRuntime(
             return
         }
 
-        val peer = resolveReceiverPeer()
-            ?: return
-
         val opened =
             UsbAccessoryConnection.open(
                 usbManager,
@@ -87,6 +94,21 @@ class UsbAccessoryRuntime(
         var realtimeSender: UsbRealtimeSender? = null
 
         try {
+            val peer =
+                resolveReceiverPeer()
+                    ?: if (
+                        trustedPeerStore
+                            .list()
+                            .isEmpty()
+                    ) {
+                        performFirstPairing(
+                            opened,
+                        )
+                    } else {
+                        opened.close()
+                        return
+                    }
+
             session =
                 connectTrustedSession(
                     opened,
@@ -114,6 +136,221 @@ class UsbAccessoryRuntime(
             session?.close()
             opened.close()
             throw exception
+        }
+    }
+
+    private fun performFirstPairing(
+        opened: UsbAccessoryConnection,
+    ): TrustedPeerRecord {
+        PairingInitiatorSession(
+            localPeerId,
+        ).use { pairing ->
+            writePairingFrame(
+                opened,
+                PairingFrameCodec
+                    .encodeOffer(
+                        pairing.offer,
+                    ),
+            )
+
+            val responseFrame =
+                UsbStreamFrameCodec
+                    .readFrame(
+                        opened.input,
+                    )
+
+            when (readMessageType(responseFrame)) {
+                MessageType.PAIRING_ABORT -> {
+                    val abort =
+                        PairingFrameCodec
+                            .decodeAbort(
+                                responseFrame,
+                            )
+
+                    error(
+                        "Windows rejected pairing: " +
+                            abort.reason,
+                    )
+                }
+
+                MessageType.PAIRING_RESPONSE -> Unit
+
+                else -> error(
+                    "Expected PAIRING_RESPONSE from Windows.",
+                )
+            }
+
+            val response =
+                PairingFrameCodec
+                    .decodeResponse(
+                        responseFrame,
+                    )
+
+            val code =
+                pairing.acceptResponse(
+                    response,
+                )
+
+            val approved =
+                pairingConfirmation
+                    .requestConfirmation(
+                        PairingPrompt(
+                            comparisonCode = code,
+                            remotePeerId =
+                                response.windowsPeerId,
+                        ),
+                    )
+
+            if (!approved) {
+                sendPairingAbort(
+                    opened,
+                    PairingAbortReason.USER_REJECTED,
+                )
+
+                error(
+                    "Pairing was rejected or timed out on Android.",
+                )
+            }
+
+            val localConfirm =
+                pairing
+                    .approveDisplayedCode()
+
+            writePairingFrame(
+                opened,
+                PairingFrameCodec
+                    .encodeConfirm(
+                        localConfirm,
+                    ),
+            )
+
+            val remoteFrame =
+                UsbStreamFrameCodec
+                    .readFrame(
+                        opened.input,
+                    )
+
+            val remoteConfirm:
+                PairingConfirmPayload =
+                when (
+                    readMessageType(
+                        remoteFrame,
+                    )
+                ) {
+                    MessageType.PAIRING_CONFIRM ->
+                        PairingFrameCodec
+                            .decodeConfirm(
+                                remoteFrame,
+                            )
+
+                    MessageType.PAIRING_ABORT -> {
+                        val abort =
+                            PairingFrameCodec
+                                .decodeAbort(
+                                    remoteFrame,
+                                )
+
+                        error(
+                            "Windows aborted pairing: " +
+                                abort.reason,
+                        )
+                    }
+
+                    else ->
+                        error(
+                            "Expected PAIRING_CONFIRM from Windows.",
+                        )
+                }
+
+            pairing
+                .acceptRemoteConfirmation(
+                    remoteConfirm,
+                ).use { established ->
+                    val secret =
+                        established
+                            .copyTrustSecret()
+
+                    try {
+                        val record =
+                            TrustedPeerRecord(
+                                peerId =
+                                    established
+                                        .remotePeerId,
+                                displayName =
+                                    "NATSX Windows Receiver",
+                                capabilities =
+                                    TransportCapabilities.WIFI or
+                                        TransportCapabilities.BLUETOOTH or
+                                        TransportCapabilities.USB_DIRECT,
+                                pairedAtEpochMillis =
+                                    System.currentTimeMillis(),
+                            )
+
+                        trustedPeerStore.put(
+                            record,
+                            secret,
+                        )
+
+                        return record
+                    } finally {
+                        secret.fill(0)
+                    }
+                }
+        }
+    }
+
+    private fun sendPairingAbort(
+        opened: UsbAccessoryConnection,
+        reason: PairingAbortReason,
+    ) {
+        runCatching {
+            writePairingFrame(
+                opened,
+                PairingFrameCodec
+                    .encodeAbort(
+                        PairingAbortPayload(
+                            reason,
+                        ),
+                    ),
+            )
+        }
+    }
+
+    private fun writePairingFrame(
+        opened: UsbAccessoryConnection,
+        frame: ByteArray,
+    ) {
+        val packet =
+            UsbStreamFrameCodec
+                .encode(frame)
+
+        try {
+            opened.output.write(
+                packet,
+            )
+            opened.output.flush()
+        } finally {
+            frame.fill(0)
+            packet.fill(0)
+        }
+    }
+
+    private fun readMessageType(
+        frame: ByteArray,
+    ): MessageType {
+        require(
+            frame.size >=
+                ProtocolConstants.HEADER_SIZE,
+        ) {
+            "USB pairing frame is shorter than the protocol header."
+        }
+
+        return requireNotNull(
+            MessageType.fromWireValue(
+                frame[6].toInt() and 0xFF,
+            ),
+        ) {
+            "USB pairing frame has an unknown message type."
         }
     }
 
