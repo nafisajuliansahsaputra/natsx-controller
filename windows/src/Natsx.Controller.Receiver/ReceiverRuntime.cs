@@ -28,7 +28,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
     private WifiDiscoveryResponder? _wifiDiscovery;
     private WifiTrustedSession? _wifiSession;
     private WinUsbAoaAccessoryConnection? _usbConnection;
-    private UsbTrustedHandshakeCompletion? _usbHandshake;
+    private IDisposable? _usbSessionOwner;
     private HidMaestroVirtualGamepadBackend? _virtualGamepad;
     private ControllerTransportRuntime? _transportRuntime;
     private bool _started;
@@ -747,7 +747,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 "Android accessory re-enumerated, but the NATSX WinUSB bulk interface could not be opened.");
         }
 
-        UsbTrustedHandshakeCompletion? handshake =
+        IDisposable? sessionOwner =
             null;
         UsbControllerTransport? transport =
             null;
@@ -757,10 +757,11 @@ public sealed class ReceiverRuntime : IAsyncDisposable
         try
         {
             var lifecycle =
-                new TransportLifecycle();
+                new TransportLifecycle(
+                    TransportRuntimeState.Connecting);
 
             Report(
-                "Waiting for trusted Android USB handshake…");
+                "Waiting for trusted Android USB session…");
 
             using var handshakeTimeout =
                 CancellationTokenSource
@@ -770,23 +771,14 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             handshakeTimeout.CancelAfter(
                 TimeSpan.FromSeconds(15));
 
-            var handshakeServer =
-                new UsbTrustedHandshakeServer(
-                    trust.LocalPeerId,
-                    lifecycle: lifecycle,
-                    sessionRegistry: sessionRegistry);
+            byte[] firstFrame;
 
             try
             {
-                handshake =
-                    await handshakeServer
-                        .AuthenticateAsync(
+                firstFrame =
+                    await UsbStreamFrameCodec
+                        .ReadFrameAsync(
                             connection.Input,
-                            connection.Output,
-                            peerId =>
-                                ResolveTrustSecret(
-                                    trust,
-                                    peerId),
                             handshakeTimeout.Token)
                         .ConfigureAwait(false);
             }
@@ -794,12 +786,104 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 when (!cancellationToken.IsCancellationRequested)
             {
                 throw new TimeoutException(
-                    "Timed out waiting for the trusted Android USB handshake. Open NATSX Controller on the phone and make sure this PC is paired.");
+                    "Timed out waiting for the trusted Android USB session. Open NATSX Controller on the phone and make sure this PC is paired.");
+            }
+
+            MessageType messageType =
+                ReadUsbInitialMessageType(
+                    firstFrame);
+
+            UsbTrustedSession trustedSession;
+            PeerId remotePeerId;
+
+            switch (messageType)
+            {
+                case MessageType.AuthChallenge:
+                {
+                    var handshakeServer =
+                        new UsbTrustedHandshakeServer(
+                            trust.LocalPeerId,
+                            lifecycle: lifecycle,
+                            sessionRegistry: sessionRegistry);
+
+                    UsbTrustedHandshakeCompletion completion;
+
+                    try
+                    {
+                        completion =
+                            await handshakeServer
+                                .AuthenticateAsync(
+                                    connection.Input,
+                                    connection.Output,
+                                    peerId =>
+                                        ResolveTrustSecret(
+                                            trust,
+                                            peerId),
+                                    firstFrame,
+                                    handshakeTimeout.Token)
+                                .ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                        when (!cancellationToken.IsCancellationRequested)
+                    {
+                        throw new TimeoutException(
+                            "Timed out completing the trusted Android USB handshake.");
+                    }
+
+                    sessionOwner =
+                        completion;
+                    trustedSession =
+                        completion.Session;
+                    remotePeerId =
+                        completion.RemotePeerId;
+                    break;
+                }
+
+                case MessageType.SessionReady:
+                {
+                    var joinServer =
+                        new UsbSecondarySessionJoinServer(
+                            trust.LocalPeerId,
+                            sessionRegistry,
+                            lifecycle: lifecycle);
+
+                    UsbSecondarySessionJoinCompletion completion;
+
+                    try
+                    {
+                        completion =
+                            await joinServer
+                                .JoinAsync(
+                                    connection.Input,
+                                    connection.Output,
+                                    firstFrame,
+                                    handshakeTimeout.Token)
+                                .ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                        when (!cancellationToken.IsCancellationRequested)
+                    {
+                        throw new TimeoutException(
+                            "Timed out joining USB Direct to the active trusted controller session.");
+                    }
+
+                    sessionOwner =
+                        completion;
+                    trustedSession =
+                        completion.Session;
+                    remotePeerId =
+                        completion.RemotePeerId;
+                    break;
+                }
+
+                default:
+                    throw new FormatException(
+                        $"Unsupported initial USB control message: {messageType}.");
             }
 
             transport =
                 new UsbControllerTransport(
-                    handshake.Session,
+                    trustedSession,
                     lifecycle,
                     connectionPolicy: _policy);
 
@@ -839,24 +923,23 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
             _usbConnection =
                 connection;
-            _usbHandshake =
-                handshake;
+            _usbSessionOwner =
+                sessionOwner;
 
             connection =
                 null;
-            handshake =
+            sessionOwner =
                 null;
             transport =
                 null;
 
             Report(
-                "USB Direct authenticated and registered with Smart Auto.");
+                $"USB Direct authenticated and registered with Smart Auto: {remotePeerId}.");
         }
         finally
         {
             if (transportAttached)
             {
-                // Successful ownership belongs to ControllerTransportRuntime.
                 transport =
                     null;
             }
@@ -868,7 +951,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                     .ConfigureAwait(false);
             }
 
-            handshake?.Dispose();
+            sessionOwner?.Dispose();
 
             if (connection is not null)
             {
@@ -877,6 +960,27 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                     .ConfigureAwait(false);
             }
         }
+    }
+
+    private static MessageType ReadUsbInitialMessageType(
+        ReadOnlySpan<byte> frame)
+    {
+        if (frame.Length <
+            ProtocolConstants.HeaderSize)
+        {
+            throw new FormatException(
+                "Initial USB frame is shorter than the protocol header.");
+        }
+
+        if (!frame[..ProtocolConstants.Magic.Length]
+            .SequenceEqual(
+                ProtocolConstants.Magic))
+        {
+            throw new FormatException(
+                "Initial USB frame has invalid protocol magic.");
+        }
+
+        return (MessageType)frame[6];
     }
 
     private static byte[]? ResolveTrustSecret(
@@ -996,8 +1100,8 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             _wifiSession?.Dispose();
             _wifiSession = null;
 
-            _usbHandshake?.Dispose();
-            _usbHandshake = null;
+            _usbSessionOwner?.Dispose();
+            _usbSessionOwner = null;
 
             if (_usbConnection is not null)
             {
