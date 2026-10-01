@@ -41,6 +41,25 @@ jobs:
         shell: pwsh
         run: nuget restore windows/driver/aoa-bootstrap/packages.config -PackagesDirectory windows/driver/aoa-bootstrap/packages -NonInteractive
 
+      - name: Expose WDK tools
+        shell: pwsh
+        run: |
+          $roots = @(
+            (Join-Path $PWD "windows/driver/aoa-bootstrap/packages"),
+            (Join-Path ${env:ProgramFiles(x86)} "Windows Kits/10/bin")
+          )
+
+          $stampInf = Get-ChildItem -Path $roots -Filter stampinf.exe -File -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.DirectoryName -match "(?i)[\\/]x64([\\/]|$)" } |
+            Select-Object -First 1
+
+          if ($null -eq $stampInf) {
+            throw "stampinf.exe was not found in the restored WDK NuGet packages or installed Windows Kits."
+          }
+
+          Write-Host "Using WDK tools from $($stampInf.DirectoryName)"
+          $stampInf.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Build x64 Release
         shell: pwsh
         run: msbuild windows/driver/aoa-bootstrap/Natsx.AoaBootstrap.Driver.vcxproj /m /p:Configuration=Release /p:Platform=x64
@@ -54,4 +73,6 @@ jobs:
             windows/driver/aoa-bootstrap/x64/Release/*.sys
             windows/driver/aoa-bootstrap/x64/Release/*.pdb
             windows/driver/aoa-bootstrap/x64/Release/*.cer
+            windows/driver/aoa-bootstrap/x64/Release/*.inf
+            windows/driver/aoa-bootstrap/x64/Release/*.cat
           if-no-files-found: error
