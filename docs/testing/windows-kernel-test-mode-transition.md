@@ -128,8 +128,12 @@ Run the trust harness from elevated PowerShell:
 
 The first run is preflight-only.
 
-After verifying the subject/thumbprint against `package-manifest.json`, run
-again with the explicit `-Trust` switch.
+Before trust is allowed, the harness also verifies that the SYS and CAT hashes
+match the manifest and that both Authenticode signer thumbprints equal the
+artifact certificate thumbprint. An untrusted test certificate may initially
+report `UnknownError`; signer identity must still match exactly. Only after
+that identity check passes should the command be repeated with the explicit
+`-Trust` switch. After import, both signatures must re-evaluate as `Valid`.
 
 This certificate is for the exact CI validation artifact and is not a
 production publisher identity.
