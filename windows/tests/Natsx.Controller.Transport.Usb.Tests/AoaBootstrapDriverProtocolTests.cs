@@ -5,6 +5,17 @@ namespace Natsx.Controller.Transport.Usb.Tests;
 public sealed class AoaBootstrapDriverProtocolTests
 {
     [Fact]
+    public void ManagedProtocolVersion_MatchesKernelContract()
+    {
+        Assert.Equal(
+            1u,
+            AoaBootstrapDriverProtocol.ProtocolVersion);
+        Assert.Equal(
+            2u,
+            AoaBootstrapDriverProtocol.MinimumSupportedDriverBuild);
+    }
+
+    [Fact]
     public void ControlCodes_MatchKernelCtlCodeLayout()
     {
         Assert.Equal(
