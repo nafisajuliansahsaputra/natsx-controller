@@ -3,7 +3,6 @@
 #include <usbdi.h>
 #include <usbdlib.h>
 #include <wdfusb.h>
-#include <wdmsec.h>
 #include <initguid.h>
 
 #include "Public.h"
@@ -415,10 +414,14 @@ NatsxEnsureControlDevice(
         return STATUS_SUCCESS;
     }
 
+    DECLARE_CONST_UNICODE_STRING(
+        controlSecurity,
+        L"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGW;;;WD)(A;;GR;;;RC)");
+
     PWDFDEVICE_INIT controlInit =
         WdfControlDeviceInitAllocate(
             Driver,
-            &SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RW_RES_R);
+            &controlSecurity);
 
     if (controlInit == NULL) {
         WdfWaitLockRelease(
