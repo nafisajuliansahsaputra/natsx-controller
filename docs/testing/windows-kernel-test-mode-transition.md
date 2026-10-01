@@ -95,6 +95,17 @@ Get-BitLockerVolume -MountPoint "C:"
 
 Confirm protection is suspended before continuing.
 
+Then run the dedicated read-only gate:
+
+```powershell
+.\windows\eng\verify-bitlocker-suspend-gate.ps1 -AsJson
+```
+
+Proceed only when `ReadyForSecureBootDisableGate` is `true`. The expected
+state is: Secure Boot still enabled, TESTSIGNING still off, VBS/HVCI still
+running, BitLocker protection suspended, and the system drive still fully
+encrypted.
+
 ## Phase D - disable Secure Boot manually
 
 Reboot into the machine firmware/UEFI settings and disable **Secure Boot only**.
