@@ -25,6 +25,8 @@ import com.natsx.controller.core.transport.wifi.WifiDiscoveryClient
 import com.natsx.controller.core.transport.wifi.WifiEndpointResolver
 import com.natsx.controller.core.transport.wifi.WifiFirstPairingClient
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class ControllerService : Service() {
@@ -39,6 +41,14 @@ class ControllerService : Service() {
             }
         }
     private val connectionBootstrapStarted = AtomicBoolean(false)
+    private val usbPermissionRequestInFlight = AtomicBoolean(false)
+    private val usbAttachWatcher: ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor { runnable ->
+            Thread(runnable, "natsx-usb-attach-watcher").apply {
+                isDaemon = true
+            }
+        }
+
     @Volatile
     private var wifiRuntime: WifiAutoReconnectRuntime? = null
 
@@ -63,6 +73,8 @@ class ControllerService : Service() {
 
                 when (intent.action) {
                     ACTION_USB_PERMISSION -> {
+                        usbPermissionRequestInFlight.set(false)
+
                         if (
                             intent.getBooleanExtra(
                                 UsbManager.EXTRA_PERMISSION_GRANTED,
@@ -71,11 +83,33 @@ class ControllerService : Service() {
                             accessory != null &&
                             UsbAccessoryIdentity.matches(accessory)
                         ) {
+                            app.usbRuntimeStatus.publish(
+                                "USB permission granted. Connecting…",
+                            )
                             usbRuntime.connect(accessory)
+                        } else {
+                            app.usbRuntimeStatus.publish(
+                                "USB permission was denied.",
+                                isError = true,
+                            )
+                        }
+                    }
+
+                    UsbManager.ACTION_USB_ACCESSORY_ATTACHED -> {
+                        if (
+                            accessory != null &&
+                            UsbAccessoryIdentity.matches(accessory)
+                        ) {
+                            app.usbRuntimeStatus.publish(
+                                "USB accessory attached. Preparing uplink…",
+                            )
+                            connectUsbAccessory(accessory)
                         }
                     }
 
                     UsbManager.ACTION_USB_ACCESSORY_DETACHED -> {
+                        usbPermissionRequestInFlight.set(false)
+
                         if (
                             accessory != null &&
                             UsbAccessoryIdentity.matches(accessory)
@@ -113,6 +147,7 @@ class ControllerService : Service() {
 
         registerUsbReceiver()
         ensureConnectionBootstrap()
+        startUsbAttachWatcher()
 
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.createNotificationChannel(
@@ -142,6 +177,7 @@ class ControllerService : Service() {
         wifiRuntime?.close()
         wifiRuntime = null
         connectionExecutor.shutdownNow()
+        usbAttachWatcher.shutdownNow()
 
         if (::usbRuntime.isInitialized) {
             usbRuntime.close()
@@ -324,6 +360,9 @@ class ControllerService : Service() {
             IntentFilter().apply {
                 addAction(ACTION_USB_PERMISSION)
                 addAction(
+                    UsbManager.ACTION_USB_ACCESSORY_ATTACHED,
+                )
+                addAction(
                     UsbManager.ACTION_USB_ACCESSORY_DETACHED,
                 )
             }
@@ -343,16 +382,53 @@ class ControllerService : Service() {
         }
     }
 
-    private fun connectUsbIfPresent() {
+    private fun startUsbAttachWatcher() {
+        usbAttachWatcher.scheduleWithFixedDelay(
+            {
+                runCatching {
+                    if (
+                        app.trustedPeerStore.list().isNotEmpty() &&
+                        app.trustedSessionRegistry.hasAnyActiveSession() &&
+                        !usbRuntime.isConnected()
+                    ) {
+                        connectUsbIfPresent(
+                            publishMissing = false,
+                        )
+                    }
+                }
+            },
+            0,
+            USB_ATTACH_POLL_MILLIS,
+            TimeUnit.MILLISECONDS,
+        )
+    }
+
+    private fun connectUsbIfPresent(
+        publishMissing: Boolean = true,
+    ) {
         val accessory =
             UsbAccessoryConnector.findNatsxAccessory(
                 usbManager,
             )
 
         if (accessory == null) {
-            app.usbRuntimeStatus.publish(
-                "NATSX USB accessory not detected.",
-            )
+            usbPermissionRequestInFlight.set(false)
+
+            if (publishMissing) {
+                app.usbRuntimeStatus.publish(
+                    "NATSX USB accessory not detected.",
+                )
+            }
+            return
+        }
+
+        connectUsbAccessory(accessory)
+    }
+
+    private fun connectUsbAccessory(
+        accessory: UsbAccessory,
+    ) {
+        if (!UsbAccessoryIdentity.matches(accessory)) {
             return
         }
 
@@ -362,10 +438,15 @@ class ControllerService : Service() {
                 accessory,
             )
         ) {
+            usbPermissionRequestInFlight.set(false)
             app.usbRuntimeStatus.publish(
                 "USB permission granted. Connecting…",
             )
             usbRuntime.connect(accessory)
+            return
+        }
+
+        if (!usbPermissionRequestInFlight.compareAndSet(false, true)) {
             return
         }
 
@@ -404,6 +485,7 @@ class ControllerService : Service() {
         const val NOTIFICATION_ID = 1001
         const val ACTION_USB_PERMISSION =
             "com.natsx.controller.action.USB_PERMISSION"
+        const val USB_ATTACH_POLL_MILLIS = 750L
 
         val RETRY_BACKOFF_MILLIS =
             longArrayOf(
