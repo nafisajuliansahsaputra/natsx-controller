@@ -205,7 +205,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
 
         if (!TryGetTransport(
                 kind,
-                out IControllerTransport? transport))
+                out IControllerTransport transport))
         {
             return false;
         }
@@ -444,14 +444,14 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
                 previousAuthorityKind != proposal.To &&
                 TryGetTransport(
                     previousAuthorityKind,
-                    out IControllerTransport? previousTransport))
+                    out IControllerTransport previousTransport))
             {
                 previousTransport.SetAuthoritative(false);
             }
 
             if (TryGetTransport(
                     proposal.To,
-                    out IControllerTransport? newTransport))
+                    out IControllerTransport newTransport))
             {
                 newTransport.SetAuthoritative(true);
             }
@@ -519,14 +519,21 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
 
     private bool TryGetTransport(
         TransportKind kind,
-        out IControllerTransport? transport)
+        out IControllerTransport transport)
     {
         lock (_transportGate)
         {
-            return _transports.TryGetValue(
-                kind,
-                out transport);
+            if (_transports.TryGetValue(
+                    kind,
+                    out IControllerTransport? registered))
+            {
+                transport = registered;
+                return true;
+            }
         }
+
+        transport = null!;
+        return false;
     }
 
     private IControllerTransport[] GetTransportSnapshot()
