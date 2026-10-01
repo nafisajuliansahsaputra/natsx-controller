@@ -119,12 +119,12 @@ public sealed class WinUsbAoaAccessoryBackend : IAoaAccessoryDataBackend
             Stream input =
                 dataInterface.BulkInPipes[0]
                     .InputStream
-                    .AsStreamForRead();
+                    .AsStreamForRead(bufferSize: 0);
 
             Stream output =
                 dataInterface.BulkOutPipes[0]
                     .OutputStream
-                    .AsStreamForWrite();
+                    .AsStreamForWrite(bufferSize: 0);
 
             return new WinUsbAoaAccessoryConnection(
                 device,
