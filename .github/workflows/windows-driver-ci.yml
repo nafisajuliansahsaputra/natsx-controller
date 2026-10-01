@@ -54,6 +54,4 @@ jobs:
             windows/driver/aoa-bootstrap/x64/Release/*.sys
             windows/driver/aoa-bootstrap/x64/Release/*.pdb
             windows/driver/aoa-bootstrap/x64/Release/*.cer
-            windows/driver/aoa-bootstrap/x64/Release/*.inf
-            windows/driver/aoa-bootstrap/x64/Release/*.cat
           if-no-files-found: error
