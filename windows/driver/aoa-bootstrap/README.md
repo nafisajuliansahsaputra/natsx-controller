@@ -42,6 +42,12 @@ WinUSB probe fails at `WinUsb_Initialize` with `ERROR_INVALID_FUNCTION`.
 Keeping custom IOCTLs off the PnP data stack avoids depending on upper WPD/WUDF
 drivers to forward requests they do not own.
 
+A CI-gated physical-validation package builder now exists at
+`build-oppo-a58-test-package.ps1`. It hard-fails if the Models section broadens
+beyond the exact validated OPPO A58 no-ADB `VID/PID/REV`, materializes the
+KMDF token, runs `InfVerif /w /v`, and emits a manifest with SHA-256 hashes.
+The output remains unsigned and is not installed automatically.
+
 The source prototype is not sufficient to mark M9 complete. It still requires:
 
 1. capture the existing upper/lower/compound filter metadata for the ADB-off
