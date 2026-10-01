@@ -25,34 +25,48 @@ public sealed class WinUsbAoaAccessoryConnection : IAsyncDisposable
 
     public Stream Output { get; }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         if (_disposed)
         {
-            return;
+            return ValueTask.CompletedTask;
         }
 
         _disposed = true;
 
         try
         {
-            await Input.DisposeAsync().ConfigureAwait(false);
+            DisposeStream(Input);
+
+            if (!ReferenceEquals(Input, Output))
+            {
+                DisposeStream(Output);
+            }
         }
         finally
         {
-            try
-            {
-                if (!ReferenceEquals(Input, Output))
-                {
-                    await Output.DisposeAsync().ConfigureAwait(false);
-                }
-            }
-            finally
-            {
-                _device.Dispose();
-            }
+            _device.Dispose();
         }
 
         GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
+
+    private static void DisposeStream(Stream stream)
+    {
+        try
+        {
+            stream.Dispose();
+        }
+        catch (NotImplementedException)
+        {
+            // Some WinRT USB output streams do not implement FlushAsync.
+            // The underlying UsbDevice is disposed below and owns the native
+            // pipe lifetime, so unsupported flush-on-close must not turn a
+            // successful USB session into a teardown failure.
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 }
