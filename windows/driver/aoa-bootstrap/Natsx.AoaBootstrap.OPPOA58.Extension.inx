@@ -26,7 +26,7 @@ Class       = Extension
 ClassGuid   = {e2f84ce7-8efa-411c-aa69-97454ca4cb57}
 Provider    = %ProviderName%
 ExtensionId = {6F2E4A6C-3C21-4B18-9D6B-4F7D0F99D9C1}
-DriverVer   = 10/01/2026,0.1.0.4
+DriverVer   = 10/01/2026,0.1.0.5
 CatalogFile = Natsx.AoaBootstrap.OPPOA58.Extension.cat
 PnpLockdown = 1
 
