@@ -48,6 +48,41 @@ public static class UsbControlFrameCodec
                 Array.Empty<byte>()),
             session.SessionKey);
 
+    public static ulong DecodeHeartbeat(
+        ReadOnlySpan<byte> frameBytes,
+        UsbTrustedSession session)
+    {
+        ProtocolFrame frame = DecodeAuthenticatedFrame(frameBytes, session);
+        if (frame.MessageType != MessageType.Heartbeat ||
+            frame.Payload.Length != 0)
+        {
+            throw new FormatException("Invalid USB HEARTBEAT.");
+        }
+        return frame.MonotonicTimestampMicros;
+    }
+
+    public static byte[] EncodeHeartbeatAck(
+        UsbTrustedSession session,
+        ulong responderTimestampMicros,
+        ulong echoedProbeTimestampMicros)
+    {
+        var payload = new byte[HeartbeatAckPayloadSize];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(
+            payload,
+            echoedProbeTimestampMicros);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.HeartbeatAck,
+                FrameFlags.Authenticated,
+                session.SessionId,
+                0,
+                responderTimestampMicros,
+                payload),
+            session.SessionKey);
+    }
+
     public static ulong DecodeHeartbeatAck(
         ReadOnlySpan<byte> frameBytes,
         UsbTrustedSession session)
