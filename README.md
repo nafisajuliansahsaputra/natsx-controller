@@ -82,6 +82,27 @@ independently from transport lifetime. Trusted Wi-Fi, Bluetooth, and USB
 transports attach to the shared Smart Connection runtime dynamically, so
 transport reconnect/handover does not recreate the virtual controller.
 
+Run the receiver during development with:
+
+```powershell
+dotnet run --project windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release
+```
+
+### First pairing
+
+When neither side has a trust record yet, connect the Android phone over the
+NATSX USB accessory path and open the Android app. Android sends a first-pair
+offer and both devices display the same six-digit SAS.
+
+Pairing completes only after the user confirms that code on **both** screens.
+The derived long-term trust secret is then stored with Android Keystore-backed
+protection on Android and Windows DPAPI on the receiver. The still-open USB
+connection immediately continues into the normal trusted reconnect handshake;
+no cable replug, ADB, manual secret entry, or IP-based trust is required.
+
+If the codes differ, reject pairing. No trust record is written until the
+remote role-bound confirmation proof also verifies.
+
 ## Android development
 
 Current build baseline:
