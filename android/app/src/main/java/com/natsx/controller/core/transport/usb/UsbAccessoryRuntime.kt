@@ -28,6 +28,7 @@ class UsbAccessoryRuntime(
     private val sessionRegistry: TrustedSessionRegistry,
     private val broadcaster: RealtimeStateBroadcaster,
     private val pairingConfirmation: PairingConfirmationCoordinator,
+    private val status: UsbRuntimeStatusCoordinator,
 ) : Closeable {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -49,9 +50,23 @@ class UsbAccessoryRuntime(
             return
         }
 
+        status.publish(
+            "USB accessory detected. Starting session…",
+        )
+
         executor.execute {
-            runCatching {
+            try {
                 connectBlocking(accessory)
+            } catch (exception: Exception) {
+                val detail =
+                    exception.message
+                        ?.takeIf { it.isNotBlank() }
+                        ?: exception::class.java.simpleName
+
+                status.publish(
+                    "USB error: $detail",
+                    isError = true,
+                )
             }
         }
     }
@@ -81,14 +96,26 @@ class UsbAccessoryRuntime(
         disconnectBlocking(null)
 
         if (!usbManager.hasPermission(accessory)) {
+            status.publish(
+                "USB permission is not granted.",
+                isError = true,
+            )
             return
         }
+
+        status.publish(
+            "Opening USB accessory…",
+        )
 
         val opened =
             UsbAccessoryConnection.open(
                 usbManager,
                 accessory,
             )
+
+        status.publish(
+            "USB accessory opened.",
+        )
 
         var session: UsbTrustedSession? = null
         var realtimeSender: UsbRealtimeSender? = null
@@ -101,6 +128,10 @@ class UsbAccessoryRuntime(
                             .list()
                             .isEmpty()
                     ) {
+                        status.publish(
+                            "No trusted PC yet. Starting secure pairing…",
+                        )
+
                         performFirstPairing(
                             opened,
                         )
@@ -108,6 +139,10 @@ class UsbAccessoryRuntime(
                         opened.close()
                         return
                     }
+
+            status.publish(
+                "Starting trusted USB authentication…",
+            )
 
             session =
                 connectTrustedSession(
@@ -130,6 +165,10 @@ class UsbAccessoryRuntime(
                 sender = realtimeSender
                 activeAccessory = accessory
             }
+
+            status.publish(
+                "USB authenticated. Realtime controller active.",
+            )
         } catch (exception: Exception) {
             realtimeSender?.let(broadcaster::removeSink)
             realtimeSender?.close()
@@ -145,12 +184,20 @@ class UsbAccessoryRuntime(
         PairingInitiatorSession(
             localPeerId,
         ).use { pairing ->
+            status.publish(
+                "Sending pairing offer to Windows…",
+            )
+
             writePairingFrame(
                 opened,
                 PairingFrameCodec
                     .encodeOffer(
                         pairing.offer,
                     ),
+            )
+
+            status.publish(
+                "Pairing offer sent. Waiting for Windows response…",
             )
 
             val responseFrame =
@@ -180,6 +227,10 @@ class UsbAccessoryRuntime(
                 )
             }
 
+            status.publish(
+                "Windows pairing response received.",
+            )
+
             val response =
                 PairingFrameCodec
                     .decodeResponse(
@@ -190,6 +241,10 @@ class UsbAccessoryRuntime(
                 pairing.acceptResponse(
                     response,
                 )
+
+            status.publish(
+                "Pairing code ready: $code",
+            )
 
             val approved =
                 pairingConfirmation
@@ -202,6 +257,10 @@ class UsbAccessoryRuntime(
                     )
 
             if (!approved) {
+                status.publish(
+                    "Pairing rejected or timed out on Android.",
+                    isError = true,
+                )
                 sendPairingAbort(
                     opened,
                     PairingAbortReason.USER_REJECTED,
@@ -215,6 +274,10 @@ class UsbAccessoryRuntime(
             val localConfirm =
                 pairing
                     .approveDisplayedCode()
+
+            status.publish(
+                "Android confirmed code. Waiting for Windows confirmation…",
+            )
 
             writePairingFrame(
                 opened,
@@ -289,6 +352,10 @@ class UsbAccessoryRuntime(
                         trustedPeerStore.put(
                             record,
                             secret,
+                        )
+
+                        status.publish(
+                            "Pairing complete. Windows receiver trusted.",
                         )
 
                         return record
@@ -468,6 +535,12 @@ class UsbAccessoryRuntime(
 
         oldSession?.close()
         oldConnection?.close()
+
+        if (accessory != null) {
+            status.publish(
+                "USB accessory disconnected.",
+            )
+        }
     }
 
     override fun close() {
