@@ -288,8 +288,8 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ## M9 — USB Direct transport
 
 - [x] Validate final Android USB accessory/direct data approach.
-- [x] Validate Windows-side USB implementation.
-- [x] Record ADR for exact USB design.
+- [ ] Validate Windows-side USB implementation.
+- [ ] Record ADR for exact USB design.
 - [ ] Implement direct USB transport.
 - [x] No USB tethering.
 - [x] No ADB requirement.
