@@ -75,6 +75,24 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         }
     }
 
+    public bool TryGetTransportState(
+        TransportKind kind,
+        out TransportRuntimeState state)
+    {
+        if (TryGetTransport(
+                kind,
+                out IControllerTransport transport))
+        {
+            state =
+                transport.State;
+            return true;
+        }
+
+        state =
+            TransportRuntimeState.Unavailable;
+        return false;
+    }
+
     public async ValueTask StartAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
