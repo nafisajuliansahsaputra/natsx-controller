@@ -377,6 +377,8 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                         completion.Session;
                     remotePeerId =
                         completion.RemotePeerId;
+                    uplinkOnly =
+                        true;
                     break;
                 }
 
@@ -1249,6 +1251,8 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
             UsbTrustedSession trustedSession;
             PeerId remotePeerId;
+            bool uplinkOnly =
+                false;
 
             switch (messageType)
             {
@@ -1350,12 +1354,23 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
             try
             {
-                await transport
-                    .AttachAuthenticatedStreamAsync(
-                        connection.Input,
-                        connection.Output,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                if (uplinkOnly)
+                {
+                    await transport
+                        .AttachAuthenticatedStreamAsync(
+                            connection.Input,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    await transport
+                        .AttachAuthenticatedStreamAsync(
+                            connection.Input,
+                            connection.Output,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
             }
             catch
             {
