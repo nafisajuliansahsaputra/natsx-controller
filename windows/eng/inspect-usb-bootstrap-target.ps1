@@ -44,7 +44,13 @@ if (-not (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue)) {
 
 $devices =
     if ([string]::IsNullOrWhiteSpace($InstanceId)) {
-        @(Get-PnpDevice -PresentOnly)
+        # Filter to USB device nodes before querying properties. The old implementation
+        # queried eight properties for every present PnP device, which could take a very
+        # long time on systems with many device nodes.
+        @(
+            Get-PnpDevice -PresentOnly |
+                Where-Object { $_.InstanceId -like "USB\*" }
+        )
     }
     else {
         @(Get-PnpDevice -InstanceId $InstanceId -PresentOnly -ErrorAction Stop)
@@ -78,12 +84,10 @@ $report = foreach ($device in $devices) {
         ($hardwareText -match "(?i)android|mtp|adb") -or
         ($compatibleText -match "(?i)android|mtp|adb")
 
-    $isUsbInstance = $device.InstanceId -like "USB\*"
-
     if (
         -not [string]::IsNullOrWhiteSpace($InstanceId) -or
-        ($IncludeAllUsb -and $isUsbInstance) -or
-        ($isUsbInstance -and $looksLikeAndroid)
+        $IncludeAllUsb -or
+        $looksLikeAndroid
     ) {
         [pscustomobject]@{
             Status = $device.Status
