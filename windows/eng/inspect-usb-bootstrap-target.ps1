@@ -65,6 +65,11 @@ $report = foreach ($device in $devices) {
     $driverInfPath = Get-NatsxPnpProperty -DeviceInstanceId $device.InstanceId -KeyName "DEVPKEY_Device_DriverInfPath"
     $driverProvider = Get-NatsxPnpProperty -DeviceInstanceId $device.InstanceId -KeyName "DEVPKEY_Device_DriverProvider"
     $driverVersion = Get-NatsxPnpProperty -DeviceInstanceId $device.InstanceId -KeyName "DEVPKEY_Device_DriverVersion"
+    $upperFilters = Get-NatsxPnpProperty -DeviceInstanceId $device.InstanceId -KeyName "DEVPKEY_Device_UpperFilters"
+    $lowerFilters = Get-NatsxPnpProperty -DeviceInstanceId $device.InstanceId -KeyName "DEVPKEY_Device_LowerFilters"
+    $compoundUpperFilters = Get-NatsxPnpProperty -DeviceInstanceId $device.InstanceId -KeyName "DEVPKEY_Device_CompoundUpperFilters"
+    $compoundLowerFilters = Get-NatsxPnpProperty -DeviceInstanceId $device.InstanceId -KeyName "DEVPKEY_Device_CompoundLowerFilters"
+    $busReportedDesc = Get-NatsxPnpProperty -DeviceInstanceId $device.InstanceId -KeyName "DEVPKEY_Device_BusReportedDeviceDesc"
 
     $hardwareText = Convert-NatsxPropertyToText $hardwareIds
     $compatibleText = Convert-NatsxPropertyToText $compatibleIds
@@ -102,6 +107,11 @@ $report = foreach ($device in $devices) {
             DriverInfPath = Convert-NatsxPropertyToText $driverInfPath
             DriverProvider = Convert-NatsxPropertyToText $driverProvider
             DriverVersion = Convert-NatsxPropertyToText $driverVersion
+            UpperFilters = Convert-NatsxPropertyToText $upperFilters
+            LowerFilters = Convert-NatsxPropertyToText $lowerFilters
+            CompoundUpperFilters = Convert-NatsxPropertyToText $compoundUpperFilters
+            CompoundLowerFilters = Convert-NatsxPropertyToText $compoundLowerFilters
+            BusReportedDeviceDesc = Convert-NatsxPropertyToText $busReportedDesc
         }
     }
 }
