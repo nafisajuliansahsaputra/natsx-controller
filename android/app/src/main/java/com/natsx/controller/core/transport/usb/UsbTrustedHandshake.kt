@@ -33,7 +33,7 @@ object UsbAuthFrameCodec {
         monotonicTimestampMicros: ULong,
     ): ByteArray {
         require(sessionId != SessionId.Zero) {
-            "Usb trusted reconnect requires a non-zero session ID."
+            "USB trusted reconnect requires a non-zero session ID."
         }
 
         return ProtocolFrameCodec.encode(
@@ -296,14 +296,14 @@ object UsbControlFrameCodec {
             frame.flags and
                 FrameFlags.AUTHENTICATED != 0,
         ) {
-            "Usb session traffic must be authenticated."
+            "USB session traffic must be authenticated."
         }
 
         require(
             frame.sessionId ==
                 trustedSession.sessionId,
         ) {
-            "Usb frame belongs to a different controller session."
+            "USB frame belongs to a different controller session."
         }
 
         return frame
@@ -347,7 +347,7 @@ class UsbTrustedHandshakeChallenge private constructor(
 
         if (responseSessionId != sessionId) {
             throw GeneralSecurityException(
-                "Usb AUTH_RESPONSE belongs to a different session.",
+                "USB AUTH_RESPONSE belongs to a different session.",
             )
         }
 
@@ -356,7 +356,7 @@ class UsbTrustedHandshakeChallenge private constructor(
             response.challengerPeerId != localPeerId
         ) {
             throw GeneralSecurityException(
-                "Usb AUTH_RESPONSE peer identity mismatch.",
+                "USB AUTH_RESPONSE peer identity mismatch.",
             )
         }
 
@@ -372,7 +372,7 @@ class UsbTrustedHandshakeChallenge private constructor(
 
         if (!valid) {
             throw GeneralSecurityException(
-                "Usb AUTH_RESPONSE proof is invalid.",
+                "USB AUTH_RESPONSE proof is invalid.",
             )
         }
 
@@ -405,7 +405,7 @@ class UsbTrustedHandshakeChallenge private constructor(
 
     private fun ensureOpen() {
         check(!closed) {
-            "Usb trusted handshake challenge is closed."
+            "USB trusted handshake challenge is closed."
         }
     }
 
@@ -510,10 +510,10 @@ class UsbTrustedReconnectClient(
                     remoteReady.peerId !=
                     receiverPeerId ||
                     remoteReady.capabilities and
-                        TransportCapabilities.BLUETOOTH == 0
+                        TransportCapabilities.USB_DIRECT == 0
                 ) {
                     throw GeneralSecurityException(
-                        "Usb SESSION_READY does not match the trusted Windows receiver.",
+                        "USB SESSION_READY does not match the trusted Windows receiver.",
                     )
                 }
 
