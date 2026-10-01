@@ -441,6 +441,128 @@ public sealed class ControllerTransportRuntimeTests
     }
 
     [Fact]
+    public async Task RepeatedUsbAttachDetach_PreservesWifiFallbackAndBackend()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new FakeBackend();
+        var session = new ControllerSession();
+        ConnectionPolicy policy = ConnectionPolicy.Competitive;
+        var safety = new InputSafetyEngine(
+            session,
+            backend,
+            policy,
+            clock);
+        var manager = new SmartConnectionManager(
+            policy,
+            clock);
+
+        var wifi =
+            new FakeTransport(
+                TransportKind.Wifi,
+                clock)
+            {
+                Snapshot =
+                    Healthy(
+                        TransportKind.Wifi,
+                        95),
+            };
+
+        await using var runtime =
+            new ControllerTransportRuntime(
+                session,
+                safety,
+                manager,
+                new IControllerTransport[]
+                {
+                    wifi,
+                },
+                policy,
+                clock);
+
+        await runtime.StartAsync();
+
+        uint sequence = 1;
+
+        wifi.Publish(
+            sequence,
+            GamepadState.Neutral);
+
+        runtime.EvaluateOnce();
+
+        Assert.Equal(
+            TransportKind.Wifi,
+            runtime.ActiveTransport);
+
+        for (int cycle = 0; cycle < 10; cycle++)
+        {
+            var usb =
+                new FakeTransport(
+                    TransportKind.Usb,
+                    clock)
+                {
+                    Snapshot =
+                        Healthy(
+                            TransportKind.Usb,
+                            100),
+                };
+
+            await runtime.AttachTransportAsync(
+                usb);
+
+            sequence += 1;
+
+            GamepadState state =
+                GamepadState.Neutral with
+                {
+                    Buttons =
+                        cycle % 2 == 0
+                            ? GamepadButtons.A
+                            : GamepadButtons.B,
+                    LeftX =
+                        (short)(1000 + cycle),
+                };
+
+            wifi.Publish(
+                sequence,
+                state);
+            usb.Publish(
+                sequence,
+                state);
+
+            clock.Advance(
+                policy.UsbRecoveryStability);
+
+            runtime.EvaluateOnce();
+
+            Assert.Equal(
+                TransportKind.Usb,
+                runtime.ActiveTransport);
+
+            bool removed =
+                await runtime.DetachTransportAsync(
+                    TransportKind.Usb);
+
+            Assert.True(
+                removed);
+            Assert.Equal(
+                TransportKind.Wifi,
+                runtime.ActiveTransport);
+            Assert.Equal(
+                TransportKind.Wifi,
+                session.AuthoritativeTransport);
+            Assert.Equal(
+                state,
+                backend.LastState);
+            Assert.True(
+                backend.IsStarted);
+
+            clock.Advance(
+                TimeSpan.FromMilliseconds(
+                    100));
+        }
+    }
+
+    [Fact]
     public async Task NonAuthoritativeRealtimeState_DoesNotReachBackend()
     {
         var clock = new ManualTimeProvider();
