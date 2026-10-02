@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.CornerPathEffect
+import android.graphics.Matrix
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
@@ -59,14 +60,17 @@ internal class ControllerSkin {
             p.shader = gradient(0f, h, "#FCFCFD", "#EBEBEE")
             c.drawRect(0f, 0f, w, h, p)
             val panel = Path().apply {
-                moveTo(insetX + usableW * 0.340f, insetY)
-                lineTo(insetX + usableW * 0.660f, insetY)
-                lineTo(insetX + usableW * 0.553f, insetY + usableH * 0.381f)
-                quadTo(insetX + usableW * 0.542f, insetY + usableH * 0.415f,
-                    insetX + usableW * 0.518f, insetY + usableH * 0.415f)
-                lineTo(insetX + usableW * 0.482f, insetY + usableH * 0.415f)
-                quadTo(insetX + usableW * 0.458f, insetY + usableH * 0.415f,
-                    insetX + usableW * 0.447f, insetY + usableH * 0.381f)
+                fun dx(value: Float) = insetX + value * usableW / 2400f
+                fun dy(value: Float) = insetY + value * usableH / 1080f
+                moveTo(dx(820f), dy(0f))
+                lineTo(dx(1580f), dy(0f))
+                quadTo(dx(1560f), dy(0f), dx(1540f), dy(30f))
+                lineTo(dx(1340f), dy(410f))
+                quadTo(dx(1325f), dy(450f), dx(1295f), dy(450f))
+                lineTo(dx(1105f), dy(450f))
+                quadTo(dx(1075f), dy(450f), dx(1060f), dy(410f))
+                lineTo(dx(860f), dy(30f))
+                quadTo(dx(840f), dy(0f), dx(820f), dy(0f))
                 close()
             }
             p.shader = gradient(insetY, insetY + usableH * 0.415f, "#F9F9FA", "#EEEAF6")
@@ -202,6 +206,7 @@ internal class ControllerSkin {
                 c.drawCircle(cos(a).toFloat() * rr, sin(a).toFloat() * rr, r * 0.0045f, p)
             }
         }
+        p.alpha = 255 // Stippling has translucent paint; the recessed face must be opaque.
         p.shader = gradient(-r * 0.75f, r * 0.75f,
             if (active) "#3F714C" else "#4F8159", if (active) "#8CCD98" else "#A8E9B4")
         c.drawCircle(0f, 0f, r * 0.78f, p)
@@ -213,86 +218,119 @@ internal class ControllerSkin {
     }
 
     private fun keyPath(id: String, r: RectF): Path {
-        val p = Path()
-        val h = r.height()
+        val path = Path()
         val w = r.width()
+        val h = r.height()
+        val x = r.left
+        val y = r.top
         when (id) {
-            "A", "B", "X", "Y" -> p.addOval(r, Path.Direction.CW)
-            "LT", "RT" -> p.addRoundRect(r, h * 0.28f, h * 0.28f, Path.Direction.CW)
+            "A", "B", "X", "Y" -> path.addOval(r, Path.Direction.CW)
+            "LT", "RT" -> path.addRoundRect(r, h * 0.25f, h * 0.25f, Path.Direction.CW)
             "LB", "RB" -> {
-                val taper = w * 0.21f
-                if (id == "LB") {
-                    p.moveTo(r.left, r.top); p.lineTo(r.right - taper, r.top)
-                    p.lineTo(r.right, r.bottom); p.lineTo(r.left, r.bottom)
-                } else {
-                    p.moveTo(r.left + taper, r.top); p.lineTo(r.right, r.top)
-                    p.lineTo(r.right, r.bottom); p.lineTo(r.left, r.bottom)
-                }
-                p.close()
+                // Rounded trapezoid with one straight wall and one long inward slope.
+                path.moveTo(x + h * 0.27f, y)
+                path.lineTo(x + w * 0.69f, y)
+                path.cubicTo(x + w * 0.75f, y, x + w * 0.78f, y + h * 0.05f,
+                    x + w * 0.81f, y + h * 0.19f)
+                path.lineTo(x + w * 0.985f, y + h * 0.79f)
+                path.quadTo(r.right + w * 0.025f, r.bottom, r.right - h * 0.12f, r.bottom)
+                path.lineTo(x + h * 0.27f, r.bottom)
+                path.quadTo(x, r.bottom, x, r.bottom - h * 0.27f)
+                path.lineTo(x, y + h * 0.27f)
+                path.quadTo(x, y, x + h * 0.27f, y)
+                path.close()
+                if (id == "RB") path.transform(Matrix().apply { setScale(-1f, 1f, r.centerX(), r.centerY()) })
             }
             "GUIDE" -> {
-                p.moveTo(r.left, r.top); p.lineTo(r.right, r.top)
-                p.lineTo(r.right - w * 0.21f, r.bottom); p.lineTo(r.left + w * 0.21f, r.bottom); p.close()
+                path.moveTo(x + w * 0.18f, y)
+                path.lineTo(r.right - w * 0.18f, y)
+                path.quadTo(r.right + w * 0.01f, y, r.right - w * 0.05f, y + h * 0.29f)
+                path.lineTo(r.right - w * 0.19f, r.bottom - h * 0.24f)
+                path.quadTo(r.right - w * 0.24f, r.bottom, r.right - w * 0.39f, r.bottom)
+                path.lineTo(x + w * 0.39f, r.bottom)
+                path.quadTo(x + w * 0.24f, r.bottom, x + w * 0.19f, r.bottom - h * 0.24f)
+                path.lineTo(x + w * 0.05f, y + h * 0.29f)
+                path.quadTo(x - w * 0.01f, y, x + w * 0.18f, y)
+                path.close()
             }
             else -> {
-                val slant = w * 0.18f
-                if (id == "BACK" || id == "L3") {
-                    p.moveTo(r.left, r.top); p.lineTo(r.right - slant, r.top)
-                    p.lineTo(r.right, r.bottom); p.lineTo(r.left + slant * 0.25f, r.bottom)
-                } else {
-                    p.moveTo(r.left + slant, r.top); p.lineTo(r.right, r.top)
-                    p.lineTo(r.right - slant * 0.25f, r.bottom); p.lineTo(r.left, r.bottom)
-                }
-                p.close()
+                // Reference mint keys: the two rows lean toward the center,
+                // with a broad rounded bottom rather than a parallelogram outline.
+                path.moveTo(x + w * 0.14f, y)
+                path.lineTo(r.right - w * 0.29f, y)
+                path.quadTo(r.right - w * 0.17f, y, r.right - w * 0.12f, y + h * 0.16f)
+                path.lineTo(r.right - w * 0.005f, r.bottom - h * 0.25f)
+                path.quadTo(r.right + w * 0.025f, r.bottom, r.right - w * 0.13f, r.bottom)
+                path.lineTo(x + w * 0.23f, r.bottom)
+                path.quadTo(x + w * 0.095f, r.bottom, x + w * 0.06f, r.bottom - h * 0.28f)
+                path.lineTo(x, y + h * 0.29f)
+                path.quadTo(x - w * 0.025f, y, x + w * 0.14f, y)
+                path.close()
+                if (id == "START" || id == "R3") path.transform(Matrix().apply { setScale(-1f, 1f, r.centerX(), r.centerY()) })
             }
         }
-        return p
+        return path
     }
 
-    private fun drawKey(c: Canvas, id: String, r: RectF, active: Boolean) {
+    private fun drawKey(c: Canvas, id: String, bounds: RectF, active: Boolean) {
         val mint = id in listOf("BACK", "START", "L3", "R3", "GUIDE")
         val circle = id in listOf("A", "B", "X", "Y")
-        val depth = unit * if (active) 0.003f else 0.008f
+        val px = unit / 1080f
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        p.pathEffect = CornerPathEffect(r.height() * 0.23f)
-        val rim = keyPath(id, RectF(r).apply { inset(-unit * 0.009f, -unit * 0.009f) })
-        p.color = Color.parseColor("#ECEAF0")
-        p.setShadowLayer(unit * 0.012f, 0f, unit * 0.012f, Color.parseColor("#38000000"))
-        c.drawPath(rim, p)
+        val socket = keyPath(id, bounds)
+        p.color = Color.parseColor("#ECE9F0")
+        p.setShadowLayer(12f * px, 0f, 11f * px, Color.parseColor("#35000000"))
+        c.drawPath(socket, p)
         p.clearShadowLayer()
         p.style = Paint.Style.STROKE
-        p.strokeWidth = unit * 0.002f
-        p.color = Color.parseColor("#CDC7D4")
-        c.drawPath(rim, p)
+        p.strokeWidth = 2f * px
+        p.color = Color.parseColor("#C3BCCB")
+        c.drawPath(socket, p)
         p.style = Paint.Style.FILL
-        p.color = Color.parseColor(if (mint) "#315941" else "#51466A")
-        c.save(); c.translate(0f, depth); c.drawPath(keyPath(id, r), p); c.restore()
-        val face = keyPath(id, r)
+
+        val r = RectF(bounds).apply { inset(9f * px, 9f * px) }
+        val key = keyPath(id, r)
+        p.color = Color.parseColor(if (mint) "#345E40" else "#4A405D")
+        val depth = if (active) 3f * px else 8f * px
+        c.save(); c.translate(0f, depth); c.drawPath(key, p); c.restore()
+        c.save(); if (active) c.translate(0f, 4f * px)
+        // A broad bevel, then a smaller face. No doubled white stroke around the label.
         p.shader = gradient(r.top, r.bottom,
-            if (mint) "#C1F2C9" else "#E0CDFB",
-            if (mint) (if (active) "#6FAE7B" else "#84C58E") else (if (active) "#A28BBC" else "#B7A3D6"),
-            if (mint) "#589566" else "#9D8CBE")
-        c.save(); if (active) c.translate(0f, unit * 0.004f)
-        c.drawPath(face, p)
+            if (mint) "#DBFBDD" else "#F1E5FE",
+            if (mint) "#86BB8D" else "#B8A5D5",
+            if (mint) "#4C8158" else "#74648F")
+        c.drawPath(key, p)
         p.shader = null
         p.style = Paint.Style.STROKE
-        p.strokeWidth = unit * 0.0018f
-        p.color = Color.parseColor(if (mint) "#609969" else "#9B8AAE")
-        c.drawPath(face, p)
-        val highlight = RectF(r).apply { inset(unit * 0.007f, unit * 0.007f) }
-        p.color = Color.parseColor("#66FFFFFF")
-        p.strokeWidth = unit * 0.002f
-        c.drawPath(keyPath(id, highlight), p)
-        p.pathEffect = null
-        p.color = Color.parseColor("#FAF8FF")
+        p.color = Color.parseColor(if (mint) "#416E48" else "#68577F")
+        p.strokeWidth = 1.6f * px
+        c.drawPath(key, p)
         p.style = Paint.Style.FILL
+        val inset = if (circle) 10f * px else if (mint) 7f * px else 13f * px
+        val faceRect = RectF(r).apply { inset(inset, inset); offset(0f, -2f * px) }
+        val face = keyPath(id, faceRect)
+        p.color = Color.WHITE
+        p.shader = gradient(faceRect.top, faceRect.bottom,
+            if (mint) "#B5E7BE" else "#D0BCE9",
+            if (mint) (if (active) "#70AA7C" else "#8AC893") else (if (active) "#9F8ABA" else "#B6A2D0"),
+            if (mint) "#6BAA77" else "#AD99C8")
+        c.drawPath(face, p)
+        p.shader = null
+        // Localized top reflection and a darker lower edge are rasterized once.
+        c.save(); c.clipPath(face)
+        p.shader = gradient(faceRect.top, faceRect.top + faceRect.height() * 0.30f,
+            "#65FFFFFF", "#00FFFFFF")
+        c.drawRect(faceRect, p)
+        p.shader = null
+        c.restore()
+        p.color = Color.parseColor("#FAF8FF")
         p.textAlign = Paint.Align.CENTER
         p.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        p.textSize = r.height() * if (circle) 0.42f else 0.31f
+        p.textSize = bounds.height() * if (circle) 0.42f else if (mint) 0.35f else 0.32f
         val label = when (id) { "L3" -> "LS"; "R3" -> "RS"; "BACK", "START", "GUIDE" -> ""; else -> id }
         if (label.isNotEmpty()) {
-            c.drawText(label, r.centerX(), r.centerY() - (p.ascent() + p.descent()) / 2f, p)
-        } else drawUtilityIcon(c, id, r, p)
+            c.drawText(label, bounds.centerX(), bounds.centerY() - (p.ascent() + p.descent()) / 2f, p)
+        } else drawUtilityIcon(c, id, bounds, p)
         c.restore()
     }
 
@@ -325,22 +363,22 @@ internal class ControllerSkin {
         val right = nodes["DPAD_RIGHT"] ?: return
         val x = (left.x + right.x) * 0.5f
         val y = (up.y + down.y) * 0.5f
-        val radius = unit * 0.215f
+        val radius = unit * (232f / 1080f)
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.color = Color.parseColor("#F3F0F7")
         p.setShadowLayer(unit * 0.018f, 0f, unit * 0.014f, Color.parseColor("#38000000"))
-        c.drawCircle(x, y, radius * 1.055f, p)
+        c.drawCircle(x, y, unit * (240f / 1080f), p)
         p.clearShadowLayer()
-        p.shader = gradient(y - radius, y + radius, "#E1CDF7", "#A38DBF")
+        p.shader = gradient(y - radius, y + radius, "#D5BAF0", "#8D76AC")
         c.drawCircle(x, y, radius, p)
         p.shader = null; p.style = Paint.Style.STROKE
         p.color = Color.parseColor("#544561"); p.strokeWidth = unit * 0.0025f
         c.drawCircle(x, y, radius, p)
         p.color = Color.WHITE; p.strokeWidth = unit * 0.002f
-        c.drawCircle(x, y - unit * 0.003f, radius * 1.025f, p)
-        val t = unit * 0.066f
-        val l = left.x - left.radius * 0.94f; val r = right.x + right.radius * 0.94f
-        val top = up.y - up.radius * 0.94f; val bottom = down.y + down.radius * 0.94f
+        c.drawCircle(x, y - unit * 0.003f, unit * (238f / 1080f), p)
+        val t = unit * (75f / 1080f)
+        val l = left.x - left.radius * 0.78f; val r = right.x + right.radius * 0.78f
+        val top = up.y - up.radius * 0.78f; val bottom = down.y + down.radius * 0.78f
         val cross = Path().apply {
             moveTo(x - t, top); lineTo(x + t, top); lineTo(x + t, y - t)
             lineTo(r, y - t); lineTo(r, y + t); lineTo(x + t, y + t)
@@ -352,11 +390,16 @@ internal class ControllerSkin {
         p.setShadowLayer(unit * 0.008f, 0f, unit * 0.01f, Color.parseColor("#55000000"))
         c.save(); c.translate(0f, unit * 0.008f); c.drawPath(cross, p); c.restore()
         p.clearShadowLayer()
-        p.shader = gradient(top, bottom, "#D5BEF0", "#B4A0D1", "#AA95C8")
+        p.shader = gradient(top, bottom, "#EEE2FC", "#B9A4D7", "#7D679C")
         c.drawPath(cross, p)
+        val inner = Path(cross).apply {
+            transform(Matrix().apply { setScale(0.965f, 0.965f, x, y) })
+        }
+        p.shader = gradient(top, bottom, "#C7B0E0", "#B5A1D0", "#AA95C5")
+        c.drawPath(inner, p)
         p.shader = null; p.style = Paint.Style.STROKE
-        p.color = Color.parseColor("#AAFFFFFF"); p.strokeWidth = unit * 0.003f
-        c.drawPath(cross, p)
+        p.color = Color.parseColor("#4DFFFFFF"); p.strokeWidth = unit * 0.0018f
+        c.drawPath(inner, p)
         p.pathEffect = null; p.strokeCap = Paint.Cap.ROUND
         p.color = Color.parseColor("#F4EDFF"); p.strokeWidth = unit * 0.007f
         val mark = unit * 0.014f

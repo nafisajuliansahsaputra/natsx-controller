@@ -129,34 +129,48 @@ Responsive adaptation may move controls by a few percent, but must not change th
 
 ---
 
-## 6. Reference geometry (2026-10-02)
+## 6. Reference geometry — 2400 × 1080 with 50px margins
 
-The user-approved `Pastel Xbox-Style Controller UI Mockup (1)(4).png`
-(1870 × 841) supersedes earlier approximate sizing. Coordinates are normalized
-against the usable viewport, with symmetric cutout insets and height-scaled
-circles. The same geometry supplies visuals and pointer routing.
+The latest user clarification fixes the landscape design artboard at **2400 ×
+1080 physical pixels**, with **50px margins on all four sides**. The supplied
+1870 × 841 reference is a resized preview of this same aspect ratio. Use one
+uniform `ControllerDesignViewport` transform for rendering, hit testing,
+layout editing, logo and HUD. Do not stretch X and Y independently.
 
-| Control | Center / bounds | Height-based radius |
-|---|---|---|
-| LT / RT | X 2.5–18.2% / 81.9–97.5%; Y 4.5–19.6% | rounded rectangle |
-| LB / RB | X 20.5–36.6% / 63.5–79.6%; Y 5.1–19.7% | inward-tapered shoulder |
-| Left stick | (15.3%, 47.4%) | plate 20.8%, cap 12.8% |
-| Right stick | (62.0%, 71.0%) | plate 20.8%, cap 12.8% |
-| D-pad | (38.0%, 72.2%) | plate 21.5%, cross half-thickness 6.6% |
-| Y / X / B / A | (84.3%,35.8%) / (78.1%,49.8%) / (90.7%,49.8%) / (84.4%,64.0%) | 7.7% |
-| View / Menu | X 32.6–39.7% / 60.3–67.4%; Y 24.3–32.1% | tapered mint key |
-| LS / RS | X 35.8–42.9% / 57.1–64.2%; Y 36.4–44.2% | tapered mint key |
-| Guide | X 46.7–53.4%; Y 47.2–55.4% | downward-tapered mint key |
+| Control | Artboard geometry (px) |
+|---|---|
+| LT / RT socket | (50,50)–(450,218) / (1950,50)–(2350,218) |
+| LB / RB socket | (500,50)–(890,218) / (1510,50)–(1900,218) |
+| Left / right stick | center (367,520) / (1485,774); plate radius 224.64; cap radius 138.24 |
+| D-pad | center (910,790); socket radius 240; colored plate radius 232; cross half-thickness 75 |
+| Up / left / right / down target | (910,625) / (745,790) / (1075,790) / (910,955) |
+| Y / X / B / A | (2025,386) / (1874,535) / (2177,535) / (2025,692); socket radius 84 |
+| View / Menu | (780,258)–(951,346) / (1449,258)–(1620,346) |
+| LS / RS | (855,388)–(1036,484) / (1364,388)–(1545,484) |
+| Guide | (1120,505)–(1280,602) |
+| Logo | (1148.7,167.4)–(1251.3,270) |
+| Lamp | center (1200,360) |
 
-The D-pad reads as one rounded cross over a lavender circular plate.
-Left/right D-pad arm spacing is height-based to preserve a square cross on
-16:9 and wider phones. Analog processing/calibration radii are preserved.
+Margins are measured to socket bounds, excluding soft shadow falloff and
+anti-aliasing. The 50px shoulder gaps and bottom D-pad socket edge (1030px)
+are explicit. On other resolutions, scale the complete artboard uniformly
+and center it. Ordinary cutouts fitting inside the existing margin add no
+second margin; unusually large insets shrink the artboard only as needed.
+A 16:9 viewport receives vertical spare space instead of stretched controls.
+Custom saved positions remain artboard-normalized and editable.
+
+Shoulders use explicitly rounded trapezoids. Mint keys lean inward with
+rounded bottom edges; Guide is a downward-tapering rounded key. ABXY uses
+circular sockets and broad bevels. D-pad uses one rounded cross over a
+circular plate. The center panel follows the reference's wider rounded tip.
 
 `ControllerSkin` rasterizes gradients, highlights, modest shadows, labels and
-cap stippling only on geometry changes. Gameplay frames draw cached sprites,
-translate the shared cap using the processed stick values, and draw cheap
-D-pad state overlays. Raster resolution is capped at 2400 × 1080; no new
-rendering dependency, frame loop or realtime blur is introduced.
+cap stippling only on geometry changes. The recessed cap face resets paint
+alpha after stippling so its dark-to-light gradient stays opaque. Gameplay
+frames draw cached sprites and translate the shared cap from the processed
+stick values. Raster resolution remains capped at 2400 × 1080 with no new
+production dependency or animation loop. Analog processing radii and
+calibration behavior retain the existing design-height scale.
 
 ---
 
@@ -672,3 +686,12 @@ When visual fidelity conflicts with performance or control ergonomics, **perform
 - Native Skia previews were visually inspected. These checks establish geometry
   and input behavior, not physical-device GPU frame-time or battery measurements.
   Those remain open and the APK is a debug build, not a production release.
+
+### 50px correction verification
+
+The subsequent correction adds four geometry regression tests (exact native
+artboard margins, cutout absorption, uniform 16:9 scaling, large-inset safety).
+Native Skia checks also verify a clear cap gradient after the stipple-alpha
+reset. Debug APK and instrumentation APK builds, lint, 130 repository unit
+tests and two temporary native render/touch tests all pass (132 tests total). Device GPU timing
+and extended physical gameplay remain unmeasured.

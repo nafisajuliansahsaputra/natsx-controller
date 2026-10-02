@@ -370,8 +370,10 @@ class ControllerSurfaceView(
                 it.id == controlId
             } ?: return
 
-        val contentWidth = (width - safeInsetLeft - safeInsetRight).coerceAtLeast(1f)
-        val contentHeight = (height - safeInsetTop - safeInsetBottom).coerceAtLeast(1f)
+        val viewport = ControllerDesignViewport.fit(width.toFloat(), height.toFloat(),
+            safeInsetLeft, safeInsetTop, safeInsetRight, safeInsetBottom)
+        val contentWidth = viewport.width
+        val contentHeight = viewport.height
 
         val halfWidth =
             when (
@@ -409,7 +411,7 @@ class ControllerSurfaceView(
 
         val normalizedX =
             (
-                (x - safeInsetLeft) /
+                (x - viewport.left) /
                     contentWidth
             )
                 .coerceIn(
@@ -421,7 +423,7 @@ class ControllerSurfaceView(
 
         val normalizedY =
             (
-                (y - safeInsetTop) /
+                (y - viewport.top) /
                     contentHeight
             )
                 .coerceIn(
@@ -665,155 +667,52 @@ class ControllerSurfaceView(
 
     private fun rebuildLayout(width: Float, height: Float) {
         controls.clear()
+        if (width <= 0f || height <= 0f) return
+        val viewport = ControllerDesignViewport.fit(width, height,
+            safeInsetLeft, safeInsetTop, safeInsetRight, safeInsetBottom)
+        val scale = viewport.scale
 
-        if (width <= 0f || height <= 0f) {
-            return
+        fun circle(id: ControlId, x: Float, y: Float, radius: Float, hitScale: Float = 1.16f) {
+            val position = controllerLayout.positionFor(id.name, x / 2400f, y / 1080f)
+            controls += ControlGeometry.circle(id, viewport.x(position.x * 2400f),
+                viewport.y(position.y * 1080f), radius * scale, radius * scale * hitScale)
         }
 
-        val contentWidth =
-            (
-                width -
-                    safeInsetLeft -
-                    safeInsetRight
-            ).coerceAtLeast(
-                1f,
-            )
-        val contentHeight =
-            (
-                height -
-                    safeInsetTop -
-                    safeInsetBottom
-            ).coerceAtLeast(
-                1f,
-            )
-        val unit =
-            min(
-                contentWidth,
-                contentHeight,
-            )
-
-        fun circle(
-            id: ControlId,
-            x: Float,
-            y: Float,
-            radius: Float,
-            hitScale: Float = 1.16f,
-        ) {
-            val position =
-                controllerLayout
-                    .positionFor(
-                        id.name,
-                        x,
-                        y,
-                    )
-
-            controls += ControlGeometry.circle(
-                id = id,
-                centerX =
-                    safeInsetLeft + contentWidth *
-                            position.x,
-                centerY =
-                    safeInsetTop + contentHeight *
-                            position.y,
-                radius = unit * radius,
-                hitRadius =
-                    unit *
-                        radius *
-                        hitScale,
-            )
+        fun rect(id: ControlId, left: Float, top: Float, right: Float, bottom: Float) {
+            val position = controllerLayout.positionFor(id.name,
+                (left + right) / 4800f, (top + bottom) / 2160f)
+            val x = viewport.x(position.x * 2400f)
+            val y = viewport.y(position.y * 1080f)
+            val halfW = (right - left) * scale / 2f
+            val halfH = (bottom - top) * scale / 2f
+            controls += ControlGeometry.rect(id, RectF(x - halfW, y - halfH, x + halfW, y + halfH), 14f * scale)
         }
 
-        fun rect(
-            id: ControlId,
-            left: Float,
-            top: Float,
-            right: Float,
-            bottom: Float,
-            hitPadding: Float = 0.018f,
-        ) {
-            val defaultX =
-                (left + right) /
-                    2f
-            val defaultY =
-                (top + bottom) /
-                    2f
+        // Outer button/socket bounds: exactly 50px from the artboard edges.
+        // Shoulder gaps are also 50px; dimensions never stretch independently.
+        rect(ControlId.LT, 50f, 50f, 450f, 218f)
+        rect(ControlId.LB, 500f, 50f, 890f, 218f)
+        rect(ControlId.RB, 1510f, 50f, 1900f, 218f)
+        rect(ControlId.RT, 1950f, 50f, 2350f, 218f)
+        rect(ControlId.BACK, 780f, 258f, 951f, 346f)
+        rect(ControlId.L3, 855f, 388f, 1036f, 484f)
+        rect(ControlId.R3, 1364f, 388f, 1545f, 484f)
+        rect(ControlId.START, 1449f, 258f, 1620f, 346f)
+        rect(ControlId.GUIDE, 1120f, 505f, 1280f, 602f)
 
-            val position =
-                controllerLayout
-                    .positionFor(
-                        id.name,
-                        defaultX,
-                        defaultY,
-                    )
+        // Processing radii retain the existing analog response/calibration scale.
+        circle(ControlId.LEFT_STICK, 367f, 520f, 142.56f, 1.28f)
+        circle(ControlId.RIGHT_STICK, 1485f, 774f, 113.4f, 1.60f)
+        circle(ControlId.DPAD_UP, 910f, 625f, 75f, 1.10f)
+        circle(ControlId.DPAD_LEFT, 745f, 790f, 75f, 1.10f)
+        circle(ControlId.DPAD_RIGHT, 1075f, 790f, 75f, 1.10f)
+        circle(ControlId.DPAD_DOWN, 910f, 955f, 75f, 1.10f)
+        circle(ControlId.Y, 2025f, 386f, 84f, 1.14f)
+        circle(ControlId.X, 1874f, 535f, 84f, 1.14f)
+        circle(ControlId.B, 2177f, 535f, 84f, 1.14f)
+        circle(ControlId.A, 2025f, 692f, 84f, 1.14f)
 
-            val halfWidth =
-                (right - left) /
-                    2f
-            val halfHeight =
-                (bottom - top) /
-                    2f
-
-            controls += ControlGeometry.rect(
-                id = id,
-                rect =
-                    RectF(
-                        safeInsetLeft +
-                            contentWidth *
-                                (
-                                    position.x -
-                                    halfWidth
-                            ),
-                        safeInsetTop +
-                            contentHeight *
-                                (
-                                    position.y -
-                                    halfHeight
-                            ),
-                        safeInsetLeft +
-                            contentWidth *
-                                (
-                                    position.x +
-                                    halfWidth
-                            ),
-                        safeInsetTop +
-                            contentHeight *
-                                (
-                                    position.y +
-                                    halfHeight
-                            ),
-                    ),
-                hitPadding =
-                    unit *
-                        hitPadding,
-            )
-        }
-
-        rect(ControlId.LT, 0.025f, 0.045f, 0.182f, 0.196f)
-        rect(ControlId.LB, 0.205f, 0.051f, 0.366f, 0.197f)
-        rect(ControlId.RB, 0.635f, 0.051f, 0.796f, 0.197f)
-        rect(ControlId.RT, 0.819f, 0.045f, 0.975f, 0.196f)
-
-        rect(ControlId.BACK, 0.326f, 0.243f, 0.397f, 0.321f)
-        rect(ControlId.L3, 0.358f, 0.364f, 0.429f, 0.442f)
-        rect(ControlId.R3, 0.571f, 0.364f, 0.642f, 0.442f)
-        rect(ControlId.START, 0.603f, 0.243f, 0.674f, 0.321f)
-        rect(ControlId.GUIDE, 0.467f, 0.472f, 0.534f, 0.554f)
-
-        circle(ControlId.LEFT_STICK, 0.153f, 0.474f, 0.132f, 1.28f)
-
-        circle(ControlId.DPAD_UP, 0.380f, 0.582f, 0.070f, 1.10f)
-        circle(ControlId.DPAD_LEFT, 0.380f - unit * 0.140f / contentWidth, 0.722f, 0.070f, 1.10f)
-        circle(ControlId.DPAD_RIGHT, 0.380f + unit * 0.140f / contentWidth, 0.722f, 0.070f, 1.10f)
-        circle(ControlId.DPAD_DOWN, 0.380f, 0.862f, 0.070f, 1.10f)
-
-        circle(ControlId.RIGHT_STICK, 0.620f, 0.710f, 0.105f, 1.60f)
-
-        circle(ControlId.Y, 0.843f, 0.358f, 0.077f, 1.14f)
-        circle(ControlId.X, 0.781f, 0.498f, 0.077f, 1.14f)
-        circle(ControlId.B, 0.907f, 0.498f, 0.077f, 1.14f)
-        circle(ControlId.A, 0.844f, 0.640f, 0.077f, 1.14f)
-
-        skin.rebuild(width, height, safeInsetLeft, safeInsetTop, contentWidth, contentHeight,
+        skin.rebuild(width, height, viewport.left, viewport.top, viewport.width, viewport.height,
             controls.map { control ->
                 ControllerSkin.Node(control.id.name, control.centerX, control.centerY,
                     control.radius, control.rect, control.radius * 0.50f)

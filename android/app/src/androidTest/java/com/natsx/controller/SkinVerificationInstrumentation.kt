@@ -27,7 +27,7 @@ class SkinVerificationInstrumentation : Instrumentation() {
         var error: Throwable? = null
         runOnMainSync {
             try {
-                for ((w, h) in listOf(1870 to 841, 2400 to 1080, 1920 to 1080)) verify(w, h)
+                for ((w, h) in listOf(2400 to 1080, 1870 to 841, 1920 to 1080)) verify(w, h)
             } catch (failure: Throwable) {
                 error = failure
             }
@@ -49,20 +49,25 @@ class SkinVerificationInstrumentation : Instrumentation() {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
             colorFilter = android.graphics.PorterDuffColorFilter(Color.rgb(168, 139, 223), android.graphics.PorterDuff.Mode.SRC_IN)
         }
-        canvas.drawBitmap(logo, null, android.graphics.RectF(w / 2f - h * 0.0475f, h * 0.155f, w / 2f + h * 0.0475f, h * 0.250f), paint)
+        val logoViewport = com.natsx.controller.feature.controller.ControllerDesignViewport.fit(w.toFloat(), h.toFloat())
+        canvas.drawBitmap(logo, null, android.graphics.RectF(logoViewport.x(1148.7f), logoViewport.y(167.4f), logoViewport.x(1251.3f), logoViewport.y(270f)), paint)
+        val capX = logoViewport.x(367f).toInt()
+        val topGreen = Color.green(bitmap.getPixel(capX, logoViewport.y(455f).toInt()))
+        val bottomGreen = Color.green(bitmap.getPixel(capX, logoViewport.y(585f).toInt()))
+        check(bottomGreen - topGreen > 25) { "Recessed cap shading must not inherit the stipple alpha" }
         val directory = File(targetContext.getExternalFilesDir(null), "skin-verification").apply { mkdirs() }
         File(directory, "controller-${w}x$h.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         // Include non-zero cutout and bottom gesture insets in the real pointer checks.
         view.applySafeInsets(32, 8, 0, 16)
-        val uw = w - 64f; val uh = h - 24f
-        fun point(x: Float, y: Float) = 32f + uw * x to 8f + uh * y
-        val points = arrayListOf(point(0.153f, 0.474f), point(0.897f, 0.120f), point(0.844f, 0.640f), point(0.620f, 0.710f))
+        val viewport = com.natsx.controller.feature.controller.ControllerDesignViewport.fit(w.toFloat(), h.toFloat(), 32f, 8f, 0f, 16f)
+        fun point(x: Float, y: Float) = viewport.x(x) to viewport.y(y)
+        val points = arrayListOf(point(367f, 520f), point(2150f, 134f), point(2025f, 692f), point(1485f, 774f))
         touch(view, MotionEvent.ACTION_DOWN, points.take(1))
         for (count in 2..4) touch(view, MotionEvent.ACTION_POINTER_DOWN or ((count - 1) shl 8), points.take(count))
         check(store.snapshot().rightTrigger == 255)
         check(store.snapshot().buttons and GamepadButtons.A != 0)
-        points[0] = point(0.153f + uh * 0.11f / uw, 0.474f)
-        points[3] = point(0.620f, 0.625f)
+        points[0] = point(486f, 520f)
+        points[3] = point(1485f, 682f)
         touch(view, MotionEvent.ACTION_MOVE, points)
         check(store.snapshot().leftX > 0 && store.snapshot().rightY > 0)
         touch(view, MotionEvent.ACTION_POINTER_UP or (2 shl 8), points)
@@ -70,7 +75,7 @@ class SkinVerificationInstrumentation : Instrumentation() {
         check(store.snapshot().rightTrigger == 255 && store.snapshot().leftX > 0)
         touch(view, MotionEvent.ACTION_CANCEL, points)
         check(store.snapshot() == GamepadState.Neutral)
-        val diagonal = listOf(point(0.380f, 0.582f), point(0.380f + uh * 0.140f / uw, 0.722f))
+        val diagonal = listOf(point(910f, 625f), point(1075f, 790f))
         touch(view, MotionEvent.ACTION_DOWN, diagonal.take(1))
         touch(view, MotionEvent.ACTION_POINTER_DOWN or (1 shl 8), diagonal)
         check(store.snapshot().dpad == (DpadState.UP or DpadState.RIGHT))

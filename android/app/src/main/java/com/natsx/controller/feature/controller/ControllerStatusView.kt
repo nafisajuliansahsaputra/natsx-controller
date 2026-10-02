@@ -68,6 +68,7 @@ class ControllerStatusView(
     private var safeInsetLeft = 0
     private var safeInsetTop = 0
     private var safeInsetRight = 0
+    private var safeInsetBottom = 0
 
     init {
         isClickable = false
@@ -92,6 +93,7 @@ class ControllerStatusView(
         left: Int,
         top: Int,
         right: Int,
+        bottom: Int = 0,
     ) {
         val horizontalInset =
             max(
@@ -108,7 +110,7 @@ class ControllerStatusView(
         if (
             safeInsetLeft == nextLeft &&
             safeInsetTop == nextTop &&
-            safeInsetRight == nextRight
+            safeInsetRight == nextRight && safeInsetBottom == bottom.coerceAtLeast(0)
         ) {
             return
         }
@@ -116,6 +118,7 @@ class ControllerStatusView(
         safeInsetLeft = nextLeft
         safeInsetTop = nextTop
         safeInsetRight = nextRight
+        safeInsetBottom = bottom.coerceAtLeast(0)
         invalidate()
     }
 
@@ -128,14 +131,16 @@ class ControllerStatusView(
             return
         }
 
-        val contentWidth = (width - safeInsetLeft - safeInsetRight).coerceAtLeast(1).toFloat()
-        val contentHeight = (height - safeInsetTop).coerceAtLeast(1).toFloat()
-        val contentCenterX = width / 2f
+        val viewport = ControllerDesignViewport.fit(width.toFloat(), height.toFloat(),
+            safeInsetLeft.toFloat(), safeInsetTop.toFloat(), safeInsetRight.toFloat(), safeInsetBottom.toFloat())
+        val contentWidth = viewport.width
+        val contentHeight = viewport.height
+        val contentCenterX = viewport.x(1200f)
         val iconSize = contentHeight * 0.028f
         val gap = contentWidth * 0.018f
         val groupWidth = iconSize * 4f + gap * 3f
         val firstCenterX = contentCenterX - groupWidth / 2f + iconSize / 2f
-        val iconCenterY = safeInsetTop + contentHeight * 0.063f
+        val iconCenterY = viewport.y(68f)
         val stroke = (contentHeight * 0.0028f).coerceAtLeast(1.5f)
 
         inactivePaint.strokeWidth = stroke
@@ -190,7 +195,7 @@ class ControllerStatusView(
 
         val lampWidth = contentWidth * 0.064f
         val lampHeight = contentHeight * 0.014f
-        val lampCenterY = safeInsetTop + contentHeight * 0.334f
+        val lampCenterY = viewport.y(360f)
 
         lampPaint.color =
             when (state.activeTransport) {

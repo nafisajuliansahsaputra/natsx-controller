@@ -223,6 +223,7 @@ class MainActivity : Activity() {
                             safeLeft,
                             safeTop,
                             safeRight,
+                            safeBottom,
                         )
                 }
             } else {
@@ -315,13 +316,18 @@ class MainActivity : Activity() {
         )
 
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            val topInset = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                root.rootWindowInsets?.displayCutout?.safeInsetTop ?: 0
-            } else 0
-            val usableHeight = (root.height - topInset).coerceAtLeast(1)
-            val size = (usableHeight * 0.095f).toInt().coerceAtLeast(1)
+            val viewport = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val cutout = root.rootWindowInsets?.displayCutout
+                com.natsx.controller.feature.controller.ControllerDesignViewport.fit(
+                    root.width.toFloat(), root.height.toFloat(),
+                    (cutout?.safeInsetLeft ?: 0).toFloat(), (cutout?.safeInsetTop ?: 0).toFloat(),
+                    (cutout?.safeInsetRight ?: 0).toFloat(), (cutout?.safeInsetBottom ?: 0).toFloat())
+            } else {
+                com.natsx.controller.feature.controller.ControllerDesignViewport.fit(root.width.toFloat(), root.height.toFloat())
+            }
+            val size = (102.6f * viewport.scale).toInt().coerceAtLeast(1)
             val params = settingsLogoButton.layoutParams as FrameLayout.LayoutParams
-            val margin = topInset + (usableHeight * 0.155f).toInt()
+            val margin = viewport.y(167.4f).toInt()
             if (params.width != size || params.height != size || params.topMargin != margin) {
                 params.width = size
                 params.height = size
