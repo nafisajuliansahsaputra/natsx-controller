@@ -44,6 +44,7 @@ Source: "install-firewall-rules.ps1"; DestDir: "{app}\tools"; Flags: ignoreversi
 Source: "remove-firewall-rules.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "install-gamepad-host.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "remove-gamepad-host.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "prepare-gamepad-host-upgrade.ps1"; Flags: dontcopy
 #if IncludeUsbDrivers == "1"
 Source: "{#BootstrapDriverDir}\*"; DestDir: "{app}\drivers\aoa-bootstrap"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#WinUsbDriverDir}\*"; DestDir: "{app}\drivers\aoa-winusb"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -69,6 +70,43 @@ Filename: "{app}\Natsx.Controller.Receiver.exe"; Parameters: "--uninstall-cleanu
 Type: filesandordirs; Name: "{app}"
 
 [Code]
+var
+  GamepadHostPrepared: Boolean;
+  InstallCompleted: Boolean;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+  ScriptPath: String;
+begin
+  Result := '';
+  ExtractTemporaryFile('prepare-gamepad-host-upgrade.ps1');
+  ScriptPath := ExpandConstant('{tmp}\prepare-gamepad-host-upgrade.ps1');
+
+  if not Exec(
+    ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + ScriptPath + '"',
+    ExpandConstant('{tmp}'),
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  ) then
+  begin
+    Result := 'Unable to prepare the NATSX privileged gamepad host for upgrade.';
+    exit;
+  end;
+
+  if ResultCode <> 0 then
+  begin
+    Result :=
+      'Unable to stop the existing NATSX privileged gamepad host before upgrade. Exit code: ' +
+      IntToStr(ResultCode) + '.';
+    exit;
+  end;
+
+  GamepadHostPrepared := True;
+end;
+
 procedure RunCleanupScript(const ScriptName: String);
 var
   CleanupCode: Integer;
@@ -96,6 +134,12 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
 begin
+  if CurStep = ssDone then
+  begin
+    InstallCompleted := True;
+    exit;
+  end;
+
   if CurStep = ssPostInstall then
   begin
 #if IncludeUsbDrivers == "1"
@@ -210,5 +254,23 @@ begin
         '. See %ProgramData%\NATSX\Controller\setup-driver-error.log.'
       );
     end;
+  end;
+end;
+
+
+procedure DeinitializeSetup();
+var
+  ResultCode: Integer;
+begin
+  if GamepadHostPrepared and (not InstallCompleted) then
+  begin
+    Exec(
+      ExpandConstant('{sysnative}\sc.exe'),
+      'start NatsxControllerGamepadHost',
+      '',
+      SW_HIDE,
+      ewWaitUntilTerminated,
+      ResultCode
+    );
   end;
 end;

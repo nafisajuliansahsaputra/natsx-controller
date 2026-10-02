@@ -226,6 +226,45 @@ jobs:
             throw "Receiver failed to reconnect automatically after gamepad-host service restart."
           }
 
+          $receiverSettingsKey = "HKCU:\Software\NATSX\Controller Receiver"
+          $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+          New-Item -Path $receiverSettingsKey -Force | Out-Null
+          New-ItemProperty -Path $receiverSettingsKey -Name "CloseToTray" -Value 0 -PropertyType DWord -Force | Out-Null
+          New-ItemProperty -Path $runKey -Name "NATSX Controller Receiver" -Value '"C:\ci\Natsx.Controller.Receiver.exe" --background' -PropertyType String -Force | Out-Null
+
+          $repair = Start-Process -FilePath $installer[0].FullName -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-",
+            "/DIR=$installRoot"
+          ) -Wait -PassThru
+
+          if ($repair.ExitCode -ne 0) {
+            throw "CI repair/upgrade installer exited with code $($repair.ExitCode)."
+          }
+
+          $gamepadService = Get-Service -Name "NatsxControllerGamepadHost" -ErrorAction Stop
+
+          if ($gamepadService.Status -ne "Running") {
+            throw "Gamepad-host service is not running after repair/upgrade."
+          }
+
+          if ((Get-FileHash -LiteralPath $trustedPeers -Algorithm SHA256).Hash -ne $trustedPeersHash -or
+              (Get-FileHash -LiteralPath $localPeerIdentity -Algorithm SHA256).Hash -ne $localPeerIdentityHash) {
+            throw "Repair/upgrade modified pairing/trust identity data."
+          }
+
+          if (-not (Test-Path -LiteralPath $receiverSettingsKey)) {
+            throw "Repair/upgrade removed Receiver UI settings."
+          }
+
+          $upgradeRunValue = (Get-ItemProperty -Path $runKey -Name "NATSX Controller Receiver" -ErrorAction SilentlyContinue)."NATSX Controller Receiver"
+
+          if ([string]::IsNullOrWhiteSpace([string]$upgradeRunValue)) {
+            throw "Repair/upgrade removed Receiver Startup registry entry."
+          }
+
           $firewallRule = Get-NetFirewallRule -Name "NATSX.Controller.LanUdp" -ErrorAction Stop
           $firewallPort = $firewallRule | Get-NetFirewallPortFilter
           $firewallAddress = $firewallRule | Get-NetFirewallAddressFilter
@@ -254,12 +293,6 @@ jobs:
           if ($null -eq $uninstaller) {
             throw "Inno Setup uninstaller was not created."
           }
-
-          $receiverSettingsKey = "HKCU:\Software\NATSX\Controller Receiver"
-          $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-          New-Item -Path $receiverSettingsKey -Force | Out-Null
-          New-ItemProperty -Path $receiverSettingsKey -Name "CloseToTray" -Value 0 -PropertyType DWord -Force | Out-Null
-          New-ItemProperty -Path $runKey -Name "NATSX Controller Receiver" -Value '"C:\ci\Natsx.Controller.Receiver.exe" --background' -PropertyType String -Force | Out-Null
 
           $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList @(
             "/VERYSILENT",

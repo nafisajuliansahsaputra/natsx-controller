@@ -54,8 +54,12 @@ function Wait-ServiceState {
 }
 
 $existing = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+$existingCim = $null
+$createdNew = $null -eq $existing
 
 if ($null -ne $existing) {
+    $existingCim = Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue
+
     if ($existing.Status -ne "Stopped") {
         Invoke-Sc -Arguments @("stop", $serviceName) -AllowFailure | Out-Null
 
@@ -63,39 +67,37 @@ if ($null -ne $existing) {
             Wait-ServiceState -ExpectedStatus "Stopped" -TimeoutSeconds 15
         }
         catch {
-            $wmi = Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue
-            if ($null -ne $wmi -and $wmi.ProcessId -gt 0) {
-                Stop-Process -Id $wmi.ProcessId -Force -ErrorAction SilentlyContinue
+            if ($null -ne $existingCim -and $existingCim.ProcessId -gt 0) {
+                Stop-Process -Id $existingCim.ProcessId -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 500
             }
         }
-    }
-
-    Invoke-Sc -Arguments @("delete", $serviceName) -AllowFailure | Out-Null
-
-    $deleteDeadline = [DateTimeOffset]::UtcNow.AddSeconds(10)
-    do {
-        if ($null -eq (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) {
-            break
-        }
-        Start-Sleep -Milliseconds 250
-    } while ([DateTimeOffset]::UtcNow -lt $deleteDeadline)
-
-    if ($null -ne (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) {
-        throw "Existing service '$serviceName' could not be removed before reinstall."
     }
 }
 
 $quotedHost = '"' + $hostPath + '" --service'
 
 try {
-    Invoke-Sc -Arguments @(
-        "create",
-        $serviceName,
-        "binPath= $quotedHost",
-        "start= auto",
-        "obj= LocalSystem",
-        "DisplayName= NATSX Controller Gamepad Host"
-    ) | Out-Null
+    if ($createdNew) {
+        Invoke-Sc -Arguments @(
+            "create",
+            $serviceName,
+            "binPath= $quotedHost",
+            "start= auto",
+            "obj= LocalSystem",
+            "DisplayName= NATSX Controller Gamepad Host"
+        ) | Out-Null
+    }
+    else {
+        Invoke-Sc -Arguments @(
+            "config",
+            $serviceName,
+            "binPath= $quotedHost",
+            "start= auto",
+            "obj= LocalSystem",
+            "DisplayName= NATSX Controller Gamepad Host"
+        ) | Out-Null
+    }
 
     Invoke-Sc -Arguments @(
         "description",
@@ -125,10 +127,29 @@ try {
         throw "Gamepad-host service is not running under LocalSystem."
     }
 
+    if ([string]$service.PathName -notlike "*Natsx.Controller.GamepadHost.exe*--service*") {
+        throw "Gamepad-host service command line is incorrect."
+    }
+
     Write-Host "NATSX privileged gamepad-host service installed and running."
 }
 catch {
     Invoke-Sc -Arguments @("stop", $serviceName) -AllowFailure | Out-Null
-    Invoke-Sc -Arguments @("delete", $serviceName) -AllowFailure | Out-Null
+
+    if ($createdNew) {
+        Invoke-Sc -Arguments @("delete", $serviceName) -AllowFailure | Out-Null
+    }
+    elseif ($null -ne $existingCim -and -not [string]::IsNullOrWhiteSpace([string]$existingCim.PathName)) {
+        Invoke-Sc -Arguments @(
+            "config",
+            $serviceName,
+            "binPath= $($existingCim.PathName)",
+            "start= auto",
+            "obj= LocalSystem"
+        ) -AllowFailure | Out-Null
+
+        Invoke-Sc -Arguments @("start", $serviceName) -AllowFailure | Out-Null
+    }
+
     throw
 }
