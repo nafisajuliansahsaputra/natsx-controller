@@ -255,8 +255,12 @@ class ControllerService : Service() {
                     app.trustedPeerStore.list()
 
                 val peer =
-                    when {
-                        peers.isEmpty() -> {
+                    when (
+                        val plan =
+                            TrustedConnectionBootstrapPlanner
+                                .plan(peers)
+                    ) {
+                        TrustedConnectionBootstrapPlan.PairNew -> {
                             app.usbRuntimeStatus.publish(
                                 "No trusted PC yet. Secure pairing is using LAN/Wi-Fi…",
                             )
@@ -272,10 +276,10 @@ class ControllerService : Service() {
                             }
                         }
 
-                        peers.size == 1 ->
-                            peers.single()
+                        is TrustedConnectionBootstrapPlan.Reconnect ->
+                            plan.peer
 
-                        else -> {
+                        TrustedConnectionBootstrapPlan.RequireReceiverSelection -> {
                             app.usbRuntimeStatus.publish(
                                 "Multiple trusted PCs found. Receiver selection is required.",
                                 isError = true,

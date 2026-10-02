@@ -21,6 +21,7 @@ import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.haptics.HapticLevel
 import com.natsx.controller.core.input.ControllerInputTuning
 import com.natsx.controller.core.input.ControllerProfile
+import com.natsx.controller.core.lifecycle.GameplayLifecycleSafety
 import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
 import com.natsx.controller.core.pairing.PairingPrompt
 import com.natsx.controller.core.protocol.ProtocolTransport
@@ -37,6 +38,8 @@ class MainActivity : Activity() {
     private lateinit var app: NatsxControllerApplication
     private lateinit var stateStore: GamepadStateStore
     private lateinit var controllerView: ControllerSurfaceView
+    private lateinit var gameplayLifecycleSafety:
+        GameplayLifecycleSafety
     private lateinit var pairingConfirmation: PairingConfirmationCoordinator
     private lateinit var pairingOverlay: LinearLayout
     private lateinit var pairingCodeText: TextView
@@ -105,6 +108,14 @@ class MainActivity : Activity() {
                         .current(),
                 )
             }
+
+        gameplayLifecycleSafety =
+            GameplayLifecycleSafety(
+                releaseInputs =
+                    controllerView::releaseAllInputs,
+                stopGameRumble =
+                    app.hapticEngine::stopGameRumble,
+            )
 
         setContentView(
             buildRootView(),
@@ -1335,14 +1346,26 @@ class MainActivity : Activity() {
 
         if (hasFocus) {
             applyImmersiveMode()
-        } else if (::controllerView.isInitialized) {
-            controllerView.releaseAllInputs()
+        }
+
+        if (
+            ::gameplayLifecycleSafety
+                .isInitialized
+        ) {
+            gameplayLifecycleSafety
+                .onWindowFocusChanged(
+                    hasFocus,
+                )
         }
     }
 
     override fun onStop() {
-        if (::controllerView.isInitialized) {
-            controllerView.releaseAllInputs()
+        if (
+            ::gameplayLifecycleSafety
+                .isInitialized
+        ) {
+            gameplayLifecycleSafety
+                .onStop()
         }
 
         super.onStop()
