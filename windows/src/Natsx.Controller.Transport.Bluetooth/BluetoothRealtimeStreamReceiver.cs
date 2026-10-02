@@ -157,6 +157,66 @@ public sealed class BluetoothRealtimeStreamReceiver : IAsyncDisposable
         }
     }
 
+    public async ValueTask<bool> TrySendHandoverCommitAsync(
+        ProtocolTransport activeTransport,
+        uint stateSequence,
+        CancellationToken cancellationToken = default)
+    {
+        Stream? outputStream =
+            _outputStream;
+
+        if (outputStream is null ||
+            _receiveLoop is null)
+        {
+            return false;
+        }
+
+        byte[] frame =
+            BluetoothControlFrameCodec
+                .EncodeHandoverCommit(
+                    _trustedSession,
+                    new HandoverPayload(
+                        activeTransport,
+                        stateSequence),
+                    GetMonotonicMicroseconds());
+
+        byte[] framed =
+            BluetoothStreamFrameCodec
+                .Encode(
+                    frame);
+
+        await _outputGate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await outputStream.WriteAsync(
+                    framed,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            await outputStream.FlushAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        finally
+        {
+            _outputGate.Release();
+        }
+    }
+
     public TransportHealthSnapshot GetHealthSnapshot(
         TransportRuntimeState state)
     {

@@ -1,12 +1,14 @@
 using Natsx.Controller.Connection;
 using Natsx.Controller.Core;
+using Natsx.Controller.Protocol;
 using Windows.Networking.Sockets;
 
 namespace Natsx.Controller.Transport.Bluetooth;
 
 public sealed class BluetoothControllerTransport :
     IControllerTransport,
-    IControllerOutputTransport
+    IControllerOutputTransport,
+    IControllerStatusOutputTransport
 {
     private readonly BluetoothRealtimeStreamReceiver _receiver;
     private readonly TransportLifecycle _lifecycle;
@@ -273,6 +275,32 @@ public sealed class BluetoothControllerTransport :
         return _receiver.TrySendRumbleAsync(
             rumble,
             cancellationToken);
+    }
+
+    public ValueTask<bool> TrySendHandoverCommitAsync(
+        TransportKind activeTransport,
+        uint stateSequence,
+        CancellationToken cancellationToken = default)
+    {
+        ProtocolTransport protocolTransport =
+            activeTransport switch
+            {
+                TransportKind.Wifi =>
+                    ProtocolTransport.Wifi,
+                TransportKind.Bluetooth =>
+                    ProtocolTransport.Bluetooth,
+                TransportKind.Usb =>
+                    ProtocolTransport.UsbDirect,
+                _ =>
+                    throw new ArgumentOutOfRangeException(
+                        nameof(activeTransport)),
+            };
+
+        return _receiver
+            .TrySendHandoverCommitAsync(
+                protocolTransport,
+                stateSequence,
+                cancellationToken);
     }
 
     private async Task PumpStatesAsync(
