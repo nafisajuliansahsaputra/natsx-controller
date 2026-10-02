@@ -1,6 +1,7 @@
 package com.natsx.controller.core.transport.wifi
 
 import android.os.SystemClock
+import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.ProtocolConstants
 import com.natsx.controller.core.protocol.RumblePayload
@@ -29,6 +30,7 @@ class WifiRealtimeSender(
     private val remoteEndpoint: InetSocketAddress,
     private val trustedSession: WifiTrustedSession,
     private val rumbleSink: (RumblePayload) -> Unit = {},
+    private val handoverSink: (HandoverPayload) -> Unit = {},
 ) : WifiRealtimeLink {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -74,6 +76,10 @@ class WifiRealtimeSender(
 
     @Volatile
     var rumblesReceived: Long = 0
+        private set
+
+    @Volatile
+    var handoverCommitsReceived: Long = 0
         private set
 
     @Volatile
@@ -238,6 +244,18 @@ class WifiRealtimeSender(
 
                         rumbleSink(rumble)
                         rumblesReceived += 1
+                    }
+
+                    MessageType.HANDOVER_COMMIT -> {
+                        val handover =
+                            WifiControlDatagramCodec
+                                .decodeHandoverCommit(
+                                    datagram,
+                                    trustedSession,
+                                )
+
+                        handoverSink(handover)
+                        handoverCommitsReceived += 1
                     }
 
                     else ->

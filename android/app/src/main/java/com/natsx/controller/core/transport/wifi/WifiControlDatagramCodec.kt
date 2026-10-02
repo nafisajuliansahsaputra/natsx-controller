@@ -1,6 +1,8 @@
 package com.natsx.controller.core.transport.wifi
 
 import com.natsx.controller.core.protocol.FrameFlags
+import com.natsx.controller.core.protocol.HandoverPayload
+import com.natsx.controller.core.protocol.HandoverPayloadCodec
 import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.ProtocolFrame
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
@@ -82,6 +84,42 @@ object WifiControlDatagramCodec {
         }
 
         return RumblePayloadCodec.decode(frame.payload)
+    }
+
+    fun encodeHandoverCommit(
+        trustedSession: WifiTrustedSession,
+        payload: HandoverPayload,
+        monotonicTimestampMicros: ULong,
+    ): ByteArray =
+        ProtocolFrameCodec.encode(
+            frame = ProtocolFrame(
+                version = ProtocolVersion.Current,
+                messageType = MessageType.HANDOVER_COMMIT,
+                flags = FrameFlags.AUTHENTICATED,
+                sessionId = trustedSession.sessionId,
+                sequence = 0u,
+                monotonicTimestampMicros = monotonicTimestampMicros,
+                payload = HandoverPayloadCodec.encode(payload),
+            ),
+            authenticationKey =
+                trustedSession.authenticationKey(),
+        )
+
+    fun decodeHandoverCommit(
+        datagram: ByteArray,
+        trustedSession: WifiTrustedSession,
+    ): HandoverPayload {
+        val frame =
+            decodeAuthenticatedFrame(
+                datagram,
+                trustedSession,
+            )
+
+        require(frame.messageType == MessageType.HANDOVER_COMMIT) {
+            "Expected HANDOVER_COMMIT, received " + frame.messageType + "."
+        }
+
+        return HandoverPayloadCodec.decode(frame.payload)
     }
 
     fun encodeHeartbeat(

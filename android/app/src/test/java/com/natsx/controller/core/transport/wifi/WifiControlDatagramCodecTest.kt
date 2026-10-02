@@ -1,11 +1,13 @@
 package com.natsx.controller.core.transport.wifi
 
 import com.natsx.controller.core.protocol.FrameFlags
+import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.PeerId
 import com.natsx.controller.core.protocol.PeerRole
 import com.natsx.controller.core.protocol.ProtocolFrame
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
+import com.natsx.controller.core.protocol.ProtocolTransport
 import com.natsx.controller.core.protocol.ProtocolVersion
 import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.protocol.SessionId
@@ -77,6 +79,32 @@ class WifiControlDatagramCodecTest {
             assertEquals(
                 expected,
                 WifiControlDatagramCodec.decodeRumble(
+                    encoded,
+                    trusted,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun handoverCommitRoundTripPreservesAuthorityAndSequence() {
+        WifiTrustedSession(sessionId, key).use { trusted ->
+            val expected =
+                HandoverPayload(
+                    transport = ProtocolTransport.USB_DIRECT,
+                    stateSequence = 0xCAFE_BABEu,
+                )
+
+            val encoded =
+                WifiControlDatagramCodec.encodeHandoverCommit(
+                    trustedSession = trusted,
+                    payload = expected,
+                    monotonicTimestampMicros = 777uL,
+                )
+
+            assertEquals(
+                expected,
+                WifiControlDatagramCodec.decodeHandoverCommit(
                     encoded,
                     trusted,
                 ),
