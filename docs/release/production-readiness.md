@@ -57,3 +57,10 @@ product:
 Remote desktop, keyboard/mouse remote, game streaming, file transfer, media
 remote, presentation remote, and cloud accounts are explicitly outside the v1
 controller scope.
+
+
+## Exact-commit physical approval
+
+Final physical acceptance is bound to the tested source revision. After clean-machine install, soak, sleep/resume, resource, battery, upgrade, and uninstall validation pass, set `NATSX_PHYSICAL_RELEASE_APPROVED_SHA` to that exact full commit SHA.
+
+A later source change intentionally invalidates the release approval until the variable is moved to the newly validated commit.

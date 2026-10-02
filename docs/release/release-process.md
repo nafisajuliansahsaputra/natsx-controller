@@ -114,3 +114,12 @@ The PFX is decoded only into the runner temporary directory, used to sign NATSX-
 Recent Inno Setup releases explicitly ask commercial users to purchase a commercial license, and an unlicensed compiler identifies itself as non-commercial use. Before a production release, the project owner must confirm that the intended distribution is permitted or covered by an appropriate Inno Setup commercial license, then set `NATSX_INNO_LICENSE_CONFIRMED=true`.
 
 That variable is an explicit release-owner acknowledgement, not an automated legal determination.
+
+
+## Physical approval commit pin
+
+After all physical release gates pass, set repository variable `NATSX_PHYSICAL_RELEASE_APPROVED_SHA` to the exact full Git commit SHA that was tested.
+
+The release workflow compares that variable to `github.sha` and fails if they differ. Any code change after physical approval therefore invalidates the approval automatically and requires the affected final validation to be repeated on the new commit.
+
+Use `docs/testing/results/PRODUCTION-RELEASE-TEMPLATE.md` for the evidence record and `windows/eng/collect-release-evidence.ps1` for the Windows environment snapshot.
