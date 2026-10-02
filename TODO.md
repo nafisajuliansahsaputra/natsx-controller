@@ -407,15 +407,15 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M15 — Release engineering
 
-- [ ] Windows installer strategy.
-- [ ] Driver/backend dependency installation.
-- [ ] elevation flow.
-- [ ] uninstall cleanup.
-- [ ] Android signed release build.
-- [ ] versioning strategy.
-- [ ] changelog.
-- [ ] release checklist.
-- [ ] upgrade/migration behavior.
+- [x] Windows installer strategy.
+- [x] Driver/backend dependency installation.
+- [x] elevation flow.
+- [x] uninstall cleanup.
+- [x] Android signed release build.
+- [x] versioning strategy.
+- [x] changelog.
+- [x] release checklist.
+- [x] upgrade/migration behavior.
 - [ ] crash/log collection strategy that remains local-first/private.
 - [ ] security review.
 - [ ] license/dependency review.

@@ -34,11 +34,41 @@ Name: "{autodesktop}\\NATSX Controller"; Filename: "{app}\\Natsx.Controller.Rece
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
-[Registry]
-Root: HKCU; Subkey: "Software\\Microsoft\\Windows\\CurrentVersion\\Run"; ValueName: "NATSX Controller Receiver"; Flags: uninsdeletevalue
-
 [Run]
-Filename: "{app}\\Natsx.Controller.Receiver.exe"; Description: "Launch NATSX Controller"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\\Natsx.Controller.Receiver.exe"; Description: "Launch NATSX Controller"; Flags: nowait postinstall skipifsilent runasoriginaluser
+
+[UninstallRun]
+Filename: "{app}\\Natsx.Controller.Receiver.exe"; Parameters: "--uninstall-cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "NatsxControllerUserCleanup"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
+
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    if not Exec(
+      ExpandConstant('{app}\\Natsx.Controller.Receiver.exe'),
+      '--install-driver',
+      ExpandConstant('{app}'),
+      SW_HIDE,
+      ewWaitUntilTerminated,
+      ResultCode
+    ) then
+    begin
+      RaiseException('Unable to start the NATSX virtual-controller driver bootstrap.');
+    end;
+
+    if ResultCode <> 0 then
+    begin
+      RaiseException(
+        'NATSX virtual-controller driver bootstrap failed with exit code ' +
+        IntToStr(ResultCode) +
+        '. See %ProgramData%\\NATSX\\Controller\\setup-driver-error.log.'
+      );
+    end;
+  end;
+end;

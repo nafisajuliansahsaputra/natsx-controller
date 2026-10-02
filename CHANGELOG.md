@@ -16,7 +16,7 @@ Application releases follow Semantic Versioning. Protocol compatibility is versi
 - Android manual transport preference with emergency Smart Auto fallback.
 - Windows Receiver tray/startup/recovery UX and live diagnostics.
 - Signed Android release workflow plumbing and Windows publish artifacts.
-- Windows Inno Setup installer strategy.
+- Windows Inno Setup installer with elevated virtual-controller driver bootstrap, normal-user launch, and pairing-preserving uninstall cleanup.
 
 ### Reliability
 

@@ -16,6 +16,19 @@ $publishPath = (Resolve-Path (Join-Path $repoRoot $PublishDir)).Path
 $outputPath = Join-Path $repoRoot $OutputDir
 New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
 
+$requiredPublishedFiles = @(
+    "Natsx.Controller.Receiver.exe",
+    "HIDMaestro.Core.dll"
+)
+
+foreach ($requiredFile in $requiredPublishedFiles) {
+    $requiredPath = Join-Path $publishPath $requiredFile
+
+    if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
+        throw "Required published installer input is missing: $requiredPath"
+    }
+}
+
 $iscc = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
 if ($null -eq $iscc) {
     $candidate = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\\ISCC.exe"

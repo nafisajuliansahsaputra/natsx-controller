@@ -40,7 +40,9 @@ Windows release:
 
 The installer requires administrator elevation because virtual-controller and driver setup may require privileged operations.
 
-Normal uninstall removes installed application files and the Receiver startup entry. It intentionally preserves trusted controller records and local peer identity under %LOCALAPPDATA%\NATSX\Controller so reinstall/upgrade does not force pairing again.
+The installer performs the HIDMaestro/virtual-controller bootstrap while Setup is already elevated. It launches the Receiver in the hidden --install-driver mode, requires a successful backend create/teardown, and aborts installation if that verification fails. The normal post-install Receiver launch is then returned to the original unelevated user context.
+
+Normal uninstall runs the hidden --uninstall-cleanup mode before deleting program files. That removes the per-user Receiver startup entry and Receiver UI settings while intentionally preserving trusted controller records and local peer identity under %LOCALAPPDATA%\NATSX\Controller so reinstall/upgrade does not force pairing again.
 
 Use windows/installer/purge-user-data.ps1 -PurgeTrust only for an explicit full reset.
 

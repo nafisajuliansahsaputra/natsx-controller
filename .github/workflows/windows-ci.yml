@@ -9,11 +9,13 @@ on:
     paths:
       - "windows/**"
       - "Directory.Build.props"
+      - "VERSION"
       - ".github/workflows/windows-ci.yml"
   pull_request:
     paths:
       - "windows/**"
       - "Directory.Build.props"
+      - "VERSION"
       - ".github/workflows/windows-ci.yml"
 
 permissions:
@@ -78,3 +80,15 @@ jobs:
 
       - name: Test
         run: dotnet test windows/Natsx.Controller.slnx --configuration Release --no-build --verbosity normal
+
+      - name: Publish Receiver for installer smoke test
+        shell: pwsh
+        run: dotnet publish windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver-ci
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Compile Windows installer
+        shell: pwsh
+        run: ./windows/installer/build-installer.ps1 -PublishDir "artifacts/windows-receiver-ci" -OutputDir "artifacts/installer-ci"

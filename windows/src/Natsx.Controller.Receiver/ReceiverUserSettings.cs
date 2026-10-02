@@ -105,6 +105,24 @@ internal sealed class ReceiverUserSettings
             RegistryValueKind.String);
     }
 
+    public static void CleanupForUninstall()
+    {
+        using RegistryKey? run =
+            Registry.CurrentUser
+                .OpenSubKey(
+                    RunKeyPath,
+                    writable: true);
+
+        run?.DeleteValue(
+            RunValueName,
+            throwOnMissingValue: false);
+
+        Registry.CurrentUser
+            .DeleteSubKeyTree(
+                SettingsKeyPath,
+                throwOnMissingSubKey: false);
+    }
+
     private static string BuildStartupCommand()
     {
         string executable =
