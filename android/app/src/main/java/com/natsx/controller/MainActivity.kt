@@ -924,10 +924,7 @@ class MainActivity : Activity() {
 
                 renderStatusOverlay()
 
-                if (
-                    ::dialog.isInitialized &&
-                    dialog.isShowing
-                ) {
+                if (dialog.isShowing) {
                     dialog.dismiss()
                 }
             }
