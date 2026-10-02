@@ -62,6 +62,10 @@ class ControllerStatusView(
     private var state =
         ControllerHudState()
 
+    private var safeInsetLeft = 0
+    private var safeInsetTop = 0
+    private var safeInsetRight = 0
+
     init {
         isClickable = false
         isFocusable = false
@@ -81,6 +85,32 @@ class ControllerStatusView(
         invalidate()
     }
 
+    fun applySafeInsets(
+        left: Int,
+        top: Int,
+        right: Int,
+    ) {
+        val nextLeft =
+            left.coerceAtLeast(0)
+        val nextTop =
+            top.coerceAtLeast(0)
+        val nextRight =
+            right.coerceAtLeast(0)
+
+        if (
+            safeInsetLeft == nextLeft &&
+            safeInsetTop == nextTop &&
+            safeInsetRight == nextRight
+        ) {
+            return
+        }
+
+        safeInsetLeft = nextLeft
+        safeInsetTop = nextTop
+        safeInsetRight = nextRight
+        invalidate()
+    }
+
     override fun onDraw(
         canvas: Canvas,
     ) {
@@ -90,9 +120,24 @@ class ControllerStatusView(
             return
         }
 
+        val contentWidth =
+            (
+                width -
+                    safeInsetLeft -
+                    safeInsetRight
+            )
+                .coerceAtLeast(
+                    1,
+                )
+
+        val contentCenterX =
+            safeInsetLeft +
+                contentWidth /
+                    2f
+
         val scale =
             min(
-                width / 1920f,
+                contentWidth / 1920f,
                 height / 320f,
             )
                 .coerceAtLeast(
@@ -107,11 +152,14 @@ class ControllerStatusView(
             iconSize * 4f +
                 gap * 3f
         val firstCenterX =
-            width / 2f -
+            contentCenterX -
                 groupWidth / 2f +
                 iconSize / 2f
         val iconCenterY =
-            24f * density * scale
+            safeInsetTop +
+                24f *
+                    density *
+                    scale
 
         val stroke =
             (2f * density * scale)
@@ -174,7 +222,7 @@ class ControllerStatusView(
         drawCenteredText(
             canvas = canvas,
             text = "NATSX",
-            x = width / 2f,
+            x = contentCenterX,
             y =
                 iconCenterY +
                     44f * density * scale,
@@ -205,9 +253,9 @@ class ControllerStatusView(
             }
 
         tempRect.set(
-            width / 2f - lampWidth / 2f,
+            contentCenterX - lampWidth / 2f,
             lampCenterY - lampHeight / 2f,
-            width / 2f + lampWidth / 2f,
+            contentCenterX + lampWidth / 2f,
             lampCenterY + lampHeight / 2f,
         )
 
@@ -235,7 +283,7 @@ class ControllerStatusView(
                 drawCenteredText(
                     canvas = canvas,
                     text = message,
-                    x = width / 2f,
+                    x = contentCenterX,
                     y =
                         lampCenterY +
                             21f * density * scale,
@@ -319,9 +367,9 @@ class ControllerStatusView(
                 )
 
         tempRect.set(
-            centerX - width / 2f,
+            centerX - contentCenterX,
             centerY - height / 2f,
-            centerX + width / 2f,
+            centerX + contentCenterX,
             centerY + height / 2f,
         )
 
@@ -336,10 +384,10 @@ class ControllerStatusView(
             size * 0.10f
 
         tempRect.set(
-            centerX + width / 2f +
+            centerX + contentCenterX +
                 inactivePaint.strokeWidth,
             centerY - height * 0.17f,
-            centerX + width / 2f +
+            centerX + contentCenterX +
                 terminalWidth,
             centerY + height * 0.17f,
         )
@@ -387,11 +435,11 @@ class ControllerStatusView(
             }
 
         tempRect.set(
-            centerX - width / 2f +
+            centerX - contentCenterX +
                 innerPadding,
             centerY - height / 2f +
                 innerPadding,
-            centerX - width / 2f +
+            centerX - contentCenterX +
                 innerPadding +
                 availableWidth *
                     fillFraction.coerceIn(
