@@ -25,7 +25,8 @@ enum class MessageType(val wireValue: Int) {
     PAIRING_OFFER(13),
     PAIRING_RESPONSE(14),
     PAIRING_CONFIRM(15),
-    PAIRING_ABORT(16);
+    PAIRING_ABORT(16),
+    TRANSPORT_PREFERENCE(17);
 
     companion object {
         fun fromWireValue(value: Int): MessageType? =

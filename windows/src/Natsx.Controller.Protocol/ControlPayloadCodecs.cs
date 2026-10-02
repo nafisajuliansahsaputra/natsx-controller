@@ -9,6 +9,69 @@ public enum ProtocolTransport : byte
     UsbDirect = 3,
 }
 
+public enum TransportPreferenceMode : byte
+{
+    Auto = 0,
+    Wifi = 1,
+    Bluetooth = 2,
+    UsbDirect = 3,
+}
+
+public readonly record struct TransportPreferencePayload(
+    TransportPreferenceMode Mode);
+
+public static class TransportPreferencePayloadCodec
+{
+    public const int PayloadSize = 4;
+
+    public static byte[] Encode(
+        TransportPreferencePayload payload)
+    {
+        ValidateMode(payload.Mode);
+
+        return
+        [
+            (byte)payload.Mode,
+            0,
+            0,
+            0,
+        ];
+    }
+
+    public static TransportPreferencePayload Decode(
+        ReadOnlySpan<byte> bytes)
+    {
+        if (bytes.Length != PayloadSize)
+        {
+            throw new FormatException(
+                $"TRANSPORT_PREFERENCE payload must be exactly {PayloadSize} bytes.");
+        }
+
+        TransportReadyPayloadCodec
+            .EnsureReservedZero(
+                bytes[1..4],
+                "TRANSPORT_PREFERENCE");
+
+        var mode =
+            (TransportPreferenceMode)bytes[0];
+
+        ValidateMode(mode);
+
+        return new TransportPreferencePayload(
+            mode);
+    }
+
+    private static void ValidateMode(
+        TransportPreferenceMode mode)
+    {
+        if (!Enum.IsDefined(mode))
+        {
+            throw new FormatException(
+                "Unknown transport preference mode.");
+        }
+    }
+}
+
 public readonly record struct HeartbeatAckPayload(ulong EchoedTimestampMicros);
 
 public static class HeartbeatAckPayloadCodec

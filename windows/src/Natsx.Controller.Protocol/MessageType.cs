@@ -18,4 +18,5 @@ public enum MessageType : byte
     PairingResponse = 14,
     PairingConfirm = 15,
     PairingAbort = 16,
+    TransportPreference = 17,
 }
