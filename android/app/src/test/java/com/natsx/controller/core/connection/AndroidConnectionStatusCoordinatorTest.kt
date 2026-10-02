@@ -143,6 +143,49 @@ class AndroidConnectionStatusCoordinatorTest {
     }
 
     @Test
+    fun resetAuthorityAllowsFreshSequenceAfterRuntimeRestart() {
+        val coordinator =
+            AndroidConnectionStatusCoordinator()
+
+        assertTrue(
+            coordinator.applyHandoverCommit(
+                HandoverPayload(
+                    transport =
+                        ProtocolTransport.USB_DIRECT,
+                    stateSequence = 500u,
+                ),
+            ),
+        )
+
+        coordinator.resetSmartAutoAuthority()
+
+        assertEquals(
+            null,
+            coordinator.current()
+                .smartAutoActiveTransport,
+        )
+        assertEquals(
+            null,
+            coordinator.current()
+                .smartAutoStateSequence,
+        )
+
+        assertTrue(
+            coordinator.applyHandoverCommit(
+                HandoverPayload(
+                    transport = ProtocolTransport.WIFI,
+                    stateSequence = 1u,
+                ),
+            ),
+        )
+        assertEquals(
+            ProtocolTransport.WIFI,
+            coordinator.current()
+                .smartAutoActiveTransport,
+        )
+    }
+
+    @Test
     fun localLinkRefreshPreservesWindowsAuthority() {
         val coordinator =
             AndroidConnectionStatusCoordinator()

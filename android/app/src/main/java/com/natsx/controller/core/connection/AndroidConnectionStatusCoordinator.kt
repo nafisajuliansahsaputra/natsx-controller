@@ -110,6 +110,27 @@ class AndroidConnectionStatusCoordinator {
         return changed != null
     }
 
+    fun resetSmartAutoAuthority() {
+        val changed =
+            synchronized(gate) {
+                if (
+                    current.smartAutoActiveTransport == null &&
+                    current.smartAutoStateSequence == null
+                ) {
+                    null
+                } else {
+                    commitLocked(
+                        current.copy(
+                            smartAutoActiveTransport = null,
+                            smartAutoStateSequence = null,
+                        ),
+                    )
+                }
+            }
+
+        notifyIfChanged(changed)
+    }
+
     fun addListener(
         listener: (AndroidConnectionStatus) -> Unit,
     ) {

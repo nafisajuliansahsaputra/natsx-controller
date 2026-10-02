@@ -142,6 +142,8 @@ class ControllerService : Service() {
         super.onCreate()
 
         app = application as NatsxControllerApplication
+        app.connectionStatus.resetSmartAutoAuthority()
+
         realtimePublisher = ControllerRealtimePublisher(
             stateStore = app.gamepadStateStore,
             broadcaster = app.realtimeBroadcaster,
