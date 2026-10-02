@@ -2,6 +2,7 @@ package com.natsx.controller
 
 import android.app.Application
 import com.natsx.controller.core.connection.AndroidConnectionStatusCoordinator
+import com.natsx.controller.core.connection.TransportPreferenceSettings
 import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.haptics.AndroidHapticEngine
 import com.natsx.controller.core.haptics.HapticSettings
@@ -68,6 +69,14 @@ class NatsxControllerApplication : Application() {
 
     val wifiEndpointCache: WifiEndpointCache by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         SharedPreferencesWifiEndpointCache(connectionPreferences)
+    }
+
+    val transportPreferenceSettings: TransportPreferenceSettings by lazy(
+        LazyThreadSafetyMode.SYNCHRONIZED,
+    ) {
+        TransportPreferenceSettings(
+            connectionPreferences,
+        )
     }
 
     val gamepadStateStore: GamepadStateStore by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
