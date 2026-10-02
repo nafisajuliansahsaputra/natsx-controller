@@ -19,6 +19,7 @@ import com.natsx.controller.NatsxControllerApplication
 import com.natsx.controller.core.connection.AndroidConnectionStatus
 import com.natsx.controller.core.connection.AndroidLinkState
 import com.natsx.controller.core.protocol.PeerId
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.session.ControllerRealtimePublisher
 import com.natsx.controller.core.transport.bluetooth.BluetoothAutoReconnectRuntime
 import com.natsx.controller.core.transport.bluetooth.BluetoothPermissionGate
@@ -595,12 +596,38 @@ class ControllerService : Service() {
                     }
                 }.also {
                     publishConnectionStatus()
+                    broadcastTransportPreference()
                 }
             },
             0,
             USB_ATTACH_POLL_MILLIS,
             TimeUnit.MILLISECONDS,
         )
+    }
+
+    private fun broadcastTransportPreference() {
+        val payload:
+            TransportPreferencePayload =
+            app.transportPreferenceSettings
+                .preference
+                .toPayload()
+
+        wifiRuntime
+            ?.trySendTransportPreference(
+                payload,
+            )
+
+        bluetoothRuntime
+            ?.trySendTransportPreference(
+                payload,
+            )
+
+        if (::usbRuntime.isInitialized) {
+            usbRuntime
+                .trySendTransportPreference(
+                    payload,
+                )
+        }
     }
 
     private fun publishConnectionStatus() {
