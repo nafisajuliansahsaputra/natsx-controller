@@ -8,12 +8,14 @@ The codebase is ready for final physical release validation only when all of
 the following are true:
 
 - Android CI is green, including lint, unit tests, and APK assembly;
-- Windows CI is green, including build, tests, publish, and installer compile;
+- Windows CI is green, including build, tests, publish, installer compile, and full install/repair/reconnect/uninstall lifecycle;
 - Windows Driver CI is green;
 - HIDMaestro bootstrap CI is green;
 - the driver production gate rejects CI/test/attestation packages;
 - the reproducible HLK driver payload builds;
 - hot-path allocation regression tests pass;
+- the Windows Receiver remains `asInvoker` and privileged virtual-controller work is isolated to the Program-Files-only LocalSystem GamepadHost;
+- installer post-install verification fails closed if the unelevated Receiver cannot use the GamepadHost;
 - release metadata/signing gates fail closed;
 - no release artifact is produced from a `-dev` version;
 - Windows app and installer Authenticode signing are mandatory;
@@ -36,7 +38,8 @@ These cannot be truthfully completed by source code or CI alone:
 - Windows sleep/resume;
 - CPU/resource review on representative hardware;
 - Android battery/thermal review;
-- upgrade/uninstall physical validation.
+- upgrade/uninstall physical validation;
+- standard-user game/XInput validation that the LocalSystem-created Xbox 360 virtual controller is visible and usable by the target game.
 
 The release workflow deliberately blocks on the external signing/license
 inputs rather than silently producing a reduced Wi-Fi/Bluetooth-only build.

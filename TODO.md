@@ -106,6 +106,11 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Submit sticks.
 - [x] Submit triggers.
 - [x] Verify device remains alive while session transport is absent/recovering.
+- [x] Isolate privileged HIDMaestro ownership in the LocalSystem GamepadHost service.
+- [x] Keep the network-facing Receiver explicitly unelevated (`asInvoker`).
+- [x] Add authenticated local Receiver -> GamepadHost IPC with fixed protocol.
+- [x] Add stale-client watchdog neutralization and automatic host reconnect.
+- [x] Keep one persistent virtual controller across Receiver reconnects.
 - [x] Implement output/rumble callback boundary.
 - [x] Add virtual-backend diagnostics.
 
@@ -408,7 +413,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ## M15 — Release engineering
 
 - [x] Windows installer strategy.
-- [ ] Driver/backend dependency installation (installer/release gate is wired and HIDMaestro is complete; Microsoft retail-signed USB AOA driver packages plus clean-machine validation are still required for feature-complete production).
+- [ ] Driver/backend dependency installation (HIDMaestro bootstrap, privileged GamepadHost runtime, install/repair/reconnect/uninstall lifecycle, and release gates are complete in CI; Microsoft retail-signed USB AOA driver packages plus clean-machine physical validation are still required for feature-complete production).
 - [x] elevation flow.
 - [x] uninstall cleanup.
 - [x] Android signed release build.

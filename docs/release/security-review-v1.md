@@ -25,6 +25,14 @@ The v1 design assumes that untrusted devices may exist on the same LAN, arbitrar
 - Local crash logging uploads nothing automatically and does not intentionally record raw controller frames, trust secrets, pairing proofs, or session keys.
 - The Windows USB bootstrap package is hardware-ID scoped to the validated OPPO A58 no-ADB target; the AOA WinUSB package is restricted to the expected Google AOA IDs/interfaces.
 - CI test certificates are ephemeral and explicitly marked non-shipping.
+- The network-facing Windows Receiver is explicitly `asInvoker`; it is never elevated for normal runtime.
+- Privileged HIDMaestro runtime ownership is isolated in the minimal LocalSystem `NatsxControllerGamepadHost` service.
+- The LocalSystem service executable must live below Program Files; the installer rejects user-writable service roots.
+- GamepadHost exposes no network listener and parses none of the Wi-Fi/Bluetooth/USB/pairing protocol.
+- Receiver/GamepadHost IPC is local-only, uses a fixed versioned frame protocol, has a restrictive pipe ACL, and validates the connected client process path against the installed Receiver executable.
+- The GamepadHost keeps the virtual controller alive across Receiver reconnects, neutralizes stale sessions after 500 ms, and drops the pipe rather than retaining stale input.
+- Normal GamepadHost runtime does not re-run HIDMaestro's install/global sweep when the machine dependency is already present.
+- Windows CI exercises first install, unelevated Receiver-to-host smoke, GamepadHost stop/start with automatic Receiver reconnect, repair/upgrade preservation, and uninstall cleanup.
 
 ## Supply-chain controls
 
@@ -35,7 +43,7 @@ The v1 design assumes that untrusted devices may exist on the same LAN, arbitrar
 
 ## Findings and disposition
 
-No critical/high-severity code finding was identified in the reviewed trust/session/transport paths.
+No critical/high-severity code finding was identified in the reviewed trust/session/transport or privileged GamepadHost boundary paths. The previous design risk of letting the network-facing Receiver directly own privileged HIDMaestro runtime operations has been removed: normal gameplay now crosses a narrow local IPC boundary into the LocalSystem service.
 
 One release-blocking packaging finding remains by design: CI-generated NATSX USB driver packages are test-signed and MUST NOT ship. Clean-machine USB Direct requires production-signed KMDF AOA-bootstrap and AOA WinUSB packages, validated and bundled by the production installer. Until those packages are available, a release may exercise Wi-Fi/Bluetooth but must not be called feature-complete production because that would remove the promised USB Direct path.
 

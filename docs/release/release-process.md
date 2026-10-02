@@ -35,8 +35,8 @@ Android release:
 Windows release:
 
 - restores and tests the solution;
-- publishes a self-contained win-x64 Receiver;
-- Authenticode-signs and verifies NATSX-owned Receiver binaries;
+- publishes a self-contained win-x64 Receiver and GamepadHost;
+- Authenticode-signs and verifies NATSX-owned Receiver/GamepadHost binaries;
 - builds the Inno Setup installer only when the production dependency gate is satisfied;
 - Authenticode-signs and verifies the final installer;
 - emits SHA-256 checksum files for Windows artifacts;
@@ -44,13 +44,48 @@ Windows release:
 
 ## Windows installer policy
 
-The installer requires administrator elevation because virtual-controller and driver setup may require privileged operations.
+The installer requires administrator elevation because driver/bootstrap setup,
+firewall configuration, and registration of the privileged virtual-controller
+service require machine-level access. The normal Receiver itself remains
+explicitly unelevated (`asInvoker`).
 
-The installer performs the HIDMaestro/virtual-controller bootstrap while Setup is already elevated. It launches the Receiver in the hidden --install-driver mode, requires a successful backend create/teardown, and aborts installation if that verification fails. The normal post-install Receiver launch is then returned to the original unelevated user context.
+Setup performs one elevated HIDMaestro compatibility/bootstrap verification via
+the hidden Receiver `--install-driver` mode. After that, runtime HIDMaestro
+ownership moves to `NatsxControllerGamepadHost`, a minimal LocalSystem Windows
+service installed only below Program Files. The service owns one persistent
+Xbox 360-compatible virtual controller and exposes only a fixed local named-pipe
+protocol to the Receiver.
 
-Normal uninstall runs the hidden --uninstall-cleanup mode before deleting program files. That removes the per-user Receiver startup entry and Receiver UI settings while intentionally preserving trusted controller records and local peer identity under %LOCALAPPDATA%\NATSX\Controller so reinstall/upgrade does not force pairing again.
+After service registration/start, Setup launches the installed Receiver as the
+original unelevated user with `--verify-gamepad-host`. Installation fails closed
+with a nonzero Setup exit code if that boundary cannot create/use the virtual
+controller. Clean-install rollback removes newly created NATSX service/firewall
+side effects; failed repair/upgrade preserves dependencies that belonged to the
+previous working install.
 
-Use windows/installer/purge-user-data.ps1 -PurgeTrust only for an explicit full reset.
+Normal runtime is therefore:
+
+```text
+unelevated Receiver
+  -> PipeVirtualGamepadBackend
+  -> local authenticated named pipe
+  -> LocalSystem GamepadHost
+  -> HIDMaestro Xbox 360 backend
+```
+
+Windows CI validates first install, service identity/start mode, unelevated host
+smoke, GamepadHost stop/start with automatic Receiver reconnect, repair/upgrade
+preservation, firewall scoping, and uninstall cleanup.
+
+Normal uninstall stops/deletes the NATSX GamepadHost service and runs the hidden
+`--uninstall-cleanup` mode before deleting program files. It removes the
+per-user Receiver startup entry and Receiver UI settings while intentionally
+preserving trusted controller records and local peer identity under
+`%LOCALAPPDATA%\NATSX\Controller` so reinstall/upgrade does not force pairing
+again.
+
+Use `windows/installer/purge-user-data.ps1 -PurgeTrust` only for an explicit
+full reset.
 
 ## Release checklist
 
@@ -61,6 +96,7 @@ Use windows/installer/purge-user-data.ps1 -PurgeTrust only for an explicit full 
 - [ ] Validate Android release signing.
 - [ ] Validate Windows publish artifact on a clean Windows machine.
 - [ ] Validate production-signed driver/backend installation.
+- [ ] Validate GamepadHost-created Xbox 360 controller is visible to the target game from a standard-user session.
 - [ ] Validate upgrade over previous installed version.
 - [ ] Validate normal uninstall preserves pairing data.
 - [ ] Validate explicit purge removes pairing data.
@@ -138,6 +174,6 @@ Normal uninstall removes only that exact NATSX rule. Setup rollback also removes
 
 HIDMaestro is installed machine-wide and its upstream SDK exposes an uninstall-grade global cleanup that removes all HIDMaestro virtual controllers and installed HIDMaestro packages.
 
-NATSX does **not** call that global cleanup during normal uninstall. The installer cannot prove that NATSX is the only HIDMaestro consumer on the machine, so removing a shared machine dependency could break another application. Normal NATSX uninstall removes NATSX-owned files, settings/startup state, firewall rule, and NATSX AOA driver packages while leaving the shared HIDMaestro installation available.
+NATSX does **not** call that global cleanup during normal uninstall or normal GamepadHost runtime. Setup may run the pinned compatibility bootstrap explicitly, but once the dependency is present the service creates/owns only the NATSX virtual controller and avoids the upstream install/global-sweep path. The installer cannot prove that NATSX is the only HIDMaestro consumer on the machine, so removing a shared machine dependency could break another application. Normal NATSX uninstall removes NATSX-owned files, GamepadHost service, settings/startup state, firewall rule, and NATSX AOA driver packages while leaving the shared HIDMaestro installation available.
 
 A true HIDMaestro machine purge is therefore an explicit administrator maintenance operation outside normal NATSX uninstall and must only be performed when the operator has confirmed no other application depends on HIDMaestro.
