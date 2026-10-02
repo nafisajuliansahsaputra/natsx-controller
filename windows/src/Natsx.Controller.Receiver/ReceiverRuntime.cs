@@ -2081,6 +2081,15 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                     activeKind);
         }
 
+        HidMaestroVirtualGamepadDiagnostics gamepadDiagnostics =
+            _virtualGamepad?.GetDiagnostics() ??
+            new HidMaestroVirtualGamepadDiagnostics(
+                false,
+                HidMaestroVirtualGamepadBackend.ProfileId,
+                HidMaestroVirtualGamepadBackend.IdentityKey,
+                0,
+                0);
+
         DiagnosticsChanged?.Invoke(
             new ReceiverDiagnosticsSnapshot(
                 SmartAutoState:
@@ -2096,9 +2105,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                             ", ",
                             backup),
                 VirtualControllerStatus:
-                    _virtualGamepad?.IsStarted == true
-                        ? "Ready"
-                        : "Unavailable",
+                    gamepadDiagnostics.IsStarted
+                        ? $"Ready • {gamepadDiagnostics.ProfileId} • {gamepadDiagnostics.SubmittedStateCount} states • {gamepadDiagnostics.RumblePacketCount} rumble"
+                        : $"Unavailable • {gamepadDiagnostics.ProfileId}",
                 TrustedControllerCount:
                     trustedControllerCount,
                 TrustedControllerPeerId:

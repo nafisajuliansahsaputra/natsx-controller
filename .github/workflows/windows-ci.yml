@@ -78,6 +78,9 @@ jobs:
       - name: Restore
         run: dotnet restore windows/Natsx.Controller.slnx
 
+      - name: Verify C# whitespace formatting
+        run: dotnet format whitespace windows/Natsx.Controller.slnx --verify-no-changes --no-restore --verbosity minimal
+
       - name: Build
         run: dotnet build windows/Natsx.Controller.slnx --configuration Release --no-restore
 

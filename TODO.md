@@ -107,7 +107,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Submit triggers.
 - [x] Verify device remains alive while session transport is absent/recovering.
 - [x] Implement output/rumble callback boundary.
-- [ ] Add virtual-backend diagnostics.
+- [x] Add virtual-backend diagnostics.
 
 **Exit criteria:** Windows can drive the virtual controller from deterministic internal test states without any phone connection.
 

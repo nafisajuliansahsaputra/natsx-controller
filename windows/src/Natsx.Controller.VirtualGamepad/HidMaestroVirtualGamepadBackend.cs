@@ -3,6 +3,13 @@ using Natsx.Controller.Core;
 
 namespace Natsx.Controller.VirtualGamepad;
 
+public readonly record struct HidMaestroVirtualGamepadDiagnostics(
+    bool IsStarted,
+    string ProfileId,
+    string IdentityKey,
+    long SubmittedStateCount,
+    long RumblePacketCount);
+
 public sealed class HidMaestroVirtualGamepadBackend : IVirtualGamepadBackend
 {
     public const string ProfileId = "xbox-360-wired";
@@ -17,10 +24,22 @@ public sealed class HidMaestroVirtualGamepadBackend : IVirtualGamepadBackend
     private HMAxis _rightY = HMAxis.None;
     private HMAxis _leftTrigger = HMAxis.None;
     private HMAxis _rightTrigger = HMAxis.None;
+    private long _submittedStateCount;
+    private long _rumblePacketCount;
 
     public bool IsStarted => _controller is not null;
 
     public event Action<RumbleState>? RumbleReceived;
+
+    public HidMaestroVirtualGamepadDiagnostics GetDiagnostics() =>
+        new(
+            IsStarted,
+            ProfileId,
+            IdentityKey,
+            Interlocked.Read(
+                ref _submittedStateCount),
+            Interlocked.Read(
+                ref _rumblePacketCount));
 
     public ValueTask StartAsync(CancellationToken cancellationToken = default)
     {
@@ -116,6 +135,9 @@ public sealed class HidMaestroVirtualGamepadBackend : IVirtualGamepadBackend
 
         ApplyState(state);
         controller.SubmitState(in _nativeState);
+
+        Interlocked.Increment(
+            ref _submittedStateCount);
     }
 
     public async ValueTask DisposeAsync()
@@ -213,6 +235,9 @@ public sealed class HidMaestroVirtualGamepadBackend : IVirtualGamepadBackend
         {
             return;
         }
+
+        Interlocked.Increment(
+            ref _rumblePacketCount);
 
         RumbleReceived?.Invoke(new RumbleState(
             LowFrequencyMotor: data[2],
