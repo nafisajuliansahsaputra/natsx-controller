@@ -1,5 +1,6 @@
 package com.natsx.controller.core.transport.bluetooth
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
@@ -168,6 +169,7 @@ class BluetoothRfcommConnector(
                 "65dbf3c2-1b88-4ac8-9a1d-3b7c9f5f6e11",
             )
 
+        @SuppressLint("MissingPermission")
         fun forDevice(
             context: Context,
             device: BluetoothDevice,
@@ -188,11 +190,18 @@ class BluetoothRfcommConnector(
             require(permissionGate.isBluetoothEnabled()) {
                 "Bluetooth is disabled."
             }
-            require(
-                device.bondState ==
-                    BluetoothDevice.BOND_BONDED,
-            ) {
-                "Bluetooth receiver is not OS-bonded. Complete pairing first."
+            try {
+                require(
+                    device.bondState ==
+                        BluetoothDevice.BOND_BONDED,
+                ) {
+                    "Bluetooth receiver is not OS-bonded. Complete pairing first."
+                }
+            } catch (exception: SecurityException) {
+                throw IllegalStateException(
+                    "Bluetooth permission was revoked while checking receiver bonding.",
+                    exception,
+                )
             }
 
             val manager =
@@ -206,17 +215,24 @@ class BluetoothRfcommConnector(
 
             val provider =
                 BluetoothRfcommSocketProvider {
-                    // Discovery slows RFCOMM setup and is unnecessary when
-                    // connecting to an already selected / bonded receiver.
-                    runCatching {
-                        adapter.cancelDiscovery()
-                    }
+                    try {
+                        // Discovery slows RFCOMM setup and is unnecessary when
+                        // connecting to an already selected / bonded receiver.
+                        runCatching {
+                            adapter.cancelDiscovery()
+                        }
 
-                    AndroidBluetoothRfcommSocket(
-                        device.createRfcommSocketToServiceRecord(
-                            SERVICE_UUID,
-                        ),
-                    )
+                        AndroidBluetoothRfcommSocket(
+                            device.createRfcommSocketToServiceRecord(
+                                SERVICE_UUID,
+                            ),
+                        )
+                    } catch (exception: SecurityException) {
+                        throw IllegalStateException(
+                            "Bluetooth permission was revoked while opening RFCOMM.",
+                            exception,
+                        )
+                    }
                 }
 
             return BluetoothRfcommConnector(

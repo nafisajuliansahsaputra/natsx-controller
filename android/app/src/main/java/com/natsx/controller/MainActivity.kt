@@ -154,26 +154,31 @@ class MainActivity : Activity() {
                 _,
                 insets,
             ->
-            val cutout =
-                if (
-                    Build.VERSION.SDK_INT >=
-                    Build.VERSION_CODES.P
-                ) {
+            if (
+                Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.P
+            ) {
+                val cutout =
                     insets.displayCutout
-                } else {
-                    null
-                }
 
-            controllerView.applySafeInsets(
-                cutout?.safeInsetLeft
-                    ?: 0,
-                cutout?.safeInsetTop
-                    ?: 0,
-                cutout?.safeInsetRight
-                    ?: 0,
-                cutout?.safeInsetBottom
-                    ?: 0,
-            )
+                controllerView.applySafeInsets(
+                    cutout?.safeInsetLeft
+                        ?: 0,
+                    cutout?.safeInsetTop
+                        ?: 0,
+                    cutout?.safeInsetRight
+                        ?: 0,
+                    cutout?.safeInsetBottom
+                        ?: 0,
+                )
+            } else {
+                controllerView.applySafeInsets(
+                    0,
+                    0,
+                    0,
+                    0,
+                )
+            }
 
             insets
         }

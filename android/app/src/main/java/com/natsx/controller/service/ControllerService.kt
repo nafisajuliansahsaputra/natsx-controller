@@ -1,5 +1,6 @@
 package com.natsx.controller.service
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -94,12 +95,18 @@ class ControllerService : Service() {
                         usbPermissionRequestInFlight.set(false)
 
                         if (
+                            accessory != null &&
+                            UsbAccessoryIdentity.matches(
+                                accessory,
+                            ) &&
                             intent.getBooleanExtra(
                                 UsbManager.EXTRA_PERMISSION_GRANTED,
                                 false,
                             ) &&
-                            accessory != null &&
-                            UsbAccessoryIdentity.matches(accessory)
+                            UsbAccessoryConnector.hasPermission(
+                                usbManager,
+                                accessory,
+                            )
                         ) {
                             app.usbRuntimeStatus.publish(
                                 "USB permission granted. Connecting…",
@@ -434,6 +441,7 @@ class ControllerService : Service() {
         }
     }
 
+    @SuppressLint("MissingPermission")
     private fun createBondedBluetoothLink(
         receiverPeerId: PeerId,
     ): BluetoothRealtimeLink {
@@ -460,14 +468,21 @@ class ControllerService : Service() {
             }
 
         val candidates =
-            adapter.bondedDevices
-                .filter {
-                    it.bondState ==
-                        BluetoothDevice.BOND_BONDED
-                }
-                .sortedBy {
-                    it.address
-                }
+            try {
+                adapter.bondedDevices
+                    .filter {
+                        it.bondState ==
+                            BluetoothDevice.BOND_BONDED
+                    }
+                    .sortedBy {
+                        it.address
+                    }
+            } catch (exception: SecurityException) {
+                throw IllegalStateException(
+                    "Bluetooth permission was revoked while enumerating bonded devices.",
+                    exception,
+                )
+            }
 
         require(candidates.isNotEmpty()) {
             "No OS-bonded Bluetooth devices are available."
@@ -525,6 +540,7 @@ class ControllerService : Service() {
         return false
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private fun registerUsbReceiver() {
         val filter =
             IntentFilter().apply {
@@ -544,6 +560,10 @@ class ControllerService : Service() {
                 RECEIVER_NOT_EXPORTED,
             )
         } else {
+            // Android 8-12 do not expose RECEIVER_NOT_EXPORTED for dynamic
+            // receivers. The custom permission callback is package-scoped by
+            // PendingIntent and UsbManager.hasPermission is rechecked before
+            // opening the accessory, so a spoofed broadcast cannot grant USB.
             @Suppress("DEPRECATION")
             registerReceiver(
                 usbReceiver,

@@ -1,5 +1,6 @@
 package com.natsx.controller.core.transport.bluetooth
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.os.SystemClock
 
@@ -15,6 +16,14 @@ interface BluetoothBondDevice {
     fun requestBond(): Boolean
 }
 
+/**
+ * Thin adapter around BluetoothDevice.
+ *
+ * Runtime callers must pass through BluetoothPermissionGate before creating or
+ * using this adapter. Permission can still be revoked asynchronously, so the
+ * higher-level pairing flow treats SecurityException as a connection failure.
+ */
+@SuppressLint("MissingPermission")
 class AndroidBluetoothBondDevice(
     private val device: BluetoothDevice,
 ) : BluetoothBondDevice {
