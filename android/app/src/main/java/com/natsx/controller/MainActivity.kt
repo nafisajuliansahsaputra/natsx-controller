@@ -100,6 +100,10 @@ class MainActivity : Activity() {
                 applyStickCalibration(
                     app.inputSettings.calibration(),
                 )
+                applyControllerLayout(
+                    app.controllerLayoutSettings
+                        .current(),
+                )
             }
 
         setContentView(
@@ -528,6 +532,17 @@ class MainActivity : Activity() {
                 }
             }
 
+        val layoutButton =
+            Button(this).apply {
+                text =
+                    "Layout — " +
+                        layoutStatusLabel()
+
+                setOnClickListener {
+                    showControllerLayoutEditor()
+                }
+            }
+
         val leftDeadzoneLabel =
             TextView(this)
         val leftSensitivityLabel =
@@ -696,6 +711,7 @@ class MainActivity : Activity() {
         container.addView(transportButton)
         container.addView(diagnosticsButton)
         container.addView(calibrationButton)
+        container.addView(layoutButton)
         container.addView(leftDeadzoneLabel)
         container.addView(leftDeadzone)
         container.addView(leftSensitivityLabel)
@@ -847,6 +863,22 @@ class MainActivity : Activity() {
                         " • range " +
                         "${(calibration.right.travelScale * 100f).roundToInt()}%",
                 )
+
+                val customLayout =
+                    app.controllerLayoutSettings
+                        .current()
+
+                appendLine(
+                    "Custom layout: " +
+                        if (
+                            customLayout.positions
+                                .isEmpty()
+                        ) {
+                            "Default"
+                        } else {
+                            "${customLayout.positions.size} moved controls"
+                        },
+                )
                 appendLine()
                 appendLine("USB runtime")
                 append(
@@ -889,6 +921,105 @@ class MainActivity : Activity() {
                 }
                 show()
             }
+    }
+
+    private fun layoutStatusLabel(): String =
+        if (
+            app.controllerLayoutSettings
+                .current()
+                .positions
+                .isEmpty()
+        ) {
+            "Default"
+        } else {
+            "Custom"
+        }
+
+    private fun showControllerLayoutEditor() {
+        controllerView.releaseAllInputs()
+
+        val editor =
+            ControllerSurfaceView(
+                context = this,
+                stateStore =
+                    GamepadStateStore(),
+                hapticLevel = {
+                    HapticLevel.OFF
+                },
+            ).apply {
+                applyInputTuning(
+                    app.inputSettings.current(),
+                )
+                applyStickCalibration(
+                    app.inputSettings.calibration(),
+                )
+                applyControllerLayout(
+                    app.controllerLayoutSettings
+                        .current(),
+                )
+                setLayoutEditing(
+                    true,
+                )
+            }
+
+        val dialog =
+            AlertDialog.Builder(this)
+                .setTitle("Custom controller layout")
+                .setMessage(
+                    "Drag any control to reposition it. Gameplay input is disabled inside this preview.",
+                )
+                .setView(editor)
+                .setPositiveButton(
+                    "Save",
+                ) { _, _ ->
+                    val layout =
+                        editor
+                            .currentControllerLayout()
+
+                    app.controllerLayoutSettings
+                        .update(layout)
+
+                    controllerView
+                        .applyControllerLayout(
+                            layout,
+                        )
+
+                    renderStatusOverlay()
+                }
+                .setNegativeButton(
+                    "Cancel",
+                    null,
+                )
+                .setNeutralButton(
+                    "Reset",
+                ) { _, _ ->
+                    app.controllerLayoutSettings
+                        .reset()
+
+                    controllerView
+                        .applyControllerLayout(
+                            app.controllerLayoutSettings
+                                .current(),
+                        )
+
+                    renderStatusOverlay()
+                }
+                .create()
+
+        dialog.setOnDismissListener {
+            editor.setLayoutEditing(
+                false,
+            )
+            applyImmersiveMode()
+        }
+
+        dialog.show()
+
+        editor.layoutParams =
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(420),
+            )
     }
 
     private fun calibrationStatusLabel(): String =
