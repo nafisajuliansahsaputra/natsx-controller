@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\\..")).Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $version = (Get-Content (Join-Path $repoRoot "VERSION") -Raw).Trim()
 
 if ([string]::IsNullOrWhiteSpace($version)) {
@@ -18,7 +18,9 @@ New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
 
 $requiredPublishedFiles = @(
     "Natsx.Controller.Receiver.exe",
-    "HIDMaestro.Core.dll"
+    "HIDMaestro.Core.dll",
+    "THIRD_PARTY_NOTICES.md",
+    "licenses\HIDMaestro.LICENSE.txt"
 )
 
 foreach ($requiredFile in $requiredPublishedFiles) {
@@ -31,7 +33,7 @@ foreach ($requiredFile in $requiredPublishedFiles) {
 
 $iscc = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
 if ($null -eq $iscc) {
-    $candidate = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\\ISCC.exe"
+    $candidate = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
     if (Test-Path $candidate) {
         $iscc = Get-Item $candidate
     }

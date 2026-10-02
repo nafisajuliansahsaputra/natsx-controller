@@ -14,7 +14,7 @@
 2. Required M14 physical reliability gates are complete.
 3. Android signing secrets are configured in GitHub: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD.
 4. Windows production driver/signing posture is approved. Test-signed KMDF packages must not be distributed as production drivers.
-5. Security and dependency/license review is complete.
+5. Security and dependency/license review is complete; the separate NATSX product-license decision in M0 is resolved before public distribution.
 6. Local crash diagnostics behavior has been validated and does not upload data automatically.
 7. Changelog is updated for the target version.
 
@@ -68,3 +68,12 @@ Use windows/installer/purge-user-data.ps1 -PurgeTrust only for an explicit full 
 ## Local diagnostics
 
 Crash collection is local-only and bounded. See `docs/release/local-diagnostics.md` for storage paths, privacy boundaries, rotation, and the support-sharing procedure.
+
+
+## Dependency and security evidence
+
+- `docs/release/security-review-v1.md` records the v1 security review and residual release blockers.
+- `THIRD_PARTY_NOTICES.md` inventories redistributed/build-only dependencies.
+- The Windows publish output carries the exact pinned HIDMaestro v1.9.2 license as `licenses/HIDMaestro.LICENSE.txt`.
+- NuGet audit is enabled for all transitive packages at moderate-or-higher severity, and warnings are already treated as build errors.
+- Dependabot watches NuGet, Gradle, and GitHub Actions dependencies.

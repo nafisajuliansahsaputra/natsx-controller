@@ -18,6 +18,7 @@ Application releases follow Semantic Versioning. Protocol compatibility is versi
 - Signed Android release workflow plumbing and Windows publish artifacts.
 - Windows Inno Setup installer with elevated virtual-controller driver bootstrap, normal-user launch, and pairing-preserving uninstall cleanup.
 - Bounded local-only crash diagnostics on Windows and Android with no automatic telemetry upload.
+- Dependency/license notices, NuGet vulnerability audit policy, Dependabot coverage, and a documented v1 security review.
 
 ### Reliability
 
