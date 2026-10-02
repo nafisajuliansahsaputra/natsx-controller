@@ -12,11 +12,14 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.TextView
 import com.natsx.controller.core.connection.AndroidConnectionStatus
 import com.natsx.controller.core.connection.AndroidLinkState
 import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.haptics.HapticLevel
+import com.natsx.controller.core.input.ControllerInputTuning
+import com.natsx.controller.core.input.ControllerProfile
 import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
 import com.natsx.controller.core.pairing.PairingPrompt
 import com.natsx.controller.core.protocol.ProtocolTransport
@@ -26,6 +29,7 @@ import com.natsx.controller.core.transport.usb.UsbRuntimeStatusCoordinator
 import com.natsx.controller.core.trust.TrustedPeerRecord
 import com.natsx.controller.feature.controller.ControllerSurfaceView
 import com.natsx.controller.service.ControllerService
+import kotlin.math.roundToInt
 
 class MainActivity : Activity() {
     private lateinit var app: NatsxControllerApplication
@@ -168,6 +172,40 @@ class MainActivity : Activity() {
                 Gravity.TOP or Gravity.CENTER_HORIZONTAL,
             ).apply {
                 topMargin = dp(12)
+            },
+        )
+
+        val settingsButton =
+            TextView(this).apply {
+                text = "⚙"
+                textSize = 22f
+                gravity = Gravity.CENTER
+                contentDescription = "Controller settings"
+                setTextColor(Color.WHITE)
+                setBackgroundColor(
+                    Color.argb(
+                        190,
+                        16,
+                        16,
+                        20,
+                    ),
+                )
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    showControllerSettings()
+                }
+            }
+
+        root.addView(
+            settingsButton,
+            FrameLayout.LayoutParams(
+                dp(44),
+                dp(44),
+                Gravity.TOP or Gravity.END,
+            ).apply {
+                topMargin = dp(12)
+                marginEnd = dp(12)
             },
         )
 
@@ -359,7 +397,8 @@ class MainActivity : Activity() {
                 " • USB ${linkStateLabel(currentConnectionStatus.usb)}"
 
         val controls =
-            "Haptics — ${hapticLevelLabel(app.hapticSettings.level)} (tap)" +
+            "Profile — ${app.inputSettings.profile.displayName}" +
+                " • Haptics — ${hapticLevelLabel(app.hapticSettings.level)} (tap)" +
                 " • PCs ${currentConnectionStatus.trustedPcCount} (hold)"
 
         val usbDetail =
@@ -422,6 +461,244 @@ class MainActivity : Activity() {
             ProtocolTransport.BLUETOOTH -> "Bluetooth"
             ProtocolTransport.USB_DIRECT -> "USB"
         }
+
+    private fun showControllerSettings() {
+        controllerView.releaseAllInputs()
+
+        val tuning =
+            app.inputSettings.current()
+
+        val container =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(
+                    dp(20),
+                    dp(8),
+                    dp(20),
+                    dp(8),
+                )
+            }
+
+        val profileButton =
+            Button(this)
+
+        val leftDeadzoneLabel =
+            TextView(this)
+        val leftSensitivityLabel =
+            TextView(this)
+        val rightDeadzoneLabel =
+            TextView(this)
+        val rightSensitivityLabel =
+            TextView(this)
+
+        val leftDeadzone =
+            SeekBar(this).apply {
+                max = 25
+            }
+        val leftSensitivity =
+            SeekBar(this).apply {
+                max = 100
+            }
+        val rightDeadzone =
+            SeekBar(this).apply {
+                max = 25
+            }
+        val rightSensitivity =
+            SeekBar(this).apply {
+                max = 100
+            }
+
+        fun sensitivityFromProgress(
+            progress: Int,
+        ): Float =
+            (50 + progress) / 100f
+
+        fun sensitivityProgress(
+            value: Float,
+        ): Int =
+            ((value - 0.5f) * 100f)
+                .roundToInt()
+                .coerceIn(
+                    0,
+                    100,
+                )
+
+        fun updateLabels() {
+            leftDeadzoneLabel.text =
+                "Left deadzone — ${leftDeadzone.progress}%"
+            leftSensitivityLabel.text =
+                "Left sensitivity — " +
+                    "${(sensitivityFromProgress(leftSensitivity.progress) * 100f).roundToInt()}%"
+            rightDeadzoneLabel.text =
+                "Right deadzone — ${rightDeadzone.progress}%"
+            rightSensitivityLabel.text =
+                "Right sensitivity — " +
+                    "${(sensitivityFromProgress(rightSensitivity.progress) * 100f).roundToInt()}%"
+
+            profileButton.text =
+                "Profile — " +
+                    app.inputSettings
+                        .profile
+                        .displayName
+        }
+
+        fun setControls(
+            next: ControllerInputTuning,
+        ) {
+            leftDeadzone.progress =
+                (next.leftDeadzone * 100f)
+                    .roundToInt()
+            rightDeadzone.progress =
+                (next.rightDeadzone * 100f)
+                    .roundToInt()
+            leftSensitivity.progress =
+                sensitivityProgress(
+                    next.leftSensitivity,
+                )
+            rightSensitivity.progress =
+                sensitivityProgress(
+                    next.rightSensitivity,
+                )
+
+            updateLabels()
+        }
+
+        fun applyCustomTuning() {
+            val next =
+                ControllerInputTuning(
+                    leftDeadzone =
+                        leftDeadzone.progress /
+                            100f,
+                    rightDeadzone =
+                        rightDeadzone.progress /
+                            100f,
+                    leftSensitivity =
+                        sensitivityFromProgress(
+                            leftSensitivity.progress,
+                        ),
+                    rightSensitivity =
+                        sensitivityFromProgress(
+                            rightSensitivity.progress,
+                        ),
+                )
+
+            app.inputSettings
+                .updateCustom(next)
+            controllerView
+                .applyInputTuning(next)
+            updateLabels()
+            renderStatusOverlay()
+        }
+
+        val seekListener =
+            object :
+                SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(
+                    seekBar: SeekBar?,
+                    progress: Int,
+                    fromUser: Boolean,
+                ) {
+                    if (fromUser) {
+                        applyCustomTuning()
+                    } else {
+                        updateLabels()
+                    }
+                }
+
+                override fun onStartTrackingTouch(
+                    seekBar: SeekBar?,
+                ) = Unit
+
+                override fun onStopTrackingTouch(
+                    seekBar: SeekBar?,
+                ) = Unit
+            }
+
+        leftDeadzone.setOnSeekBarChangeListener(
+            seekListener,
+        )
+        leftSensitivity.setOnSeekBarChangeListener(
+            seekListener,
+        )
+        rightDeadzone.setOnSeekBarChangeListener(
+            seekListener,
+        )
+        rightSensitivity.setOnSeekBarChangeListener(
+            seekListener,
+        )
+
+        profileButton.setOnClickListener {
+            showControllerProfileChooser { profile ->
+                val next =
+                    app.inputSettings
+                        .applyProfile(profile)
+
+                controllerView
+                    .applyInputTuning(next)
+                setControls(next)
+                renderStatusOverlay()
+            }
+        }
+
+        container.addView(profileButton)
+        container.addView(leftDeadzoneLabel)
+        container.addView(leftDeadzone)
+        container.addView(leftSensitivityLabel)
+        container.addView(leftSensitivity)
+        container.addView(rightDeadzoneLabel)
+        container.addView(rightDeadzone)
+        container.addView(rightSensitivityLabel)
+        container.addView(rightSensitivity)
+
+        setControls(tuning)
+
+        AlertDialog.Builder(this)
+            .setTitle("Controller settings")
+            .setView(container)
+            .setPositiveButton(
+                "Done",
+                null,
+            )
+            .create()
+            .apply {
+                setOnDismissListener {
+                    applyImmersiveMode()
+                }
+                show()
+            }
+    }
+
+    private fun showControllerProfileChooser(
+        onSelected: (ControllerProfile) -> Unit,
+    ) {
+        val profiles =
+            ControllerProfile.entries
+        val selected =
+            profiles.indexOf(
+                app.inputSettings.profile,
+            )
+
+        AlertDialog.Builder(this)
+            .setTitle("Controller profile")
+            .setSingleChoiceItems(
+                profiles
+                    .map {
+                        it.displayName
+                    }
+                    .toTypedArray(),
+                selected,
+            ) { dialog, which ->
+                onSelected(
+                    profiles[which],
+                )
+                dialog.dismiss()
+            }
+            .setNegativeButton(
+                "Cancel",
+                null,
+            )
+            .show()
+    }
 
     private fun cycleHapticLevel() {
         val next =
