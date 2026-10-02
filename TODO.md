@@ -374,7 +374,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Sensitivity/deadzone settings.
 - [x] Haptic settings.
 - [ ] Manual transport override.
-- [ ] Diagnostics.
+- [x] Diagnostics.
 - [ ] Calibration flow.
 - [ ] Custom layout editor.
 

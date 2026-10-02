@@ -482,6 +482,14 @@ class MainActivity : Activity() {
         val profileButton =
             Button(this)
 
+        val diagnosticsButton =
+            Button(this).apply {
+                text = "Diagnostics"
+                setOnClickListener {
+                    showDiagnostics()
+                }
+            }
+
         val leftDeadzoneLabel =
             TextView(this)
         val leftSensitivityLabel =
@@ -641,6 +649,7 @@ class MainActivity : Activity() {
         }
 
         container.addView(profileButton)
+        container.addView(diagnosticsButton)
         container.addView(leftDeadzoneLabel)
         container.addView(leftDeadzone)
         container.addView(leftSensitivityLabel)
@@ -657,6 +666,149 @@ class MainActivity : Activity() {
             .setView(container)
             .setPositiveButton(
                 "Done",
+                null,
+            )
+            .create()
+            .apply {
+                setOnDismissListener {
+                    applyImmersiveMode()
+                }
+                show()
+            }
+    }
+
+    private fun showDiagnostics() {
+        controllerView.releaseAllInputs()
+
+        val status =
+            app.connectionStatus.current()
+        val usbStatus =
+            usbRuntimeStatus.current()
+        val tuning =
+            app.inputSettings.current()
+
+        val activeTransport =
+            status.smartAutoActiveTransport
+                ?.let(::smartAutoTransportLabel)
+                ?: "Waiting for Windows"
+
+        val authoritySequence =
+            status.smartAutoStateSequence
+                ?.toString()
+                ?: "—"
+
+        val trustedPeers =
+            app.trustedPeerStore
+                .list()
+
+        val trustedPc =
+            when {
+                trustedPeers.isEmpty() ->
+                    "None"
+
+                trustedPeers.size == 1 ->
+                    trustedPeers.single()
+                        .displayName
+
+                else ->
+                    "${trustedPeers.size} trusted PCs"
+            }
+
+        val diagnostics =
+            buildString {
+                appendLine("Smart Auto")
+                appendLine("Active transport: $activeTransport")
+                appendLine("Authority sequence: $authoritySequence")
+                appendLine()
+                appendLine("Local links")
+                appendLine(
+                    "Wi-Fi: " +
+                        linkStateLabel(status.wifi),
+                )
+                appendLine(
+                    "Bluetooth: " +
+                        linkStateLabel(status.bluetooth),
+                )
+                appendLine(
+                    "USB: " +
+                        linkStateLabel(status.usb),
+                )
+                appendLine()
+                appendLine("Recovery")
+                appendLine(
+                    "Wi-Fi reconnects: " +
+                        status.wifiReconnectAttempts,
+                )
+                appendLine(
+                    "Bluetooth reconnects: " +
+                        status.bluetoothReconnectAttempts,
+                )
+                appendLine()
+                appendLine("Controller")
+                appendLine(
+                    "Trusted PC: $trustedPc",
+                )
+                appendLine(
+                    "Profile: " +
+                        app.inputSettings
+                            .profile
+                            .displayName,
+                )
+                appendLine(
+                    "Left deadzone: " +
+                        "${(tuning.leftDeadzone * 100f).roundToInt()}%",
+                )
+                appendLine(
+                    "Left sensitivity: " +
+                        "${(tuning.leftSensitivity * 100f).roundToInt()}%",
+                )
+                appendLine(
+                    "Right deadzone: " +
+                        "${(tuning.rightDeadzone * 100f).roundToInt()}%",
+                )
+                appendLine(
+                    "Right sensitivity: " +
+                        "${(tuning.rightSensitivity * 100f).roundToInt()}%",
+                )
+                appendLine(
+                    "Haptics: " +
+                        hapticLevelLabel(
+                            app.hapticSettings.level,
+                        ),
+                )
+                appendLine()
+                appendLine("USB runtime")
+                append(
+                    if (usbStatus.isError) {
+                        "Error: "
+                    } else {
+                        "Status: "
+                    },
+                )
+                append(
+                    usbStatus.message,
+                )
+            }
+
+        val diagnosticsText =
+            TextView(this).apply {
+                text = diagnostics
+                textSize = 13f
+                setTextColor(Color.WHITE)
+                setTextIsSelectable(true)
+                setPadding(
+                    dp(8),
+                    dp(8),
+                    dp(8),
+                    dp(8),
+                )
+            }
+
+        AlertDialog.Builder(this)
+            .setTitle("Diagnostics")
+            .setView(diagnosticsText)
+            .setPositiveButton(
+                "Close",
                 null,
             )
             .create()
