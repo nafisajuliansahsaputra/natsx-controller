@@ -25,6 +25,25 @@ class AndroidManifestLifecycleContractTest {
     }
 
     @Test
+    fun stickyServiceRestartReentersConnectionBootstrap() {
+        val serviceSource =
+            File(
+                "src/main/java/com/natsx/controller/service/ControllerService.kt",
+            ).readText()
+
+        assertTrue(
+            serviceSource.contains(
+                "override fun onStartCommand",
+            ),
+        )
+        assertTrue(
+            serviceSource.contains(
+                "ensureConnectionBootstrap()\n        return START_STICKY",
+            ),
+        )
+    }
+
+    @Test
     fun controllerRuntimeRemainsAConnectedDeviceForegroundService() {
         val manifest =
             File(
