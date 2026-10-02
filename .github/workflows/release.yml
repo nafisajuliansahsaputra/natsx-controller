@@ -138,6 +138,12 @@ jobs:
           NATSX_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle -p android :app:assembleRelease --stacktrace
 
+      - name: Verify final Android APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
+
       - name: Stage Android release and checksum
         shell: bash
         run: |
@@ -146,7 +152,8 @@ jobs:
           mkdir -p artifacts/android
           output="artifacts/android/natsx-controller-android-$version.apk"
           cp android/app/build/outputs/apk/release/app-release.apk "$output"
-          sha256sum "$output" > "$output.sha256"
+          hash="$(sha256sum "$output" | awk '{print $1}')"
+          printf '%s  %s\n' "$hash" "$(basename "$output")" > "$output.sha256"
 
       - name: Upload signed Android APK
         uses: actions/upload-artifact@v4
@@ -253,7 +260,7 @@ jobs:
 
       - name: Install Inno Setup
         shell: pwsh
-        run: choco install innosetup --no-progress -y
+        run: choco install innosetup --version 6.7.1 --no-progress -y
 
       - name: Build feature-complete Windows installer
         shell: pwsh
@@ -311,3 +318,64 @@ jobs:
         env:
           WINDOWS_SIGNING_PFX_PATH: ${{ runner.temp }}\natsx-release-signing.pfx
         run: Remove-Item -LiteralPath $env:WINDOWS_SIGNING_PFX_PATH -Force -ErrorAction SilentlyContinue
+
+
+  publish-release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - android-release
+      - windows-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Android release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: natsx-controller-android-release
+          path: release/android
+
+      - name: Download Windows installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: natsx-controller-windows-installer
+          path: release/windows
+
+      - name: Verify published checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r checksum; do
+            directory="$(dirname "$checksum")"
+            filename="$(basename "$checksum")"
+            (
+              cd "$directory"
+              sha256sum -c "$filename"
+            )
+          done < <(find release -type f -name '*.sha256' -print | sort)
+
+          apk_count="$(find release/android -maxdepth 1 -type f -name '*.apk' | wc -l | tr -d ' ')"
+          installer_count="$(find release/windows -maxdepth 1 -type f -name '*.exe' | wc -l | tr -d ' ')"
+
+          test "$apk_count" = "1"
+          test "$installer_count" = "1"
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t files < <(
+            find release/android release/windows -maxdepth 1 -type f \
+              \( -name '*.apk' -o -name '*.exe' -o -name '*.sha256' \) \
+              -print | sort
+          )
+
+          gh release create "${GITHUB_REF_NAME}" "${files[@]}" \
+            --verify-tag \
+            --title "NATSX Controller ${GITHUB_REF_NAME#v}" \
+            --generate-notes
