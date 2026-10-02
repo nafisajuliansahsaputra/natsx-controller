@@ -36,7 +36,10 @@ jobs:
         shell: pwsh
         run: |
           $failed = $false
-          Get-ChildItem windows/eng -Filter *.ps1 -File | ForEach-Object {
+          @(
+            Get-ChildItem windows/eng -Filter *.ps1 -File
+            Get-ChildItem windows/installer -Filter *.ps1 -File
+          ) | ForEach-Object {
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile(
