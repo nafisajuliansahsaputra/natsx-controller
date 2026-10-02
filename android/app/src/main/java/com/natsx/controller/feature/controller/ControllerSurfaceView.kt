@@ -71,6 +71,11 @@ class ControllerSurfaceView(
     private var onLayoutChanged:
         ((ControllerLayout) -> Unit)? = null
 
+    private var safeInsetLeft = 0f
+    private var safeInsetTop = 0f
+    private var safeInsetRight = 0f
+    private var safeInsetBottom = 0f
+
     init {
         isClickable = true
         isFocusable = true
@@ -173,6 +178,48 @@ class ControllerSurfaceView(
     fun currentControllerLayout():
         ControllerLayout =
         controllerLayout
+
+    fun applySafeInsets(
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int,
+    ) {
+        val nextLeft =
+            left.coerceAtLeast(0)
+                .toFloat()
+        val nextTop =
+            top.coerceAtLeast(0)
+                .toFloat()
+        val nextRight =
+            right.coerceAtLeast(0)
+                .toFloat()
+        val nextBottom =
+            bottom.coerceAtLeast(0)
+                .toFloat()
+
+        if (
+            safeInsetLeft == nextLeft &&
+            safeInsetTop == nextTop &&
+            safeInsetRight == nextRight &&
+            safeInsetBottom == nextBottom
+        ) {
+            return
+        }
+
+        releaseAllInputs()
+
+        safeInsetLeft = nextLeft
+        safeInsetTop = nextTop
+        safeInsetRight = nextRight
+        safeInsetBottom = nextBottom
+
+        rebuildLayout(
+            width.toFloat(),
+            height.toFloat(),
+        )
+        invalidate()
+    }
 
     fun setLayoutEditing(
         enabled: Boolean,
@@ -330,13 +377,30 @@ class ControllerSurfaceView(
                 it.id == controlId
             } ?: return
 
+        val contentWidth =
+            (
+                width -
+                    safeInsetLeft -
+                    safeInsetRight
+            ).coerceAtLeast(
+                1f,
+            )
+        val contentHeight =
+            (
+                height -
+                    safeInsetTop -
+                    safeInsetBottom
+            ).coerceAtLeast(
+                1f,
+            )
+
         val halfWidth =
             when (
                 geometry.shape
             ) {
                 Shape.CIRCLE ->
                     geometry.radius /
-                        width
+                        contentWidth
                 Shape.RECT ->
                     (
                         geometry.rect
@@ -344,7 +408,7 @@ class ControllerSurfaceView(
                             ?: 0f
                     ) /
                         2f /
-                        width
+                        contentWidth
             }
 
         val halfHeight =
@@ -353,7 +417,7 @@ class ControllerSurfaceView(
             ) {
                 Shape.CIRCLE ->
                     geometry.radius /
-                        height
+                        contentHeight
                 Shape.RECT ->
                     (
                         geometry.rect
@@ -361,11 +425,17 @@ class ControllerSurfaceView(
                             ?: 0f
                     ) /
                         2f /
-                        height
+                        contentHeight
             }
 
         val normalizedX =
-            (x / width)
+            (
+                (
+                    x -
+                        safeInsetLeft
+                ) /
+                    contentWidth
+            )
                 .coerceIn(
                     (halfWidth + 0.01f)
                         .coerceAtMost(0.49f),
@@ -374,7 +444,13 @@ class ControllerSurfaceView(
                 )
 
         val normalizedY =
-            (y / height)
+            (
+                (
+                    y -
+                        safeInsetTop
+                ) /
+                    contentHeight
+            )
                 .coerceIn(
                     (halfHeight + 0.01f)
                         .coerceAtMost(0.49f),
@@ -442,15 +518,53 @@ class ControllerSurfaceView(
 
     private fun handleMove(event: MotionEvent) {
         for (index in 0 until event.pointerCount) {
-            val pointerId = event.getPointerId(index)
-            val controlId = activePointers[pointerId] ?: continue
+            val pointerId =
+                event.getPointerId(
+                    index,
+                )
+            val controlId =
+                activePointers[pointerId]
+                    ?: continue
+            val x =
+                event.getX(
+                    index,
+                )
+            val y =
+                event.getY(
+                    index,
+                )
 
             when (controlId) {
                 ControlId.LEFT_STICK,
                 ControlId.RIGHT_STICK,
-                -> updateStick(controlId, event.getX(index), event.getY(index))
+                -> updateStick(
+                    controlId,
+                    x,
+                    y,
+                )
 
-                else -> Unit
+                else -> {
+                    val geometry =
+                        controls.firstOrNull {
+                            it.id ==
+                                controlId
+                        }
+
+                    if (
+                        geometry != null &&
+                        !geometry.containsForActivePointer(
+                            x,
+                            y,
+                        )
+                    ) {
+                        activePointers.remove(
+                            pointerId,
+                        )
+                        release(
+                            controlId,
+                        )
+                    }
+                }
             }
         }
     }
@@ -556,7 +670,27 @@ class ControllerSurfaceView(
             return
         }
 
-        val unit = min(width, height)
+        val contentWidth =
+            (
+                width -
+                    safeInsetLeft -
+                    safeInsetRight
+            ).coerceAtLeast(
+                1f,
+            )
+        val contentHeight =
+            (
+                height -
+                    safeInsetTop -
+                    safeInsetBottom
+            ).coerceAtLeast(
+                1f,
+            )
+        val unit =
+            min(
+                contentWidth,
+                contentHeight,
+            )
 
         fun circle(
             id: ControlId,
@@ -576,9 +710,13 @@ class ControllerSurfaceView(
             controls += ControlGeometry.circle(
                 id = id,
                 centerX =
-                    width * position.x,
+                    safeInsetLeft +
+                        contentWidth *
+                            position.x,
                 centerY =
-                    height * position.y,
+                    safeInsetTop +
+                        contentHeight *
+                            position.y,
                 radius = unit * radius,
                 hitRadius =
                     unit *
@@ -621,24 +759,28 @@ class ControllerSurfaceView(
                 id = id,
                 rect =
                     RectF(
-                        width *
-                            (
-                                position.x -
+                        safeInsetLeft +
+                            contentWidth *
+                                (
+                                    position.x -
                                     halfWidth
                             ),
-                        height *
-                            (
-                                position.y -
+                        safeInsetTop +
+                            contentHeight *
+                                (
+                                    position.y -
                                     halfHeight
                             ),
-                        width *
-                            (
-                                position.x +
+                        safeInsetLeft +
+                            contentWidth *
+                                (
+                                    position.x +
                                     halfWidth
                             ),
-                        height *
-                            (
-                                position.y +
+                        safeInsetTop +
+                            contentHeight *
+                                (
+                                    position.y +
                                     halfHeight
                             ),
                     ),
@@ -866,25 +1008,75 @@ class ControllerSurfaceView(
         val rect: RectF?,
         val hitPadding: Float,
     ) {
-        fun contains(x: Float, y: Float): Boolean {
+        fun contains(x: Float, y: Float): Boolean =
+            contains(
+                x,
+                y,
+                releaseScale = 1f,
+            )
+
+        fun containsForActivePointer(
+            x: Float,
+            y: Float,
+        ): Boolean =
+            contains(
+                x,
+                y,
+                releaseScale =
+                    ACTIVE_POINTER_RELEASE_SCALE,
+            )
+
+        private fun contains(
+            x: Float,
+            y: Float,
+            releaseScale: Float,
+        ): Boolean {
             return when (shape) {
                 Shape.CIRCLE -> {
-                    val dx = x - centerX
-                    val dy = y - centerY
-                    dx * dx + dy * dy <= hitRadius * hitRadius
+                    val dx =
+                        x -
+                            centerX
+                    val dy =
+                        y -
+                            centerY
+                    val releaseRadius =
+                        hitRadius *
+                            releaseScale
+
+                    dx * dx +
+                        dy * dy <=
+                        releaseRadius *
+                        releaseRadius
                 }
 
                 Shape.RECT -> {
-                    val visual = rect ?: return false
-                    x >= visual.left - hitPadding &&
-                        x <= visual.right + hitPadding &&
-                        y >= visual.top - hitPadding &&
-                        y <= visual.bottom + hitPadding
+                    val visual =
+                        rect
+                            ?: return false
+                    val releasePadding =
+                        hitPadding *
+                            releaseScale
+
+                    x >=
+                        visual.left -
+                            releasePadding &&
+                        x <=
+                        visual.right +
+                            releasePadding &&
+                        y >=
+                        visual.top -
+                            releasePadding &&
+                        y <=
+                        visual.bottom +
+                            releasePadding
                 }
             }
         }
 
         companion object {
+            private const val ACTIVE_POINTER_RELEASE_SCALE =
+                1.45f
+
             fun circle(
                 id: ControlId,
                 centerX: Float,

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -144,7 +145,38 @@ class MainActivity : Activity() {
     }
 
     private fun buildRootView(): View {
-        val root = FrameLayout(this)
+        val root =
+            FrameLayout(
+                this,
+            )
+
+        root.setOnApplyWindowInsetsListener {
+                _,
+                insets,
+            ->
+            val cutout =
+                if (
+                    Build.VERSION.SDK_INT >=
+                    Build.VERSION_CODES.P
+                ) {
+                    insets.displayCutout
+                } else {
+                    null
+                }
+
+            controllerView.applySafeInsets(
+                cutout?.safeInsetLeft
+                    ?: 0,
+                cutout?.safeInsetTop
+                    ?: 0,
+                cutout?.safeInsetRight
+                    ?: 0,
+                cutout?.safeInsetBottom
+                    ?: 0,
+            )
+
+            insets
+        }
 
         root.addView(
             controllerView,
@@ -366,6 +398,8 @@ class MainActivity : Activity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
             ),
         )
+
+        root.requestApplyInsets()
 
         return root
     }

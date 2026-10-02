@@ -120,7 +120,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Build dedicated landscape gameplay surface.
 - [x] Track pointer IDs independently.
 - [x] Implement control ownership.
-- [ ] Implement touch hysteresis.
+- [x] Implement touch hysteresis.
 - [x] Prevent unrelated pointer cancellation.
 - [x] Handle ACTION_CANCEL safely.
 - [x] Handle app focus loss safely.
@@ -173,7 +173,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Increase right-stick usability.
 - [x] Separate visual size from invisible hitbox size.
 - [x] Add basic layout scale.
-- [ ] Add safe-area handling.
+- [x] Add safe-area handling.
 - [x] Add landscape orientation enforcement.
 - [x] Add keep-screen-awake behavior during gameplay.
 - [x] Add configurable haptic strength.
