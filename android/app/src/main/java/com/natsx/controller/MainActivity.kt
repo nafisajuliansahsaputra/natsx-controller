@@ -13,6 +13,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.natsx.controller.core.gamepad.GamepadStateStore
+import com.natsx.controller.core.haptics.HapticLevel
 import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
 import com.natsx.controller.core.pairing.PairingPrompt
 import com.natsx.controller.core.transport.bluetooth.BluetoothPermissionGate
@@ -22,6 +23,7 @@ import com.natsx.controller.feature.controller.ControllerSurfaceView
 import com.natsx.controller.service.ControllerService
 
 class MainActivity : Activity() {
+    private lateinit var app: NatsxControllerApplication
     private lateinit var stateStore: GamepadStateStore
     private lateinit var controllerView: ControllerSurfaceView
     private lateinit var pairingConfirmation: PairingConfirmationCoordinator
@@ -53,7 +55,7 @@ class MainActivity : Activity() {
 
         applyImmersiveMode()
 
-        val app = application as NatsxControllerApplication
+        app = application as NatsxControllerApplication
 
         stateStore = app.gamepadStateStore
         pairingConfirmation = app.pairingConfirmation
@@ -118,7 +120,12 @@ class MainActivity : Activity() {
                     dp(12),
                     dp(8),
                 )
-                maxLines = 9
+                maxLines = 10
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    cycleHapticLevel()
+                }
             }
 
         root.addView(
@@ -311,7 +318,7 @@ class MainActivity : Activity() {
         val history =
             usbRuntimeStatus.historyText()
 
-        usbStatusText.text =
+        val connectionText =
             if (history.isBlank()) {
                 if (status.isError) {
                     "USB ERROR — ${status.message}"
@@ -321,6 +328,9 @@ class MainActivity : Activity() {
             } else {
                 "USB diagnostics\n$history"
             }
+
+        usbStatusText.text =
+            "$connectionText\nHaptics — ${hapticLevelLabel(app.hapticSettings.level)} (tap to change)"
 
         usbStatusText.setTextColor(
             if (status.isError) {
@@ -344,6 +354,40 @@ class MainActivity : Activity() {
             pairingOverlay.bringToFront()
         }
     }
+
+    private fun cycleHapticLevel() {
+        val next =
+            when (app.hapticSettings.level) {
+                HapticLevel.OFF ->
+                    HapticLevel.LOW
+
+                HapticLevel.LOW ->
+                    HapticLevel.MEDIUM
+
+                HapticLevel.MEDIUM ->
+                    HapticLevel.HIGH
+
+                HapticLevel.HIGH ->
+                    HapticLevel.OFF
+            }
+
+        app.hapticSettings.level = next
+        app.hapticEngine.stopGameRumble()
+
+        showUsbStatus(
+            usbRuntimeStatus.current(),
+        )
+    }
+
+    private fun hapticLevelLabel(
+        level: HapticLevel,
+    ): String =
+        when (level) {
+            HapticLevel.OFF -> "Off"
+            HapticLevel.LOW -> "Low"
+            HapticLevel.MEDIUM -> "Medium"
+            HapticLevel.HIGH -> "High"
+        }
 
     private fun requestBluetoothPermissionsIfNeeded() {
         val permissionGate = BluetoothPermissionGate(this)

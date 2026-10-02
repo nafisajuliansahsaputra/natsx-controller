@@ -176,7 +176,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [ ] Add safe-area handling.
 - [x] Add landscape orientation enforcement.
 - [x] Add keep-screen-awake behavior during gameplay.
-- [ ] Add configurable haptic strength.
+- [x] Add configurable haptic strength.
 - [ ] Validate common multi-touch combinations used in eFootball.
 
 **Exit criteria:** layout is comfortable enough for extended eFootball play before visual polish begins.
@@ -326,14 +326,16 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M11 — Rumble and haptics
 
-- [ ] Local touch haptics.
-- [ ] Off/Low/Medium/High settings.
-- [ ] Virtual-controller rumble capture.
-- [ ] Output protocol message.
-- [ ] Android rumble handler.
-- [ ] Ensure output cannot block input.
-- [ ] Define behavior during transport handover.
-- [ ] Graceful fallback on devices with limited haptics.
+- [x] Local touch haptics.
+- [x] Off/Low/Medium/High settings.
+- [x] Virtual-controller rumble capture.
+- [x] Output protocol message.
+- [x] Android rumble handler.
+- [x] Ensure output cannot block input.
+- [x] Define behavior during transport handover.
+- [x] Graceful fallback on devices with limited haptics.
+
+> Rumble output is isolated from the realtime input path with a latest-only bounded queue. Android refresh/watchdog behavior prevents stuck vibration, and uplink-only USB automatically falls back to a duplex transport for rumble without changing USB input authority.
 
 ---
 
@@ -368,7 +370,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [ ] Connection overlay that does not interrupt controls unnecessarily.
 - [ ] Controller profile chooser.
 - [ ] Sensitivity/deadzone settings.
-- [ ] Haptic settings.
+- [x] Haptic settings.
 - [ ] Manual transport override.
 - [ ] Diagnostics.
 - [ ] Calibration flow.

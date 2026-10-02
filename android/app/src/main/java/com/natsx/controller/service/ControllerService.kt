@@ -5,6 +5,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -14,7 +16,14 @@ import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.IBinder
 import com.natsx.controller.NatsxControllerApplication
+import com.natsx.controller.core.protocol.PeerId
 import com.natsx.controller.core.session.ControllerRealtimePublisher
+import com.natsx.controller.core.transport.bluetooth.BluetoothAutoReconnectRuntime
+import com.natsx.controller.core.transport.bluetooth.BluetoothPermissionGate
+import com.natsx.controller.core.transport.bluetooth.BluetoothRealtimeLink
+import com.natsx.controller.core.transport.bluetooth.BluetoothRealtimeLinkFactory
+import com.natsx.controller.core.transport.bluetooth.BluetoothReconnectState
+import com.natsx.controller.core.transport.bluetooth.BluetoothRfcommConnector
 import com.natsx.controller.core.transport.usb.UsbAccessoryConnector
 import com.natsx.controller.core.transport.usb.UsbAccessoryIdentity
 import com.natsx.controller.core.transport.usb.UsbAccessoryRuntime
@@ -44,6 +53,7 @@ class ControllerService : Service() {
     private val connectionBootstrapStarted = AtomicBoolean(false)
     private val usbPermissionRequestInFlight = AtomicBoolean(false)
     private val wifiRuntimeGate = Any()
+    private val bluetoothRuntimeGate = Any()
     private val usbAttachWatcher: ScheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor { runnable ->
             Thread(runnable, "natsx-usb-attach-watcher").apply {
@@ -53,6 +63,9 @@ class ControllerService : Service() {
 
     @Volatile
     private var wifiRuntime: WifiAutoReconnectRuntime? = null
+
+    @Volatile
+    private var bluetoothRuntime: BluetoothAutoReconnectRuntime? = null
 
     private val usbReceiver =
         object : BroadcastReceiver() {
@@ -178,6 +191,11 @@ class ControllerService : Service() {
     }
 
     override fun onDestroy() {
+        synchronized(bluetoothRuntimeGate) {
+            bluetoothRuntime?.close()
+            bluetoothRuntime = null
+        }
+
         synchronized(wifiRuntimeGate) {
             wifiRuntime?.close()
             wifiRuntime = null
@@ -259,6 +277,7 @@ class ControllerService : Service() {
                     }
 
                 startTrustedWifi(peer.peerId)
+                startTrustedBluetooth(peer.peerId)
 
                 if (waitForTrustedSession(peer.peerId)) {
                     app.usbRuntimeStatus.publish(
@@ -357,6 +376,118 @@ class ControllerService : Service() {
         }
     }
 
+    private fun startTrustedBluetooth(
+        receiverPeerId: PeerId,
+    ) {
+        synchronized(bluetoothRuntimeGate) {
+            val permissionGate =
+                BluetoothPermissionGate(this)
+
+            if (
+                !permissionGate.isBluetoothSupported() ||
+                !permissionGate.hasRequiredRuntimePermissions() ||
+                !permissionGate.isBluetoothEnabled()
+            ) {
+                return
+            }
+
+            val existing =
+                bluetoothRuntime
+
+            if (
+                existing != null &&
+                existing.state != BluetoothReconnectState.STOPPED
+            ) {
+                return
+            }
+
+            existing?.close()
+            bluetoothRuntime = null
+
+            val runtime =
+                BluetoothAutoReconnectRuntime(
+                    broadcaster = app.realtimeBroadcaster,
+                    linkFactory =
+                        BluetoothRealtimeLinkFactory {
+                            createBondedBluetoothLink(
+                                receiverPeerId,
+                            )
+                        },
+                )
+
+            bluetoothRuntime = runtime
+            runtime.start()
+        }
+    }
+
+    private fun createBondedBluetoothLink(
+        receiverPeerId: PeerId,
+    ): BluetoothRealtimeLink {
+        val permissionGate =
+            BluetoothPermissionGate(this)
+
+        require(permissionGate.isBluetoothSupported()) {
+            "Bluetooth is not supported on this device."
+        }
+        require(permissionGate.hasRequiredRuntimePermissions()) {
+            "Bluetooth runtime permissions are not granted."
+        }
+        require(permissionGate.isBluetoothEnabled()) {
+            "Bluetooth is disabled."
+        }
+
+        val manager =
+            getSystemService(
+                BluetoothManager::class.java,
+            )
+        val adapter =
+            checkNotNull(manager?.adapter) {
+                "Bluetooth adapter is unavailable."
+            }
+
+        val candidates =
+            adapter.bondedDevices
+                .filter {
+                    it.bondState ==
+                        BluetoothDevice.BOND_BONDED
+                }
+                .sortedBy {
+                    it.address
+                }
+
+        require(candidates.isNotEmpty()) {
+            "No OS-bonded Bluetooth devices are available."
+        }
+
+        var lastFailure: Exception? = null
+
+        candidates.forEach { device ->
+            try {
+                return BluetoothRfcommConnector
+                    .forDevice(
+                        context = this,
+                        device = device,
+                        localPeerId = app.localPeerId,
+                        receiverPeerId = receiverPeerId,
+                        sessionRegistry =
+                            app.trustedSessionRegistry,
+                        permissionGate =
+                            permissionGate,
+                        rumbleSink =
+                            app.hapticEngine::handleGameRumble,
+                    )
+                    .connect()
+            } catch (exception: Exception) {
+                lastFailure = exception
+            }
+        }
+
+        throw IllegalStateException(
+            "No bonded Bluetooth device accepted the authenticated NATSX RFCOMM session.",
+            lastFailure,
+        )
+    }
+
     private fun waitForTrustedSession(
         receiverPeerId: com.natsx.controller.core.protocol.PeerId,
     ): Boolean {
@@ -413,8 +544,14 @@ class ControllerService : Service() {
                         app.trustedPeerStore.list()
 
                     if (trustedPeers.size == 1) {
+                        val receiverPeerId =
+                            trustedPeers.single().peerId
+
                         startTrustedWifi(
-                            trustedPeers.single().peerId,
+                            receiverPeerId,
+                        )
+                        startTrustedBluetooth(
+                            receiverPeerId,
                         )
                     }
 
