@@ -82,18 +82,19 @@ function Get-ReceiverSnapshot {
         return $null
     }
 
+    $startTimeUtc =
+        try {
+            $process.StartTime.ToUniversalTime().ToString("O")
+        }
+        catch {
+            $null
+        }
+
     return [ordered]@{
         ProcessId =
             $process.Id
         StartTimeUtc =
-            try {
-                $process.StartTime
-                    .ToUniversalTime()
-                    .ToString("O")
-            }
-            catch {
-                $null
-            }
+            $startTimeUtc
         WorkingSetMiB =
             [Math]::Round(
                 $process.WorkingSet64 /
