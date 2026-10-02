@@ -1,0 +1,111 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  android-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Setup Gradle 9.6
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Decode Android release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/natsx-release.keystore
+
+      - name: Test Android
+        run: gradle -p android :app:testDebugUnitTest --stacktrace
+
+      - name: Verify Android signing
+        env:
+          NATSX_RELEASE_STORE_FILE: ${{ github.workspace }}/android/natsx-release.keystore
+          NATSX_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          NATSX_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          NATSX_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle -p android :app:verifyReleaseSigning --stacktrace
+
+      - name: Assemble signed Android release
+        env:
+          NATSX_RELEASE_STORE_FILE: ${{ github.workspace }}/android/natsx-release.keystore
+          NATSX_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          NATSX_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          NATSX_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle -p android :app:assembleRelease --stacktrace
+
+      - name: Upload signed Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-controller-android-release
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Remove release keystore
+        if: always()
+        run: rm -f android/natsx-release.keystore
+
+  windows-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Fetch HIDMaestro SDK
+        shell: pwsh
+        run: ./windows/eng/fetch-hidmaestro.ps1
+
+      - name: Restore
+        run: dotnet restore windows/Natsx.Controller.slnx
+
+      - name: Test
+        run: dotnet test windows/Natsx.Controller.slnx --configuration Release --no-restore --verbosity normal
+
+      - name: Publish Windows Receiver
+        shell: pwsh
+        run: dotnet publish windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver
+
+      - name: Archive Windows Receiver
+        shell: pwsh
+        run: Compress-Archive -Path artifacts/windows-receiver/* -DestinationPath artifacts/natsx-controller-windows-x64.zip
+
+      - name: Upload Windows Receiver
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-controller-windows-x64
+          path: artifacts/natsx-controller-windows-x64.zip
+          if-no-files-found: error
