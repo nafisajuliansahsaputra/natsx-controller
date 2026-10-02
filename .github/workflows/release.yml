@@ -10,7 +10,61 @@ permissions:
   contents: read
 
 jobs:
+  release-preflight:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify release metadata
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(tr -d '\r\n' < VERSION)"
+          version_code="$(tr -d '\r\n' < VERSION_CODE)"
+
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must be a stable x.y.z value for release, got: $version" >&2
+            exit 1
+          fi
+
+          if [[ ! "$version_code" =~ ^[1-9][0-9]*$ ]]; then
+            echo "VERSION_CODE must be a positive integer, got: $version_code" >&2
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "push" && "$REF_NAME" != "v$version" ]]; then
+            echo "Release tag $REF_NAME does not match VERSION v$version." >&2
+            exit 1
+          fi
+
+          if [[ ! -f LICENSE ]]; then
+            echo "Product LICENSE is missing. Resolve the M0 product-license decision before release." >&2
+            exit 1
+          fi
+
+          if ! grep -Fq "## $version" CHANGELOG.md; then
+            echo "CHANGELOG.md must contain a final ## $version release section." >&2
+            exit 1
+          fi
+
+      - name: Confirm Inno Setup licensing posture
+        shell: bash
+        env:
+          NATSX_INNO_LICENSE_CONFIRMED: ${{ vars.NATSX_INNO_LICENSE_CONFIRMED }}
+        run: |
+          set -euo pipefail
+          value="${NATSX_INNO_LICENSE_CONFIRMED,,}"
+          if [[ "$value" != "true" ]]; then
+            echo "Set NATSX_INNO_LICENSE_CONFIRMED=true only after confirming this release is covered by permitted Inno Setup usage or a commercial license." >&2
+            exit 1
+          fi
   android-release:
+    needs: release-preflight
     runs-on: ubuntu-latest
 
     steps:
@@ -65,11 +119,21 @@ jobs:
           NATSX_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle -p android :app:assembleRelease --stacktrace
 
+      - name: Stage Android release and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '\r\n' < VERSION)"
+          mkdir -p artifacts/android
+          output="artifacts/android/natsx-controller-android-$version.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$output"
+          sha256sum "$output" > "$output.sha256"
+
       - name: Upload signed Android APK
         uses: actions/upload-artifact@v4
         with:
           name: natsx-controller-android-release
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: artifacts/android/*
           if-no-files-found: error
 
       - name: Remove release keystore
@@ -77,6 +141,7 @@ jobs:
         run: rm -f android/natsx-release.keystore
 
   windows-release:
+    needs: release-preflight
     runs-on: windows-latest
 
     steps:
@@ -99,6 +164,21 @@ jobs:
         shell: pwsh
         run: nuget restore windows/driver/aoa-bootstrap/packages.config -PackagesDirectory windows/driver/aoa-bootstrap/packages -NonInteractive
 
+      - name: Decode Windows release-signing certificate
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WINDOWS_SIGNING_PFX_PATH: ${{ runner.temp }}\natsx-release-signing.pfx
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_BASE64)) {
+            throw "WINDOWS_SIGNING_PFX_BASE64 is not configured."
+          }
+
+          [IO.File]::WriteAllBytes(
+            $env:WINDOWS_SIGNING_PFX_PATH,
+            [Convert]::FromBase64String($env:WINDOWS_SIGNING_PFX_BASE64)
+          )
+
       - name: Restore
         run: dotnet restore windows/Natsx.Controller.slnx
 
@@ -108,6 +188,20 @@ jobs:
       - name: Publish Windows Receiver
         shell: pwsh
         run: dotnet publish windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver
+
+      - name: Sign Windows Receiver binaries
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX_PATH: ${{ runner.temp }}\natsx-release-signing.pfx
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+          WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_PASSWORD) -or
+              [string]::IsNullOrWhiteSpace($env:WINDOWS_TIMESTAMP_URL)) {
+            throw "Windows Authenticode signing password/timestamp URL is not fully configured."
+          }
+
+          ./windows/eng/sign-windows-release.ps1 -TargetPath artifacts/windows-receiver -PfxPath $env:WINDOWS_SIGNING_PFX_PATH -PfxPassword $env:WINDOWS_SIGNING_PFX_PASSWORD -TimestampUrl $env:WINDOWS_TIMESTAMP_URL
 
       - name: Archive Windows Receiver validation build
         shell: pwsh
@@ -146,16 +240,55 @@ jobs:
         shell: pwsh
         run: ./windows/installer/build-installer.ps1
 
+      - name: Sign Windows installer
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX_PATH: ${{ runner.temp }}\natsx-release-signing.pfx
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+          WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+        run: |
+          $installers = @(Get-ChildItem artifacts/installer -Filter *.exe -File)
+
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one Windows installer, found $($installers.Count)."
+          }
+
+          ./windows/eng/sign-windows-release.ps1 -TargetPath $installers[0].FullName -PfxPath $env:WINDOWS_SIGNING_PFX_PATH -PfxPassword $env:WINDOWS_SIGNING_PFX_PASSWORD -TimestampUrl $env:WINDOWS_TIMESTAMP_URL
+
+      - name: Write Windows SHA-256 checksums
+        shell: pwsh
+        run: |
+          $files = @(
+            Get-Item artifacts/natsx-controller-windows-x64.zip
+            Get-ChildItem artifacts/installer -Filter *.exe -File
+          )
+
+          foreach ($file in $files) {
+            $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($file.Name)" | Set-Content -LiteralPath ($file.FullName + ".sha256") -Encoding ascii
+          }
+
       - name: Upload Windows Receiver validation build
         uses: actions/upload-artifact@v4
         with:
           name: natsx-controller-windows-x64-validation
-          path: artifacts/natsx-controller-windows-x64.zip
+          path: |
+            artifacts/natsx-controller-windows-x64.zip
+            artifacts/natsx-controller-windows-x64.zip.sha256
           if-no-files-found: error
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
           name: natsx-controller-windows-installer
-          path: artifacts/installer/*.exe
+          path: |
+            artifacts/installer/*.exe
+            artifacts/installer/*.exe.sha256
           if-no-files-found: error
+
+      - name: Remove Windows release-signing certificate
+        if: always()
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX_PATH: ${{ runner.temp }}\natsx-release-signing.pfx
+        run: Remove-Item -LiteralPath $env:WINDOWS_SIGNING_PFX_PATH -Force -ErrorAction SilentlyContinue

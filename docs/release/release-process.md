@@ -13,10 +13,12 @@
 1. Android CI, Windows CI, Windows Driver CI, and HIDMaestro Bootstrap CI are green.
 2. Required M14 physical reliability gates are complete.
 3. Android signing secrets are configured in GitHub: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD.
-4. Windows production driver/signing posture is approved. Test-signed KMDF packages must not be distributed as production drivers.
-5. Security and dependency/license review is complete; the separate NATSX product-license decision in M0 is resolved before public distribution.
-6. Local crash diagnostics behavior has been validated and does not upload data automatically.
-7. Changelog is updated for the target version.
+4. Windows Authenticode secrets are configured: WINDOWS_SIGNING_PFX_BASE64 and WINDOWS_SIGNING_PFX_PASSWORD; WINDOWS_TIMESTAMP_URL points to an approved RFC3161 timestamp service.
+5. Windows production driver/signing posture is approved. Test-signed KMDF packages must not be distributed as production drivers.
+6. Security and dependency/license review is complete; the separate NATSX product-license decision in M0 is resolved before public distribution.
+7. Inno Setup usage is confirmed for the intended release context and NATSX_INNO_LICENSE_CONFIRMED is set only after that review.
+8. Local crash diagnostics behavior has been validated and does not upload data automatically.
+9. Changelog has a final section matching VERSION.
 
 ## Release workflow
 
@@ -34,8 +36,11 @@ Windows release:
 
 - restores and tests the solution;
 - publishes a self-contained win-x64 Receiver;
-- builds the Inno Setup installer when the production dependency gate is satisfied;
-- keeps the portable ZIP available for validation.
+- Authenticode-signs and verifies NATSX-owned Receiver binaries;
+- builds the Inno Setup installer only when the production dependency gate is satisfied;
+- Authenticode-signs and verifies the final installer;
+- emits SHA-256 checksum files for Windows artifacts;
+- keeps the signed portable ZIP available for validation.
 
 ## Windows installer policy
 
@@ -86,3 +91,26 @@ Feature-complete Windows releases require the two production-signed NATSX USB dr
 The release workflow consumes a SHA-256-pinned ZIP through repository variables `NATSX_PRODUCTION_DRIVER_BUNDLE_URL` and `NATSX_PRODUCTION_DRIVER_BUNDLE_SHA256`. Missing variables, hash mismatch, development/test certificate material, attestation-only signing, invalid kernel-policy signatures, catalog/binary mismatch, or broadened hardware IDs fail the release.
 
 Ordinary Windows CI compiles the installer with `-AllowMissingProductionUsbDrivers` only as a NON-SHIPPING syntax/packaging smoke test. The release workflow never uses that bypass.
+
+
+## Fail-closed release metadata
+
+The release workflow refuses to produce artifacts while VERSION contains a development suffix. VERSION must be stable x.y.z, VERSION_CODE must be a positive integer, a pushed release tag must exactly equal v<VERSION>, LICENSE must exist, and CHANGELOG.md must contain a final section named exactly for VERSION.
+
+This intentionally keeps the unresolved M0 product-license choice outside automation while preventing an accidental public release before that choice is made.
+
+## Windows Authenticode signing
+
+Production Windows artifacts use `windows/eng/sign-windows-release.ps1`. The workflow requires:
+
+- secret `WINDOWS_SIGNING_PFX_BASE64`;
+- secret `WINDOWS_SIGNING_PFX_PASSWORD`;
+- repository variable `WINDOWS_TIMESTAMP_URL`.
+
+The PFX is decoded only into the runner temporary directory, used to sign NATSX-owned Receiver binaries and the final installer, verified with SignTool, and deleted in an `always()` cleanup step. The PFX/private key must never be committed or bundled.
+
+## Installer tool licensing gate
+
+Recent Inno Setup releases explicitly ask commercial users to purchase a commercial license, and an unlicensed compiler identifies itself as non-commercial use. Before a production release, the project owner must confirm that the intended distribution is permitted or covered by an appropriate Inno Setup commercial license, then set `NATSX_INNO_LICENSE_CONFIRMED=true`.
+
+That variable is an explicit release-owner acknowledgement, not an automated legal determination.

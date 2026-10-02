@@ -29,7 +29,7 @@ These are used to build or test the product and are not intentionally bundled as
 - Microsoft.NET.Test.Sdk 17.12.0
 - xUnit 2.9.2
 - xunit.runner.visualstudio 2.8.2
-- Inno Setup 6
+- Inno Setup 6/7 (installer build tooling; current upstream licensing distinguishes commercial use, so release requires an explicit licensing-posture confirmation)
 - Windows Driver Kit tooling
 - GitHub Actions used by repository workflows
 
