@@ -117,6 +117,85 @@ class BluetoothAutoReconnectRuntimeTest {
     }
 
     @Test
+    fun repeatedHeartbeatLossRecoversAcrossFiveBluetoothCycles() {
+        val createdLinks =
+            java.util.concurrent
+                .CopyOnWriteArrayList<FakeLink>()
+
+        val broadcaster =
+            RealtimeStateBroadcaster(
+                sequence =
+                    SessionSequence(),
+                monotonicMicros = {
+                    1uL
+                },
+            )
+
+        val runtime =
+            BluetoothAutoReconnectRuntime(
+                broadcaster = broadcaster,
+                linkFactory =
+                    BluetoothRealtimeLinkFactory {
+                        FakeLink(
+                            initialHeartbeat =
+                                System.nanoTime(),
+                        ).also(
+                            createdLinks::add,
+                        )
+                    },
+                nowNanos =
+                    System::nanoTime,
+                firstHeartbeatTimeoutMillis =
+                    250,
+                heartbeatLostTimeoutMillis =
+                    500,
+                pollIntervalMillis =
+                    25,
+            )
+
+        try {
+            runtime.start()
+
+            repeat(5) { cycle ->
+                waitUntil(1_500) {
+                    createdLinks.size >=
+                        cycle + 1 &&
+                        runtime.state ==
+                        BluetoothReconnectState.ACTIVE
+                }
+
+                val active =
+                    createdLinks[cycle]
+
+                active.lastHeartbeatReceivedNanos =
+                    System.nanoTime() -
+                        1_000_000_000L
+
+                waitUntil(1_500) {
+                    createdLinks.size >=
+                        cycle + 2
+                }
+
+                assertTrue(
+                    active.closed.get(),
+                )
+            }
+
+            waitUntil(1_500) {
+                runtime.state ==
+                    BluetoothReconnectState.ACTIVE
+            }
+
+            assertTrue(
+                runtime.reconnectAttempts >=
+                    5,
+            )
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
     fun lostHeartbeatReconnectsWithoutResettingGlobalSequence() {
         val createCalls =
             AtomicInteger(0)
