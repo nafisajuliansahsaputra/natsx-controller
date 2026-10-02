@@ -1,5 +1,7 @@
 package com.natsx.controller.core.transport.usb
 
+import com.natsx.controller.core.protocol.HandoverPayload
+import com.natsx.controller.core.protocol.ProtocolTransport
 import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.protocol.SessionId
 import org.junit.Assert.assertEquals
@@ -131,6 +133,65 @@ class UsbHeartbeatTest {
 
             waitUntil {
                 sender.rumblesReceived == 1L
+            }
+
+            sender.close()
+
+            assertEquals(
+                expected,
+                observed,
+            )
+        }
+
+        sessionKey.fill(0)
+    }
+
+    @Test
+    fun senderDispatchesAuthenticatedHandoverCommit() {
+        val sessionKey =
+            ByteArray(32) { index ->
+                index.toByte()
+            }
+
+        UsbTrustedSession(
+            sessionId = SessionId.createRandom(),
+            sessionKey = sessionKey,
+        ).use { session ->
+            val expected =
+                HandoverPayload(
+                    transport =
+                        ProtocolTransport.USB_DIRECT,
+                    stateSequence = 0xCAFE_BABEu,
+                )
+
+            val framedCommit =
+                UsbStreamFrameCodec.encode(
+                    UsbControlFrameCodec
+                        .encodeHandoverCommit(
+                            trustedSession = session,
+                            payload = expected,
+                            monotonicTimestampMicros = 456uL,
+                        ),
+                )
+
+            var observed: HandoverPayload? = null
+
+            val sender =
+                UsbRealtimeSender(
+                    outputStream =
+                        ByteArrayOutputStream(),
+                    trustedSession = session,
+                    inputStream =
+                        ByteArrayInputStream(
+                            framedCommit,
+                        ),
+                    handoverSink = {
+                        observed = it
+                    },
+                )
+
+            waitUntil {
+                sender.handoverCommitsReceived == 1L
             }
 
             sender.close()
