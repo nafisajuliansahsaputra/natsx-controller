@@ -123,3 +123,12 @@ After all physical release gates pass, set repository variable `NATSX_PHYSICAL_R
 The release workflow compares that variable to `github.sha` and fails if they differ. Any code change after physical approval therefore invalidates the approval automatically and requires the affected final validation to be repeated on the new commit.
 
 Use `docs/testing/results/PRODUCTION-RELEASE-TEMPLATE.md` for the evidence record and `windows/eng/collect-release-evidence.ps1` for the Windows environment snapshot.
+
+
+## Windows Firewall policy
+
+The Windows installer creates one inbound firewall rule named `NATSX.Controller.LanUdp`. It is bound to the installed Receiver executable, allows only UDP ports 43858-43860, blocks edge traversal, and restricts remote addresses to `LocalSubnet`.
+
+Those ports cover secure first-pair/recovery, LAN discovery/trusted control, and realtime Wi-Fi controller traffic. Pairing still requires explicit SAS confirmation and realtime/control traffic still requires the authenticated NATSX protocol.
+
+Normal uninstall removes only that exact NATSX rule. Setup rollback also removes it if a later privileged bootstrap step fails.

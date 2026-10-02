@@ -40,6 +40,8 @@ UninstallDisplayIcon={app}\Natsx.Controller.Receiver.exe
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "install-production-usb-drivers.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "remove-production-usb-drivers.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "install-firewall-rules.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "remove-firewall-rules.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 #if IncludeUsbDrivers == "1"
 Source: "{#BootstrapDriverDir}\*"; DestDir: "{app}\drivers\aoa-bootstrap"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#WinUsbDriverDir}\*"; DestDir: "{app}\drivers\aoa-winusb"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -56,6 +58,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 Filename: "{app}\Natsx.Controller.Receiver.exe"; Description: "Launch NATSX Controller"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [UninstallRun]
+Filename: "{sysnative}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\tools\remove-firewall-rules.ps1"""; Flags: runhidden waituntilterminated; RunOnceId: "NatsxControllerFirewallCleanup"
 Filename: "{sysnative}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\tools\remove-production-usb-drivers.ps1"""; Flags: runhidden waituntilterminated; RunOnceId: "NatsxControllerUsbDriverCleanup"
 Filename: "{app}\Natsx.Controller.Receiver.exe"; Parameters: "--uninstall-cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "NatsxControllerUserCleanup"
 
@@ -63,6 +66,28 @@ Filename: "{app}\Natsx.Controller.Receiver.exe"; Parameters: "--uninstall-cleanu
 Type: filesandordirs; Name: "{app}"
 
 [Code]
+procedure RunCleanupScript(const ScriptName: String);
+var
+  CleanupCode: Integer;
+begin
+  Exec(
+    ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe'),
+    ExpandConstant('-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{app}\tools\' + ScriptName + '"'),
+    ExpandConstant('{app}'),
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    CleanupCode
+  );
+end;
+
+procedure RollbackPostInstallSideEffects();
+begin
+  RunCleanupScript('remove-firewall-rules.ps1');
+#if IncludeUsbDrivers == "1"
+  RunCleanupScript('remove-production-usb-drivers.ps1');
+#endif
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
@@ -84,12 +109,35 @@ begin
 
     if ResultCode <> 0 then
     begin
+      RollbackPostInstallSideEffects();
       RaiseException(
         'NATSX production USB driver installation failed with exit code ' +
         IntToStr(ResultCode) + '.'
       );
     end;
 #endif
+
+    if not Exec(
+      ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe'),
+      ExpandConstant('-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{app}\tools\install-firewall-rules.ps1" -AppRoot "{app}"'),
+      ExpandConstant('{app}'),
+      SW_HIDE,
+      ewWaitUntilTerminated,
+      ResultCode
+    ) then
+    begin
+      RollbackPostInstallSideEffects();
+      RaiseException('Unable to start NATSX Windows Firewall configuration.');
+    end;
+
+    if ResultCode <> 0 then
+    begin
+      RollbackPostInstallSideEffects();
+      RaiseException(
+        'NATSX Windows Firewall configuration failed with exit code ' +
+        IntToStr(ResultCode) + '.'
+      );
+    end;
 
     if not Exec(
       ExpandConstant('{app}\Natsx.Controller.Receiver.exe'),
@@ -100,11 +148,13 @@ begin
       ResultCode
     ) then
     begin
+      RollbackPostInstallSideEffects();
       RaiseException('Unable to start the NATSX virtual-controller driver bootstrap.');
     end;
 
     if ResultCode <> 0 then
     begin
+      RollbackPostInstallSideEffects();
       RaiseException(
         'NATSX virtual-controller driver bootstrap failed with exit code ' +
         IntToStr(ResultCode) +

@@ -158,6 +158,27 @@ jobs:
             throw "Receiver executable was not installed."
           }
 
+          $firewallRule = Get-NetFirewallRule -Name "NATSX.Controller.LanUdp" -ErrorAction Stop
+          $firewallPort = $firewallRule | Get-NetFirewallPortFilter
+          $firewallAddress = $firewallRule | Get-NetFirewallAddressFilter
+          $firewallApplication = $firewallRule | Get-NetFirewallApplicationFilter
+
+          if ($firewallPort.Protocol -ne "UDP" -or
+              $firewallPort.LocalPort -notcontains "43858-43860") {
+            throw "Installed firewall rule does not expose only NATSX UDP ports."
+          }
+
+          if ($firewallAddress.RemoteAddress -notcontains "LocalSubnet") {
+            throw "Installed firewall rule is not restricted to LocalSubnet."
+          }
+
+          if (-not [string]::Equals(
+                [IO.Path]::GetFullPath([string]$firewallApplication.Program),
+                [IO.Path]::GetFullPath($receiver),
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Installed firewall rule is not scoped to the installed Receiver executable."
+          }
+
           $uninstaller = @(
             Get-ChildItem $installRoot -Filter "unins*.exe" -File
           ) | Select-Object -First 1
@@ -206,6 +227,10 @@ jobs:
 
           if (-not [string]::IsNullOrWhiteSpace([string]$runValue)) {
             throw "Receiver Startup registry entry remained after uninstall."
+          }
+
+          if (Get-NetFirewallRule -Name "NATSX.Controller.LanUdp" -ErrorAction SilentlyContinue) {
+            throw "NATSX firewall rule remained after uninstall."
           }
 
           Remove-Item -LiteralPath $trustRoot -Recurse -Force -ErrorAction SilentlyContinue

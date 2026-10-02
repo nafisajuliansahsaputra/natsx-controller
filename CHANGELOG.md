@@ -21,6 +21,7 @@ Application releases follow Semantic Versioning. Protocol compatibility is versi
 - Dependency/license notices, NuGet vulnerability audit policy, Dependabot coverage, and a documented v1 security review.
 - Fail-closed Windows production USB-driver bundle validation, installer staging/removal hooks, and release SHA-256 pinning.
 - Reproducible Windows HLK submission payload generation, physical acceptance evidence tooling, exact-commit release approval, and installer install/uninstall CI smoke coverage.
+- Installer-managed local-subnet Windows Firewall rule for UDP 43858-43860 with rollback/uninstall cleanup.
 
 ### Reliability
 
