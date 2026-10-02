@@ -1,6 +1,6 @@
 # ADR 0007 — Windows AOA bootstrap boundary
 
-**Status:** Accepted implementation boundary; physical prototype validated, production signing/release pending  
+**Status:** Accepted implementation boundary; physical prototype validated, production signing/release pending
 **Date:** 2026-10-01
 
 ## Context
