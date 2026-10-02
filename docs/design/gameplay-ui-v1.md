@@ -1,7 +1,7 @@
 # NATSX Controller — Gameplay UI/UX Specification v1
 
-Status: **Implementation source of truth**  
-Scope: Android gameplay/controller surface  
+Status: **Implementation source of truth**
+Scope: Android gameplay/controller surface
 Priority: **input performance and usability first; visual polish second**
 
 ---
