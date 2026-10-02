@@ -367,9 +367,9 @@ class ControllerStatusView(
                 )
 
         tempRect.set(
-            centerX - contentCenterX,
+            centerX - width / 2f,
             centerY - height / 2f,
-            centerX + contentCenterX,
+            centerX + width / 2f,
             centerY + height / 2f,
         )
 
@@ -384,10 +384,10 @@ class ControllerStatusView(
             size * 0.10f
 
         tempRect.set(
-            centerX + contentCenterX +
+            centerX + width / 2f +
                 inactivePaint.strokeWidth,
             centerY - height * 0.17f,
-            centerX + contentCenterX +
+            centerX + width / 2f +
                 terminalWidth,
             centerY + height * 0.17f,
         )
@@ -435,7 +435,7 @@ class ControllerStatusView(
             }
 
         tempRect.set(
-            centerX - contentCenterX +
+            centerX - width / 2f +
                 innerPadding,
             centerY - height / 2f +
                 innerPadding,
