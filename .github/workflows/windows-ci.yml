@@ -102,3 +102,64 @@ jobs:
       - name: Compile non-shipping Windows installer
         shell: pwsh
         run: ./windows/installer/build-installer.ps1 -PublishDir "artifacts/windows-receiver-ci" -OutputDir "artifacts/installer-ci" -AllowMissingProductionUsbDrivers
+
+      - name: Exercise installer lifecycle
+        shell: pwsh
+        run: |
+          $installer = @(
+            Get-ChildItem artifacts/installer-ci -Filter *.exe -File
+          )
+
+          if ($installer.Count -ne 1) {
+            throw "Expected exactly one CI installer, found $($installer.Count)."
+          }
+
+          $installRoot = Join-Path $env:RUNNER_TEMP "natsx-controller-installed"
+
+          $install = Start-Process -FilePath $installer[0].FullName -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-",
+            "/DIR=$installRoot"
+          ) -Wait -PassThru
+
+          if ($install.ExitCode -ne 0) {
+            $setupLog = Join-Path $env:ProgramData "NATSX\Controller\setup-driver-error.log"
+
+            if (Test-Path -LiteralPath $setupLog) {
+              Get-Content -LiteralPath $setupLog | Write-Host
+            }
+
+            throw "CI installer exited with code $($install.ExitCode)."
+          }
+
+          $receiver = Join-Path $installRoot "Natsx.Controller.Receiver.exe"
+
+          if (-not (Test-Path -LiteralPath $receiver -PathType Leaf)) {
+            throw "Receiver executable was not installed."
+          }
+
+          $uninstaller = @(
+            Get-ChildItem $installRoot -Filter "unins*.exe" -File
+          ) | Select-Object -First 1
+
+          if ($null -eq $uninstaller) {
+            throw "Inno Setup uninstaller was not created."
+          }
+
+          $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART"
+          ) -Wait -PassThru
+
+          if ($uninstall.ExitCode -ne 0) {
+            throw "CI uninstaller exited with code $($uninstall.ExitCode)."
+          }
+
+          Start-Sleep -Milliseconds 500
+
+          if (Test-Path -LiteralPath $receiver) {
+            throw "Receiver executable remained after uninstall."
+          }
