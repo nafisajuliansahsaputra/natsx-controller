@@ -63,6 +63,25 @@ jobs:
             echo "Set NATSX_INNO_LICENSE_CONFIRMED=true only after confirming this release is covered by permitted Inno Setup usage or a commercial license." >&2
             exit 1
           fi
+
+      - name: Require physical release approval for this exact commit
+        shell: bash
+        env:
+          APPROVED_SHA: ${{ vars.NATSX_PHYSICAL_RELEASE_APPROVED_SHA }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$APPROVED_SHA" ]]; then
+            echo "NATSX_PHYSICAL_RELEASE_APPROVED_SHA is not configured." >&2
+            exit 1
+          fi
+
+          if [[ "$APPROVED_SHA" != "$RELEASE_SHA" ]]; then
+            echo "Physical release approval is for $APPROVED_SHA, but this release is $RELEASE_SHA." >&2
+            echo "Run clean-install/soak/sleep/CPU/battery/upgrade/uninstall validation on this exact commit before release." >&2
+            exit 1
+          fi
   android-release:
     needs: release-preflight
     runs-on: ubuntu-latest
