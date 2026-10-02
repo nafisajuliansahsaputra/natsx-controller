@@ -16,6 +16,7 @@ import android.widget.SeekBar
 import android.widget.TextView
 import com.natsx.controller.core.connection.AndroidConnectionStatus
 import com.natsx.controller.core.connection.AndroidLinkState
+import com.natsx.controller.core.connection.AndroidTransportPreference
 import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.haptics.HapticLevel
 import com.natsx.controller.core.input.ControllerInputTuning
@@ -383,13 +384,18 @@ class MainActivity : Activity() {
             return
         }
 
+        val preference =
+            app.transportPreferenceSettings
+                .preference
+                .displayName
+
         val smartAuto =
             currentConnectionStatus.smartAutoActiveTransport
                 ?.let {
-                    "Smart Auto • Active: " +
+                    "Transport • $preference • Active: " +
                         smartAutoTransportLabel(it)
                 }
-                ?: "Smart Auto • Waiting for Windows"
+                ?: "Transport • $preference • Waiting for Windows"
 
         val links =
             "Links • Wi-Fi ${linkStateLabel(currentConnectionStatus.wifi)}" +
@@ -482,6 +488,23 @@ class MainActivity : Activity() {
         val profileButton =
             Button(this)
 
+        val transportButton =
+            Button(this).apply {
+                setOnClickListener {
+                    showTransportPreferenceChooser { preference ->
+                        app.transportPreferenceSettings
+                            .preference =
+                            preference
+
+                        text =
+                            "Transport — " +
+                                preference.displayName
+
+                        renderStatusOverlay()
+                    }
+                }
+            }
+
         val diagnosticsButton =
             Button(this).apply {
                 text = "Diagnostics"
@@ -547,6 +570,12 @@ class MainActivity : Activity() {
                 "Profile — " +
                     app.inputSettings
                         .profile
+                        .displayName
+
+            transportButton.text =
+                "Transport — " +
+                    app.transportPreferenceSettings
+                        .preference
                         .displayName
         }
 
@@ -649,6 +678,7 @@ class MainActivity : Activity() {
         }
 
         container.addView(profileButton)
+        container.addView(transportButton)
         container.addView(diagnosticsButton)
         container.addView(leftDeadzoneLabel)
         container.addView(leftDeadzone)
@@ -718,6 +748,12 @@ class MainActivity : Activity() {
             buildString {
                 appendLine("Smart Auto")
                 appendLine("Active transport: $activeTransport")
+                appendLine(
+                    "Preference: " +
+                        app.transportPreferenceSettings
+                            .preference
+                            .displayName,
+                )
                 appendLine("Authority sequence: $authoritySequence")
                 appendLine()
                 appendLine("Local links")
@@ -809,6 +845,46 @@ class MainActivity : Activity() {
             .setView(diagnosticsText)
             .setPositiveButton(
                 "Close",
+                null,
+            )
+            .create()
+            .apply {
+                setOnDismissListener {
+                    applyImmersiveMode()
+                }
+                show()
+            }
+    }
+
+    private fun showTransportPreferenceChooser(
+        onSelected: (AndroidTransportPreference) -> Unit,
+    ) {
+        val preferences =
+            AndroidTransportPreference.entries
+
+        val selected =
+            preferences.indexOf(
+                app.transportPreferenceSettings
+                    .preference,
+            )
+
+        AlertDialog.Builder(this)
+            .setTitle("Transport preference")
+            .setSingleChoiceItems(
+                preferences
+                    .map {
+                        it.displayName
+                    }
+                    .toTypedArray(),
+                selected,
+            ) { dialog, which ->
+                onSelected(
+                    preferences[which],
+                )
+                dialog.dismiss()
+            }
+            .setNegativeButton(
+                "Cancel",
                 null,
             )
             .create()
