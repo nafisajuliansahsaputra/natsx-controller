@@ -99,6 +99,12 @@ jobs:
             throw "Normal NATSX uninstall must not remove the shared HIDMaestro machine dependency."
           }
 
+          $serviceInstaller = Get-Content windows/installer/install-gamepad-host.ps1 -Raw
+
+          if ($serviceInstaller -notmatch 'outside Program Files') {
+            throw "LocalSystem service root policy is missing."
+          }
+
       - name: Cache HIDMaestro SDK
         uses: actions/cache@v4
         with:
@@ -148,7 +154,7 @@ jobs:
             throw "Expected exactly one CI installer, found $($installer.Count)."
           }
 
-          $installRoot = Join-Path $env:RUNNER_TEMP "natsx-controller-installed"
+          $installRoot = Join-Path $env:ProgramFiles "NATSX Controller CI"
 
           $trustRoot = Join-Path $env:LOCALAPPDATA "NATSX\Controller"
           $trustedPeers = Join-Path $trustRoot "trusted-peers-v1.json"

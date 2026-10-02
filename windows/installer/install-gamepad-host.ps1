@@ -30,7 +30,32 @@ function Write-InstallLog {
 }
 
 $appRootPath = (Resolve-Path -LiteralPath $AppRoot).Path
-$hostPath = Join-Path $appRootPath "Natsx.Controller.GamepadHost.exe"
+$programFilesPath = [Environment]::GetFolderPath(
+    [Environment+SpecialFolder]::ProgramFiles)
+
+$programFilesRoot = [IO.Path]::GetFullPath(
+    $programFilesPath).TrimEnd(
+        [IO.Path]::DirectorySeparatorChar,
+        [IO.Path]::AltDirectorySeparatorChar)
+
+$appRootFull = [IO.Path]::GetFullPath(
+    $appRootPath).TrimEnd(
+        [IO.Path]::DirectorySeparatorChar,
+        [IO.Path]::AltDirectorySeparatorChar)
+
+$requiredPrefix =
+    $programFilesRoot +
+    [IO.Path]::DirectorySeparatorChar
+
+if (-not $appRootFull.StartsWith(
+        $requiredPrefix,
+        [StringComparison]::OrdinalIgnoreCase)) {
+    throw (
+        "Refusing to register a LocalSystem service from outside Program Files. " +
+        "AppRoot='$appRootFull', required root='$programFilesRoot'.")
+}
+
+$hostPath = Join-Path $appRootFull "Natsx.Controller.GamepadHost.exe"
 
 if (-not (Test-Path -LiteralPath $hostPath -PathType Leaf)) {
     throw "Privileged gamepad-host executable is missing: $hostPath"
@@ -125,10 +150,14 @@ try {
         Invoke-Sc -Arguments @(
             "config",
             $serviceName,
-            "binPath= $quotedHost",
-            "start= auto",
-            "obj= LocalSystem",
-            "DisplayName= NATSX Controller Gamepad Host"
+            "binPath=",
+            $quotedHost,
+            "start=",
+            "auto",
+            "obj=",
+            "LocalSystem",
+            "DisplayName=",
+            "NATSX Controller Gamepad Host"
         ) | Out-Null
     }
 
@@ -141,8 +170,10 @@ try {
     Invoke-Sc -Arguments @(
         "failure",
         $serviceName,
-        "reset= 86400",
-        "actions= restart/2000/restart/5000/restart/10000"
+        "reset=",
+        "86400",
+        "actions=",
+        "restart/2000/restart/5000/restart/10000"
     ) | Out-Null
 
     Invoke-Sc -Arguments @("failureflag", $serviceName, "1") | Out-Null
@@ -183,9 +214,12 @@ catch {
         Invoke-Sc -Arguments @(
             "config",
             $serviceName,
-            "binPath= $($existingCim.PathName)",
-            "start= auto",
-            "obj= LocalSystem"
+            "binPath=",
+            [string]$existingCim.PathName,
+            "start=",
+            "auto",
+            "obj=",
+            "LocalSystem"
         ) -AllowFailure | Out-Null
 
         Invoke-Sc -Arguments @("start", $serviceName) -AllowFailure | Out-Null

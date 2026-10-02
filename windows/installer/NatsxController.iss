@@ -24,6 +24,7 @@ AppName=NATSX Controller
 AppVersion={#MyAppVersion}
 AppPublisher=NATSX
 DefaultDirName={autopf}\NATSX Controller
+DisableDirPage=yes
 DefaultGroupName=NATSX Controller
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
