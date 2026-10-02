@@ -11,6 +11,12 @@ namespace Natsx.Controller.GamepadHost;
 
 internal sealed class GamepadHostServer
 {
+    private static readonly TimeSpan StateWatchdogTimeout =
+        TimeSpan.FromMilliseconds(500);
+
+    private static readonly TimeSpan StateWatchdogPollInterval =
+        TimeSpan.FromMilliseconds(100);
+
     private readonly string _expectedReceiverPath =
         Path.GetFullPath(
             Path.Combine(
@@ -154,6 +160,23 @@ internal sealed class GamepadHostServer
                 cancellationToken)
             .ConfigureAwait(false);
 
+        long lastStateTimestamp =
+            Stopwatch.GetTimestamp();
+
+        using var watchdogLifetime =
+            CancellationTokenSource
+                .CreateLinkedTokenSource(
+                    cancellationToken);
+
+        Task watchdogTask =
+            WatchStateFreshnessAsync(
+                pipe,
+                backend,
+                () =>
+                    Volatile.Read(
+                        ref lastStateTimestamp),
+                watchdogLifetime.Token);
+
         try
         {
             while (!cancellationToken.IsCancellationRequested)
@@ -183,10 +206,25 @@ internal sealed class GamepadHostServer
 
                 backend.Submit(
                     state);
+
+                Volatile.Write(
+                    ref lastStateTimestamp,
+                    Stopwatch.GetTimestamp());
             }
         }
         finally
         {
+            watchdogLifetime.Cancel();
+
+            try
+            {
+                await watchdogTask
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
             try
             {
                 backend.Submit(
@@ -195,6 +233,53 @@ internal sealed class GamepadHostServer
             catch
             {
             }
+        }
+    }
+
+    private static async Task WatchStateFreshnessAsync(
+        NamedPipeServerStream pipe,
+        HidMaestroVirtualGamepadBackend backend,
+        Func<long> lastStateTimestamp,
+        CancellationToken cancellationToken)
+    {
+        using var timer =
+            new PeriodicTimer(
+                StateWatchdogPollInterval);
+
+        while (await timer
+            .WaitForNextTickAsync(
+                cancellationToken)
+            .ConfigureAwait(false))
+        {
+            TimeSpan silence =
+                Stopwatch.GetElapsedTime(
+                    lastStateTimestamp(),
+                    Stopwatch.GetTimestamp());
+
+            if (silence <
+                StateWatchdogTimeout)
+            {
+                continue;
+            }
+
+            try
+            {
+                backend.Submit(
+                    GamepadState.Neutral);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                pipe.Dispose();
+            }
+            catch
+            {
+            }
+
+            return;
         }
     }
 

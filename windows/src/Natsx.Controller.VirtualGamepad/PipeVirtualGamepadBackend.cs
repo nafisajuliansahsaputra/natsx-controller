@@ -12,6 +12,9 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
     private static readonly TimeSpan ReconnectDelay =
         TimeSpan.FromMilliseconds(500);
 
+    private static readonly TimeSpan StateRefreshInterval =
+        TimeSpan.FromMilliseconds(100);
+
     private readonly object _gate =
         new();
 
@@ -314,10 +317,36 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
                 Submit(
                     latest);
 
-                await ReadLoopAsync(
+                using var connectionLifetime =
+                    CancellationTokenSource
+                        .CreateLinkedTokenSource(
+                            cancellationToken);
+
+                Task refreshTask =
+                    StateRefreshLoopAsync(
                         pipe,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                        connectionLifetime.Token);
+
+                try
+                {
+                    await ReadLoopAsync(
+                            pipe,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                finally
+                {
+                    connectionLifetime.Cancel();
+
+                    try
+                    {
+                        await refreshTask
+                            .ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
             }
             catch (OperationCanceledException)
                 when (cancellationToken.IsCancellationRequested)
@@ -429,6 +458,45 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
         {
             throw new FormatException(
                 "The privileged virtual-gamepad host returned an invalid READY frame.");
+        }
+    }
+
+    private async Task StateRefreshLoopAsync(
+        NamedPipeClientStream pipe,
+        CancellationToken cancellationToken)
+    {
+        using var timer =
+            new PeriodicTimer(
+                StateRefreshInterval);
+
+        while (await timer
+            .WaitForNextTickAsync(
+                cancellationToken)
+            .ConfigureAwait(false))
+        {
+            GamepadState latest;
+            NamedPipeClientStream? activePipe;
+
+            lock (_gate)
+            {
+                latest =
+                    _latestState;
+
+                activePipe =
+                    _connected
+                        ? _pipe
+                        : null;
+            }
+
+            if (!ReferenceEquals(
+                    activePipe,
+                    pipe))
+            {
+                return;
+            }
+
+            Submit(
+                latest);
         }
     }
 
