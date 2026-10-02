@@ -336,6 +336,146 @@ class MainActivity : Activity() {
             }
         }
 
+        pairingOverlay =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(
+                    dp(32),
+                    dp(24),
+                    dp(32),
+                    dp(24),
+                )
+                setBackgroundColor(
+                    Color.argb(
+                        238,
+                        14,
+                        14,
+                        18,
+                    ),
+                )
+                visibility = View.GONE
+                isClickable = true
+                isFocusable = true
+            }
+
+        val title =
+            TextView(this).apply {
+                text = "Pair this Windows receiver"
+                textSize = 24f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+            }
+
+        val description =
+            TextView(this).apply {
+                text =
+                    "Make sure this code matches the code shown on your PC."
+                textSize = 15f
+                setTextColor(
+                    Color.rgb(
+                        205,
+                        205,
+                        215,
+                    ),
+                )
+                gravity = Gravity.CENTER
+                setPadding(
+                    0,
+                    dp(8),
+                    0,
+                    dp(18),
+                )
+            }
+
+        pairingCodeText =
+            TextView(this).apply {
+                textSize = 44f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                letterSpacing = 0.18f
+            }
+
+        pairingPeerText =
+            TextView(this).apply {
+                textSize = 12f
+                setTextColor(
+                    Color.rgb(
+                        170,
+                        170,
+                        180,
+                    ),
+                )
+                gravity = Gravity.CENTER
+                setPadding(
+                    0,
+                    dp(8),
+                    0,
+                    dp(20),
+                )
+            }
+
+        val actions =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+            }
+
+        val reject =
+            Button(this).apply {
+                text = "Reject"
+                setOnClickListener {
+                    pairingConfirmation.resolve(
+                        false,
+                    )
+                }
+            }
+
+        val confirm =
+            Button(this).apply {
+                text = "Confirm"
+                setOnClickListener {
+                    pairingConfirmation.resolve(
+                        true,
+                    )
+                }
+            }
+
+        actions.addView(
+            reject,
+            LinearLayout.LayoutParams(
+                dp(140),
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                marginEnd = dp(12)
+            },
+        )
+
+        actions.addView(
+            confirm,
+            LinearLayout.LayoutParams(
+                dp(140),
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+
+        pairingOverlay.addView(title)
+        pairingOverlay.addView(description)
+        pairingOverlay.addView(pairingCodeText)
+        pairingOverlay.addView(pairingPeerText)
+        pairingOverlay.addView(actions)
+
+        root.addView(
+            pairingOverlay,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+
+        root.requestApplyInsets()
+
         return root
     }
 

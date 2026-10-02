@@ -32,8 +32,22 @@ class SkinVerificationInstrumentation : Instrumentation() {
                 error = failure
             }
         }
+        if (error == null) {
+            val activity = startActivitySync(
+                android.content.Intent(targetContext, MainActivity::class.java)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            ) as MainActivity
+            try {
+                waitForIdleSync()
+                PairingUiVerification.verify(activity) { block -> runOnMainSync { block() } }
+            } catch (failure: Throwable) {
+                error = failure
+            } finally {
+                runOnMainSync { activity.finish() }
+            }
+        }
         val result = Bundle()
-        result.putString("stream", error?.stackTraceToString() ?: "PASS: native rendering, safe insets, multitouch, diagonals, release/cancel at three aspect ratios\n")
+        result.putString("stream", error?.stackTraceToString() ?: "PASS: native rendering, safe insets, multitouch, diagonals, release/cancel at three aspect ratios; Activity pairing confirm/reject and input unblock\n")
         finish(if (error == null) -1 else 0, result)
     }
 

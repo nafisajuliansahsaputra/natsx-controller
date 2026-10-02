@@ -695,3 +695,15 @@ Native Skia checks also verify a clear cap gradient after the stipple-alpha
 reset. Debug APK and instrumentation APK builds, lint, 130 repository unit
 tests and two temporary native render/touch tests all pass (132 tests total). Device GPU timing
 and extended physical gameplay remain unmeasured.
+
+### Pairing overlay regression
+
+The gameplay HUD refactor had removed construction of the Android pairing
+overlay while leaving its listener registered. The receiver displayed its
+comparison code, but Android silently skipped showing the prompt and could
+not approve trust; authenticated input consequently never started. The full
+screen code/Confirm/Reject overlay is restored above the gameplay HUD. It
+releases current inputs, consumes gameplay touches while approval is pending,
+and hides when confirmation ends. Native Activity checks cover visible codes,
+both approval outcomes, and A press/release through the complete View hierarchy
+after the overlay closes. The normal USB trust/handshake protocol is unchanged.

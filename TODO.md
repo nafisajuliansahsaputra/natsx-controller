@@ -321,6 +321,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Generate/store peer identity.
 - [x] Protect long-term trust material using platform secure storage.
 - [x] Implement pairing code/confirmation flow.
+- [x] Restore the Android comparison-code overlay after HUD refactoring; verify Confirm/Reject and gameplay touch unblocking through the real Activity hierarchy.
 - [x] Bind trust to the intended device.
 - [x] Reject untrusted LAN state packets.
 - [x] Reject stale session packets.
