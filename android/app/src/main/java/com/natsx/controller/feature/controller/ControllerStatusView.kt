@@ -140,7 +140,7 @@ class ControllerStatusView(
         val gap = contentWidth * 0.018f
         val groupWidth = iconSize * 4f + gap * 3f
         val firstCenterX = contentCenterX - groupWidth / 2f + iconSize / 2f
-        val iconCenterY = viewport.y(68f)
+        val iconCenterY = viewport.y(62f)
         val stroke = (contentHeight * 0.0028f).coerceAtLeast(1.5f)
 
         inactivePaint.strokeWidth = stroke
@@ -193,9 +193,9 @@ class ControllerStatusView(
                 ),
         )
 
-        val lampWidth = contentWidth * 0.064f
-        val lampHeight = contentHeight * 0.014f
-        val lampCenterY = viewport.y(360f)
+        val lampWidth = 164f * viewport.scale
+        val lampHeight = 16f * viewport.scale
+        val lampCenterY = viewport.y(369f)
 
         lampPaint.color =
             when (state.activeTransport) {

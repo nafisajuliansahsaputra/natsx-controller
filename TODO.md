@@ -322,6 +322,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Protect long-term trust material using platform secure storage.
 - [x] Implement pairing code/confirmation flow.
 - [x] Restore the Android comparison-code overlay after HUD refactoring; verify Confirm/Reject and gameplay touch unblocking through the real Activity hierarchy.
+- [x] Finish gameplay silhouettes against the 2048×921 construction guide: measured shoulders/utilities, smaller analog caps, square D-pad cross, no nested outlines; retain 50px artboard margins and Activity pairing verification.
 - [x] Bind trust to the intended device.
 - [x] Reject untrusted LAN state packets.
 - [x] Reject stale session packets.

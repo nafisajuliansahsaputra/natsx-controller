@@ -325,9 +325,9 @@ class MainActivity : Activity() {
             } else {
                 com.natsx.controller.feature.controller.ControllerDesignViewport.fit(root.width.toFloat(), root.height.toFloat())
             }
-            val size = (102.6f * viewport.scale).toInt().coerceAtLeast(1)
+            val size = (98.4f * viewport.scale).toInt().coerceAtLeast(1)
             val params = settingsLogoButton.layoutParams as FrameLayout.LayoutParams
-            val margin = viewport.y(167.4f).toInt()
+            val margin = viewport.y(165.2f).toInt()
             if (params.width != size || params.height != size || params.topMargin != margin) {
                 params.width = size
                 params.height = size

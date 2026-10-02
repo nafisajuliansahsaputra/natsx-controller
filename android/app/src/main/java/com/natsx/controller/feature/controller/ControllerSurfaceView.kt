@@ -688,29 +688,29 @@ class ControllerSurfaceView(
             controls += ControlGeometry.rect(id, RectF(x - halfW, y - halfH, x + halfW, y + halfH), 14f * scale)
         }
 
-        // Outer button/socket bounds: exactly 50px from the artboard edges.
-        // Shoulder gaps are also 50px; dimensions never stretch independently.
-        rect(ControlId.LT, 50f, 50f, 450f, 218f)
-        rect(ControlId.LB, 500f, 50f, 890f, 218f)
-        rect(ControlId.RB, 1510f, 50f, 1900f, 218f)
-        rect(ControlId.RT, 1950f, 50f, 2350f, 218f)
-        rect(ControlId.BACK, 780f, 258f, 951f, 346f)
-        rect(ControlId.L3, 855f, 388f, 1036f, 484f)
-        rect(ControlId.R3, 1364f, 388f, 1545f, 484f)
-        rect(ControlId.START, 1449f, 258f, 1620f, 346f)
-        rect(ControlId.GUIDE, 1120f, 505f, 1280f, 602f)
+        // Measured from the user's 2048x921 construction guide on a 2400x1080 artboard.
+        // These bounds describe the colored silhouettes, excluding shadow falloff.
+        rect(ControlId.LT, 50f, 50f, 434f, 214f)
+        rect(ControlId.LB, 482f, 50f, 866f, 214f)
+        rect(ControlId.RB, 1534f, 50f, 1918f, 214f)
+        rect(ControlId.RT, 1966f, 50f, 2350f, 214f)
+        rect(ControlId.BACK, 788f, 263f, 951f, 346f)
+        rect(ControlId.L3, 863f, 395f, 1026f, 478f)
+        rect(ControlId.R3, 1374f, 395f, 1537f, 478f)
+        rect(ControlId.START, 1449f, 263f, 1612f, 346f)
+        rect(ControlId.GUIDE, 1119f, 524f, 1281f, 606f)
 
-        // Processing radii retain the existing analog response/calibration scale.
-        circle(ControlId.LEFT_STICK, 367f, 520f, 142.56f, 1.28f)
-        circle(ControlId.RIGHT_STICK, 1485f, 774f, 113.4f, 1.60f)
-        circle(ControlId.DPAD_UP, 910f, 625f, 75f, 1.10f)
-        circle(ControlId.DPAD_LEFT, 745f, 790f, 75f, 1.10f)
-        circle(ControlId.DPAD_RIGHT, 1075f, 790f, 75f, 1.10f)
-        circle(ControlId.DPAD_DOWN, 910f, 955f, 75f, 1.10f)
-        circle(ControlId.Y, 2025f, 386f, 84f, 1.14f)
-        circle(ControlId.X, 1874f, 535f, 84f, 1.14f)
-        circle(ControlId.B, 2177f, 535f, 84f, 1.14f)
-        circle(ControlId.A, 2025f, 692f, 84f, 1.14f)
+        // Preserve processing/calibration radii while the visible cap/plate follows the guide.
+        circle(ControlId.LEFT_STICK, 377f, 542f, 142.56f, 1.28f)
+        circle(ControlId.RIGHT_STICK, 1484f, 798f, 113.4f, 1.60f)
+        circle(ControlId.DPAD_UP, 917f, 630f, 82f, 1.10f)
+        circle(ControlId.DPAD_LEFT, 749f, 798f, 82f, 1.10f)
+        circle(ControlId.DPAD_RIGHT, 1085f, 798f, 82f, 1.10f)
+        circle(ControlId.DPAD_DOWN, 917f, 966f, 82f, 1.10f)
+        circle(ControlId.Y, 2024f, 392f, 82f, 1.14f)
+        circle(ControlId.X, 1873f, 540f, 82f, 1.14f)
+        circle(ControlId.B, 2175f, 540f, 82f, 1.14f)
+        circle(ControlId.A, 2024f, 692f, 82f, 1.14f)
 
         skin.rebuild(width, height, viewport.left, viewport.top, viewport.width, viewport.height,
             controls.map { control ->
