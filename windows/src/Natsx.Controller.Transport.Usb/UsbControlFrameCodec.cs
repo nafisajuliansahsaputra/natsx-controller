@@ -132,6 +132,42 @@ public static class UsbControlFrameCodec
             frame.Payload);
     }
 
+    public static byte[] EncodeHandoverCommit(
+        UsbTrustedSession session,
+        HandoverPayload payload,
+        ulong timestampMicros) =>
+        ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.HandoverCommit,
+                FrameFlags.Authenticated,
+                session.SessionId,
+                0,
+                timestampMicros,
+                HandoverPayloadCodec.Encode(
+                    payload)),
+            session.SessionKey);
+
+    public static HandoverPayload DecodeHandoverCommit(
+        ReadOnlySpan<byte> frameBytes,
+        UsbTrustedSession session)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                session);
+
+        if (frame.MessageType !=
+            MessageType.HandoverCommit)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.HandoverCommit}, received {frame.MessageType}.");
+        }
+
+        return HandoverPayloadCodec.Decode(
+            frame.Payload);
+    }
+
     public static byte[] EncodeTransportReady(
         UsbTrustedSession session,
         ProtocolTransport transport,

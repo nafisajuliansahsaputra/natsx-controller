@@ -1,11 +1,13 @@
 using Natsx.Controller.Connection;
 using Natsx.Controller.Core;
+using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Transport.Usb;
 
 public sealed class UsbControllerTransport :
     IControllerTransport,
-    IControllerOutputTransport
+    IControllerOutputTransport,
+    IControllerStatusOutputTransport
 {
     private readonly UsbRealtimeStreamReceiver _receiver;
     private readonly TransportLifecycle _lifecycle;
@@ -231,6 +233,32 @@ public sealed class UsbControllerTransport :
         return _receiver.TrySendRumbleAsync(
             rumble,
             cancellationToken);
+    }
+
+    public ValueTask<bool> TrySendHandoverCommitAsync(
+        TransportKind activeTransport,
+        uint stateSequence,
+        CancellationToken cancellationToken = default)
+    {
+        ProtocolTransport protocolTransport =
+            activeTransport switch
+            {
+                TransportKind.Wifi =>
+                    ProtocolTransport.Wifi,
+                TransportKind.Bluetooth =>
+                    ProtocolTransport.Bluetooth,
+                TransportKind.Usb =>
+                    ProtocolTransport.UsbDirect,
+                _ =>
+                    throw new ArgumentOutOfRangeException(
+                        nameof(activeTransport)),
+            };
+
+        return _receiver
+            .TrySendHandoverCommitAsync(
+                protocolTransport,
+                stateSequence,
+                cancellationToken);
     }
 
     private async Task PumpStatesAsync(

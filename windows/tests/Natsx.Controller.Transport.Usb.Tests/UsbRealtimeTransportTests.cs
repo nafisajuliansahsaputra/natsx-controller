@@ -50,6 +50,37 @@ public sealed class UsbRealtimeTransportTests
     }
 
     [Fact]
+    public void HandoverCommitRoundTrip_PreservesAuthorityAndSequence()
+    {
+        using var session =
+            new UsbTrustedSession(
+                CanonicalSessionId,
+                SessionKey);
+
+        var expected =
+            new HandoverPayload(
+                ProtocolTransport.Wifi,
+                0x10203040u);
+
+        byte[] frame =
+            UsbControlFrameCodec
+                .EncodeHandoverCommit(
+                    session,
+                    expected,
+                    654_321);
+
+        HandoverPayload actual =
+            UsbControlFrameCodec
+                .DecodeHandoverCommit(
+                    frame,
+                    session);
+
+        Assert.Equal(
+            expected,
+            actual);
+    }
+
+    [Fact]
     public async Task ControllerTransport_FirstAuthenticatedStateBecomesReady()
     {
         using var session =
