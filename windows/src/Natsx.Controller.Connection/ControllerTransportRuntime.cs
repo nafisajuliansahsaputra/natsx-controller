@@ -19,6 +19,15 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     private readonly Dictionary<TransportKind, PacketRateTracker> _packetRates = new();
     private readonly HashSet<TransportKind> _seenTransportKinds = new();
     private readonly object _rumbleStateGate = new();
+    private readonly Channel<HandoverCommitNotification> _handoverCommitQueue =
+        Channel.CreateBounded<HandoverCommitNotification>(
+            new BoundedChannelOptions(1)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true,
+                SingleWriter = false,
+                AllowSynchronousContinuations = false,
+            });
     private readonly Channel<RumbleState> _rumbleQueue =
         Channel.CreateBounded<RumbleState>(
             new BoundedChannelOptions(1)
@@ -34,6 +43,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
 
     private CancellationTokenSource? _lifetime;
     private Task? _evaluationLoop;
+    private Task? _handoverCommitLoop;
     private Task? _rumbleLoop;
     private Task? _rumbleRefreshLoop;
     private RumbleState _lastRumble;
@@ -231,6 +241,9 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         _evaluationLoop =
             EvaluationLoopAsync(
                 _lifetime.Token);
+        _handoverCommitLoop =
+            HandoverCommitLoopAsync(
+                _lifetime.Token);
         _rumbleLoop =
             RumbleLoopAsync(
                 _lifetime.Token);
@@ -402,11 +415,14 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
 
         CancellationTokenSource? lifetime = _lifetime;
         Task? loop = _evaluationLoop;
+        Task? handoverCommitLoop =
+            _handoverCommitLoop;
         Task? rumbleLoop = _rumbleLoop;
         Task? rumbleRefreshLoop =
             _rumbleRefreshLoop;
         _lifetime = null;
         _evaluationLoop = null;
+        _handoverCommitLoop = null;
         _rumbleLoop = null;
         _rumbleRefreshLoop = null;
 
@@ -417,6 +433,18 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
             try
             {
                 await loop.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        if (handoverCommitLoop is not null)
+        {
+            try
+            {
+                await handoverCommitLoop
+                    .ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -450,6 +478,11 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         {
             _lastRumble =
                 default;
+        }
+
+        while (_handoverCommitQueue.Reader.TryRead(
+            out _))
+        {
         }
 
         while (_rumbleQueue.Reader.TryRead(
@@ -487,6 +520,70 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         }
 
         lifetime?.Dispose();
+    }
+
+    private async Task HandoverCommitLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (
+                HandoverCommitNotification notification in
+                _handoverCommitQueue.Reader
+                    .ReadAllAsync(
+                        cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                await BroadcastHandoverCommitAsync(
+                        notification,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async ValueTask BroadcastHandoverCommitAsync(
+        HandoverCommitNotification notification,
+        CancellationToken cancellationToken)
+    {
+        IControllerTransport[] snapshot =
+            GetTransportSnapshot();
+
+        foreach (IControllerTransport transport in snapshot)
+        {
+            if (transport is not IControllerStatusOutputTransport output ||
+                transport.State is
+                    TransportRuntimeState.Unavailable or
+                    TransportRuntimeState.Failed)
+            {
+                continue;
+            }
+
+            try
+            {
+                await output
+                    .TrySendHandoverCommitAsync(
+                        notification.ActiveTransport,
+                        notification.StateSequence,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                OutputFaulted?.Invoke(
+                    transport.Kind,
+                    exception);
+            }
+        }
     }
 
     private async Task RumbleRefreshLoopAsync(
@@ -704,6 +801,7 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
     private bool TryCommitHandover(HandoverProposal proposal)
     {
         HandoverProposal? committed = null;
+        uint committedSequence = 0;
 
         lock (_stateGate)
         {
@@ -789,11 +887,20 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
             }
 
             committed = proposal;
+            committedSequence =
+                candidate.Sequence;
         }
 
         if (committed is HandoverProposal value)
         {
             HandoverCommitted?.Invoke(value);
+
+            _handoverCommitQueue.Writer
+                .TryWrite(
+                    new HandoverCommitNotification(
+                        value.To,
+                        committedSequence));
+
             return true;
         }
 
@@ -881,6 +988,10 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
             return _transports.Values.ToArray();
         }
     }
+
+    private readonly record struct HandoverCommitNotification(
+        TransportKind ActiveTransport,
+        uint StateSequence);
 
     private sealed class PacketRateTracker
     {
