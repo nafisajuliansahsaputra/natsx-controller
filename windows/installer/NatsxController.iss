@@ -7,7 +7,7 @@
 #endif
 
 #ifndef IncludeUsbDrivers
-  #define IncludeUsbDrivers 0
+  #define IncludeUsbDrivers "0"
 #endif
 
 #ifndef BootstrapDriverDir
@@ -40,7 +40,7 @@ UninstallDisplayIcon={app}\Natsx.Controller.Receiver.exe
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "install-production-usb-drivers.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "remove-production-usb-drivers.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
-#if IncludeUsbDrivers == 1
+#if IncludeUsbDrivers == "1"
 Source: "{#BootstrapDriverDir}\*"; DestDir: "{app}\drivers\aoa-bootstrap"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#WinUsbDriverDir}\*"; DestDir: "{app}\drivers\aoa-winusb"; Flags: ignoreversion recursesubdirs createallsubdirs
 #endif
@@ -69,7 +69,7 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-#if IncludeUsbDrivers == 1
+#if IncludeUsbDrivers == "1"
     if not Exec(
       ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe'),
       ExpandConstant('-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{app}\tools\install-production-usb-drivers.ps1" -AppRoot "{app}"'),
