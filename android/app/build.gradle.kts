@@ -67,7 +67,7 @@ android {
         versionCode = natsxVersionCode
         versionName = natsxVersionName
 
-        testInstrumentationRunner = "android.app.Instrumentation"
+        testInstrumentationRunner = "com.natsx.controller.SkinVerificationInstrumentation"
     }
 
     signingConfigs {

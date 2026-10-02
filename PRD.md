@@ -135,6 +135,9 @@ The initial eFootball layout is based on the user's existing Monect custom layou
 - D-pad in the lower-middle region.
 - Right analog stick between the D-pad and face-button region.
 
+The current approved visual proportions and lightweight skin are specified in
+`docs/design/gameplay-ui-v1.md`, section 6 (2026-10-02 reference).
+
 ### Ergonomic principles
 
 - Preserve established muscle memory.

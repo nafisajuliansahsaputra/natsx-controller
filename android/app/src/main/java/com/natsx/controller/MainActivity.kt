@@ -266,7 +266,7 @@ class MainActivity : Activity() {
             controllerStatusView,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(150),
+                ViewGroup.LayoutParams.MATCH_PARENT,
                 Gravity.TOP,
             ),
         )
@@ -314,6 +314,21 @@ class MainActivity : Activity() {
             },
         )
 
+        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            val topInset = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                root.rootWindowInsets?.displayCutout?.safeInsetTop ?: 0
+            } else 0
+            val usableHeight = (root.height - topInset).coerceAtLeast(1)
+            val size = (usableHeight * 0.095f).toInt().coerceAtLeast(1)
+            val params = settingsLogoButton.layoutParams as FrameLayout.LayoutParams
+            val margin = topInset + (usableHeight * 0.155f).toInt()
+            if (params.width != size || params.height != size || params.topMargin != margin) {
+                params.width = size
+                params.height = size
+                params.topMargin = margin
+                settingsLogoButton.layoutParams = params
+            }
+        }
 
         return root
     }

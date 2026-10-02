@@ -128,46 +128,15 @@ class ControllerStatusView(
             return
         }
 
-        val contentWidth =
-            width.coerceAtLeast(
-                1,
-            )
-
-        val contentCenterX =
-            width /
-                2f
-
-        val scale =
-            min(
-                contentWidth / 1920f,
-                height / 320f,
-            )
-                .coerceAtLeast(
-                    0.72f,
-                )
-
-        val iconSize =
-            20f * density * scale
-        val gap =
-            18f * density * scale
-        val groupWidth =
-            iconSize * 4f +
-                gap * 3f
-        val firstCenterX =
-            contentCenterX -
-                groupWidth / 2f +
-                iconSize / 2f
-        val iconCenterY =
-            safeInsetTop +
-                24f *
-                    density *
-                    scale
-
-        val stroke =
-            (2f * density * scale)
-                .coerceAtLeast(
-                    1.5f,
-                )
+        val contentWidth = (width - safeInsetLeft - safeInsetRight).coerceAtLeast(1).toFloat()
+        val contentHeight = (height - safeInsetTop).coerceAtLeast(1).toFloat()
+        val contentCenterX = width / 2f
+        val iconSize = contentHeight * 0.028f
+        val gap = contentWidth * 0.018f
+        val groupWidth = iconSize * 4f + gap * 3f
+        val firstCenterX = contentCenterX - groupWidth / 2f + iconSize / 2f
+        val iconCenterY = safeInsetTop + contentHeight * 0.063f
+        val stroke = (contentHeight * 0.0028f).coerceAtLeast(1.5f)
 
         inactivePaint.strokeWidth = stroke
         activePaint.strokeWidth = stroke
@@ -219,20 +188,9 @@ class ControllerStatusView(
                 ),
         )
 
-        val logoCenterY =
-            iconCenterY +
-                43f *
-                    density *
-                    scale
-        val lampWidth =
-            58f * density * scale
-        val lampHeight =
-            6f * density * scale
-        val lampCenterY =
-            safeInsetTop +
-                118f *
-                    density *
-                    scale
+        val lampWidth = contentWidth * 0.064f
+        val lampHeight = contentHeight * 0.014f
+        val lampCenterY = safeInsetTop + contentHeight * 0.334f
 
         lampPaint.color =
             when (state.activeTransport) {

@@ -129,117 +129,34 @@ Responsive adaptation may move controls by a few percent, but must not change th
 
 ---
 
-## 6. Relative sizing
+## 6. Reference geometry (2026-10-02)
 
-All measurements are relative to the **usable landscape viewport** after safe-area insets.
+The user-approved `Pastel Xbox-Style Controller UI Mockup (1)(4).png`
+(1870 × 841) supersedes earlier approximate sizing. Coordinates are normalized
+against the usable viewport, with symmetric cutout insets and height-scaled
+circles. The same geometry supplies visuals and pointer routing.
 
-### 6.1 Shoulder controls
+| Control | Center / bounds | Height-based radius |
+|---|---|---|
+| LT / RT | X 2.5–18.2% / 81.9–97.5%; Y 4.5–19.6% | rounded rectangle |
+| LB / RB | X 20.5–36.6% / 63.5–79.6%; Y 5.1–19.7% | inward-tapered shoulder |
+| Left stick | (15.3%, 47.4%) | plate 20.8%, cap 12.8% |
+| Right stick | (62.0%, 71.0%) | plate 20.8%, cap 12.8% |
+| D-pad | (38.0%, 72.2%) | plate 21.5%, cross half-thickness 6.6% |
+| Y / X / B / A | (84.3%,35.8%) / (78.1%,49.8%) / (90.7%,49.8%) / (84.4%,64.0%) | 7.7% |
+| View / Menu | X 32.6–39.7% / 60.3–67.4%; Y 24.3–32.1% | tapered mint key |
+| LS / RS | X 35.8–42.9% / 57.1–64.2%; Y 36.4–44.2% | tapered mint key |
+| Guide | X 46.7–53.4%; Y 47.2–55.4% | downward-tapered mint key |
 
-LT / RT:
+The D-pad reads as one rounded cross over a lavender circular plate.
+Left/right D-pad arm spacing is height-based to preserve a square cross on
+16:9 and wider phones. Analog processing/calibration radii are preserved.
 
-- width: approximately 14–16% viewport width;
-- height: approximately 14–17% viewport height.
-
-LB / RB:
-
-- width: approximately 15–17% viewport width;
-- height: approximately 14–17% viewport height.
-
-Recommended visual gap:
-
-- 1.5–2.5% viewport width.
-
-Touch region may extend approximately 8–12% beyond the visible shape.
-
-### 6.2 Left stick
-
-Center:
-
-- X: approximately 15–17%;
-- Y: approximately 53–57%.
-
-Visual outer diameter:
-
-- approximately 27–31% viewport height.
-
-Stick cap:
-
-- approximately 52–60% of outer diameter.
-
-Gesture capture radius:
-
-- approximately 115–125% of the visible outer radius where space permits.
-
-### 6.3 Right stick
-
-Center:
-
-- X: approximately 63–66%;
-- Y: approximately 63–68%.
-
-Size:
-
-- approximately 90–95% of left-stick visual size.
-
-Gesture capture radius:
-
-- approximately 115–125% of visible radius.
-
-### 6.4 D-pad
-
-Center:
-
-- X: approximately 37–39%;
-- Y: approximately 64–69%.
-
-Overall bounds:
-
-- width: approximately 20–22% viewport width;
-- height: approximately 31–34% viewport height.
-
-The D-pad should visually read as one cross, while internally retaining four directional hit regions.
-
-### 6.5 ABXY
-
-Cluster center:
-
-- X: approximately 83–85%;
-- Y: approximately 57–61%.
-
-Button diameter:
-
-- approximately 10–12% viewport height.
-
-The cluster remains:
-
-```text
-    Y
-
-  X   B
-
-    A
-```
-
-Expanded touch radius:
-
-- approximately 15–20% larger than visual radius when it does not overlap neighboring controls.
-
-### 6.6 Utility buttons
-
-Examples:
-
-- View / Back;
-- Menu / Start;
-- LS;
-- RS;
-- optional Share/action control.
-
-Recommended size:
-
-- width: approximately 5.5–7.5% viewport width;
-- height: approximately 7–9% viewport height.
-
-They use mint/green styling and must remain secondary to gameplay controls.
+`ControllerSkin` rasterizes gradients, highlights, modest shadows, labels and
+cap stippling only on geometry changes. Gameplay frames draw cached sprites,
+translate the shared cap using the processed stick values, and draw cheap
+D-pad state overlays. Raster resolution is capped at 2400 × 1080; no new
+rendering dependency, frame loop or realtime blur is introduced.
 
 ---
 
@@ -578,7 +495,7 @@ Prefer:
 - Android hardware-accelerated Canvas / existing custom gameplay renderer;
 - solid fills;
 - simple rounded paths;
-- lightweight static gradients only when visually valuable;
+- cached decorative gradients and sprite shadows only when visually valuable;
 - cached geometry/paths;
 - cached text metrics;
 - minimal allocations during pointer movement;
@@ -739,3 +656,19 @@ The intended result is:
 > a clean, attractive, comfortable controller interface that feels deliberate and polished while staying fast, predictable, and easy to use.
 
 When visual fidelity conflicts with performance or control ergonomics, **performance and ergonomics win**.
+
+## 27. Reference skin verification (2026-10-02)
+
+- Local `assembleDebug`, `assembleDebugAndroidTest` and `lintDebug` pass.
+- All 126 existing unit tests pass. Two temporary Robolectric/native Skia
+  tests additionally render the production View and route real MotionEvents
+  at 1870 × 841, 2400 × 1080 and 1920 × 1080.
+- Four simultaneous pointers (both sticks + RT + A), independent A release,
+  cancel neutralization, Up+Right D-pad, symmetric cutout insets and raster
+  cache reuse across 60 state redraws pass.
+- `SkinVerificationInstrumentation` preserves the same native device checks
+  without adding production dependencies. The screenshot CI workflow is
+  included but has not yet run on the remote branch.
+- Native Skia previews were visually inspected. These checks establish geometry
+  and input behavior, not physical-device GPU frame-time or battery measurements.
+  Those remain open and the APK is a debug build, not a production release.
