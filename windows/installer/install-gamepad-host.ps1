@@ -241,11 +241,13 @@ try {
     $serviceRegistryPath =
         "HKLM:\SYSTEM\CurrentControlSet\Services\$serviceName"
 
-    Set-ItemProperty `
+    New-ItemProperty `
         -LiteralPath $serviceRegistryPath `
         -Name "Description" `
         -Value $description `
-        -Type String
+        -PropertyType String `
+        -Force |
+        Out-Null
 
     Configure-ServiceRecovery
 
