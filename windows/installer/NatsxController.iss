@@ -42,6 +42,8 @@ Source: "install-production-usb-drivers.ps1"; DestDir: "{app}\tools"; Flags: ign
 Source: "remove-production-usb-drivers.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "install-firewall-rules.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "remove-firewall-rules.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "install-gamepad-host.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "remove-gamepad-host.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 #if IncludeUsbDrivers == "1"
 Source: "{#BootstrapDriverDir}\*"; DestDir: "{app}\drivers\aoa-bootstrap"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#WinUsbDriverDir}\*"; DestDir: "{app}\drivers\aoa-winusb"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -58,6 +60,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 Filename: "{app}\Natsx.Controller.Receiver.exe"; Description: "Launch NATSX Controller"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [UninstallRun]
+Filename: "{sysnative}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\tools\remove-gamepad-host.ps1"""; Flags: runhidden waituntilterminated; RunOnceId: "NatsxControllerGamepadHostCleanup"
 Filename: "{sysnative}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\tools\remove-firewall-rules.ps1"""; Flags: runhidden waituntilterminated; RunOnceId: "NatsxControllerFirewallCleanup"
 Filename: "{sysnative}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\tools\remove-production-usb-drivers.ps1"""; Flags: runhidden waituntilterminated; RunOnceId: "NatsxControllerUsbDriverCleanup"
 Filename: "{app}\Natsx.Controller.Receiver.exe"; Parameters: "--uninstall-cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "NatsxControllerUserCleanup"
@@ -82,6 +85,7 @@ end;
 
 procedure RollbackPostInstallSideEffects();
 begin
+  RunCleanupScript('remove-gamepad-host.ps1');
   RunCleanupScript('remove-firewall-rules.ps1');
 #if IncludeUsbDrivers == "1"
   RunCleanupScript('remove-production-usb-drivers.ps1');
@@ -158,6 +162,51 @@ begin
       RaiseException(
         'NATSX virtual-controller driver bootstrap failed with exit code ' +
         IntToStr(ResultCode) +
+        '. See %ProgramData%\NATSX\Controller\setup-driver-error.log.'
+      );
+    end;
+
+    if not Exec(
+      ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe'),
+      ExpandConstant('-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{app}\tools\install-gamepad-host.ps1" -AppRoot "{app}"'),
+      ExpandConstant('{app}'),
+      SW_HIDE,
+      ewWaitUntilTerminated,
+      ResultCode
+    ) then
+    begin
+      RollbackPostInstallSideEffects();
+      RaiseException('Unable to start NATSX privileged gamepad-host service installation.');
+    end;
+
+    if ResultCode <> 0 then
+    begin
+      RollbackPostInstallSideEffects();
+      RaiseException(
+        'NATSX privileged gamepad-host service installation failed with exit code ' +
+        IntToStr(ResultCode) + '.'
+      );
+    end;
+
+    if not ExecAsOriginalUser(
+      ExpandConstant('{app}\Natsx.Controller.Receiver.exe'),
+      '--verify-gamepad-host',
+      ExpandConstant('{app}'),
+      SW_HIDE,
+      ewWaitUntilTerminated,
+      ResultCode
+    ) then
+    begin
+      RollbackPostInstallSideEffects();
+      RaiseException('Unable to run the unelevated NATSX gamepad-host verification.');
+    end;
+
+    if ResultCode <> 0 then
+    begin
+      RollbackPostInstallSideEffects();
+      RaiseException(
+        'The unelevated NATSX Receiver could not use the privileged gamepad host. ' +
+        'Verification exit code: ' + IntToStr(ResultCode) +
         '. See %ProgramData%\NATSX\Controller\setup-driver-error.log.'
       );
     end;

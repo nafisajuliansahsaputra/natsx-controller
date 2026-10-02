@@ -59,6 +59,7 @@ $targets =
             Get-ChildItem -LiteralPath $resolvedTarget.Path -File |
                 Where-Object {
                     $_.Name -eq "Natsx.Controller.Receiver.exe" -or
+                    $_.Name -eq "Natsx.Controller.GamepadHost.exe" -or
                     $_.Name -like "Natsx.Controller.*.dll"
                 } |
                 Sort-Object Name

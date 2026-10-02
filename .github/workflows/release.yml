@@ -211,9 +211,11 @@ jobs:
       - name: Test
         run: dotnet test windows/Natsx.Controller.slnx --configuration Release --no-restore --verbosity normal
 
-      - name: Publish Windows Receiver
+      - name: Publish Windows Receiver and privileged gamepad host
         shell: pwsh
-        run: dotnet publish windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver
+        run: |
+          dotnet publish windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver
+          dotnet publish windows/src/Natsx.Controller.GamepadHost/Natsx.Controller.GamepadHost.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver
 
       - name: Sign Windows Receiver binaries
         shell: pwsh

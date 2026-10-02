@@ -20,6 +20,7 @@ New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
 
 $requiredPublishedFiles = @(
     "Natsx.Controller.Receiver.exe",
+    "Natsx.Controller.GamepadHost.exe",
     "HIDMaestro.Core.dll",
     "THIRD_PARTY_NOTICES.md",
     "licenses\HIDMaestro.LICENSE.txt"

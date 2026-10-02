@@ -105,9 +105,11 @@ jobs:
       - name: Test
         run: dotnet test windows/Natsx.Controller.slnx --configuration Release --no-build --verbosity normal
 
-      - name: Publish Receiver for installer smoke test
+      - name: Publish Windows runtime for installer smoke test
         shell: pwsh
-        run: dotnet publish windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver-ci
+        run: |
+          dotnet publish windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver-ci
+          dotnet publish windows/src/Natsx.Controller.GamepadHost/Natsx.Controller.GamepadHost.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver-ci
 
       - name: Install Inno Setup
         shell: pwsh
@@ -158,9 +160,31 @@ jobs:
           }
 
           $receiver = Join-Path $installRoot "Natsx.Controller.Receiver.exe"
+          $gamepadHost = Join-Path $installRoot "Natsx.Controller.GamepadHost.exe"
 
           if (-not (Test-Path -LiteralPath $receiver -PathType Leaf)) {
             throw "Receiver executable was not installed."
+          }
+
+          if (-not (Test-Path -LiteralPath $gamepadHost -PathType Leaf)) {
+            throw "Privileged gamepad-host executable was not installed."
+          }
+
+          $gamepadService = Get-Service -Name "NatsxControllerGamepadHost" -ErrorAction Stop
+
+          if ($gamepadService.Status -ne "Running") {
+            throw "Privileged gamepad-host service is not running after setup."
+          }
+
+          $gamepadServiceCim = Get-CimInstance Win32_Service -Filter "Name='NatsxControllerGamepadHost'" -ErrorAction Stop
+
+          if ($gamepadServiceCim.StartName -ne "LocalSystem" -or
+              $gamepadServiceCim.StartMode -ne "Auto") {
+            throw "Privileged gamepad-host service identity/start mode is incorrect."
+          }
+
+          if ([string]$gamepadServiceCim.PathName -notlike "*Natsx.Controller.GamepadHost.exe*--service*") {
+            throw "Privileged gamepad-host service command line is incorrect."
           }
 
           $firewallRule = Get-NetFirewallRule -Name "NATSX.Controller.LanUdp" -ErrorAction Stop
@@ -236,6 +260,10 @@ jobs:
 
           if (Get-NetFirewallRule -Name "NATSX.Controller.LanUdp" -ErrorAction SilentlyContinue) {
             throw "NATSX firewall rule remained after uninstall."
+          }
+
+          if (Get-Service -Name "NatsxControllerGamepadHost" -ErrorAction SilentlyContinue) {
+            throw "Privileged gamepad-host service remained after uninstall."
           }
 
           Remove-Item -LiteralPath $trustRoot -Recurse -Force -ErrorAction SilentlyContinue
