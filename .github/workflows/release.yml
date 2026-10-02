@@ -43,6 +43,9 @@ jobs:
           test -n "$ANDROID_KEYSTORE_BASE64"
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/natsx-release.keystore
 
+      - name: Lint Android
+        run: gradle -p android :app:lintRelease --stacktrace
+
       - name: Test Android
         run: gradle -p android :app:testDebugUnitTest --stacktrace
 
