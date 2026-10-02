@@ -40,7 +40,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
     private WinUsbAoaAccessoryConnection? _usbConnection;
     private IDisposable? _usbSessionOwner;
     private Task? _usbMonitorTask;
-    private HidMaestroVirtualGamepadBackend? _virtualGamepad;
+    private PipeVirtualGamepadBackend? _virtualGamepad;
     private ControllerTransportRuntime? _transportRuntime;
     private string _lastHandoverReason =
         "None";
@@ -202,7 +202,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 sessionRegistry;
 
             var virtualGamepad =
-                new HidMaestroVirtualGamepadBackend();
+                new PipeVirtualGamepadBackend();
 
             await virtualGamepad
                 .StartAsync(

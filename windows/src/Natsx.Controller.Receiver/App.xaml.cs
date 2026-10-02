@@ -29,6 +29,18 @@ public partial class App : System.Windows.Application
 
         if (HasArgument(
                 eventArgs.Args,
+                "--verify-gamepad-host"))
+        {
+            int exitCode =
+                await VerifyGamepadHostAsync();
+
+            Shutdown(
+                exitCode);
+            return;
+        }
+
+        if (HasArgument(
+                eventArgs.Args,
                 "--uninstall-cleanup"))
         {
             int exitCode =
@@ -85,6 +97,31 @@ public partial class App : System.Windows.Application
         {
             LocalCrashLog.Write(
                 "installer-driver-bootstrap",
+                exception);
+
+            TryWriteSetupError(
+                exception);
+            return 1;
+        }
+    }
+
+    private static async Task<int> VerifyGamepadHostAsync()
+    {
+        try
+        {
+            await using var backend =
+                new PipeVirtualGamepadBackend();
+
+            await backend.StartAsync();
+            backend.Submit(
+                Natsx.Controller.Core.GamepadState.Neutral);
+            await backend.StopAsync();
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            LocalCrashLog.Write(
+                "installer-gamepad-host-smoke",
                 exception);
 
             TryWriteSetupError(
