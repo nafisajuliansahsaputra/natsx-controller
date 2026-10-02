@@ -46,7 +46,7 @@ public sealed class GamepadHostProtocolTests
             new byte[
                 GamepadHostProtocol.GamepadStatePayloadSize];
 
-        payload.Clear();
+        Array.Clear(payload);
         payload[1] =
             0x80;
 
@@ -63,7 +63,7 @@ public sealed class GamepadHostProtocolTests
             new byte[
                 GamepadHostProtocol.GamepadStatePayloadSize];
 
-        payload.Clear();
+        Array.Clear(payload);
         payload[2] =
             (byte)(
                 DpadState.Up |
@@ -109,7 +109,7 @@ public sealed class GamepadHostProtocolTests
             new byte[
                 GamepadHostProtocol.HeaderSize];
 
-        header.Clear();
+        Array.Clear(header);
 
         Assert.Throws<FormatException>(
             () =>
