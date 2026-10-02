@@ -60,6 +60,17 @@ class ControllerSurfaceView(
     private val controls = mutableListOf<ControlGeometry>()
     private val activePointers = mutableMapOf<Int, ControlId>()
 
+    private var controllerLayout =
+        ControllerLayout.Default
+    private var layoutEditing =
+        false
+    private var layoutEditPointerId:
+        Int? = null
+    private var selectedLayoutControl:
+        ControlId? = null
+    private var onLayoutChanged:
+        ((ControllerLayout) -> Unit)? = null
+
     init {
         isClickable = true
         isFocusable = true
@@ -93,6 +104,12 @@ class ControllerSurfaceView(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (layoutEditing) {
+            return handleLayoutEditorTouch(
+                event,
+            )
+        }
+
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN,
             MotionEvent.ACTION_POINTER_DOWN,
@@ -141,6 +158,42 @@ class ControllerSurfaceView(
         rebuildStickProcessors()
     }
 
+    fun applyControllerLayout(
+        layout: ControllerLayout,
+    ) {
+        controllerLayout = layout
+        releaseAllInputs()
+        rebuildLayout(
+            width.toFloat(),
+            height.toFloat(),
+        )
+        invalidate()
+    }
+
+    fun currentControllerLayout():
+        ControllerLayout =
+        controllerLayout
+
+    fun setLayoutEditing(
+        enabled: Boolean,
+        onChanged:
+            ((ControllerLayout) -> Unit)? =
+            null,
+    ) {
+        releaseAllInputs()
+        layoutEditing = enabled
+        onLayoutChanged =
+            if (enabled) {
+                onChanged
+            } else {
+                null
+            }
+
+        layoutEditPointerId = null
+        selectedLayoutControl = null
+        invalidate()
+    }
+
     private fun rebuildStickProcessors() {
         releaseAllInputs()
         leftStickProcessor =
@@ -169,6 +222,179 @@ class ControllerSurfaceView(
             calibration =
                 stickCalibration.right,
         )
+
+    private fun handleLayoutEditorTouch(
+        event: MotionEvent,
+    ): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                val x = event.x
+                val y = event.y
+
+                val target =
+                    controls
+                        .asReversed()
+                        .firstOrNull {
+                            it.contains(
+                                x,
+                                y,
+                            )
+                        }
+
+                if (target != null) {
+                    layoutEditPointerId =
+                        event.getPointerId(
+                            0,
+                        )
+                    selectedLayoutControl =
+                        target.id
+
+                    moveLayoutControl(
+                        target.id,
+                        x,
+                        y,
+                    )
+                }
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                val pointerId =
+                    layoutEditPointerId
+
+                val controlId =
+                    selectedLayoutControl
+
+                if (
+                    pointerId != null &&
+                    controlId != null
+                ) {
+                    val index =
+                        event.findPointerIndex(
+                            pointerId,
+                        )
+
+                    if (index >= 0) {
+                        moveLayoutControl(
+                            controlId,
+                            event.getX(index),
+                            event.getY(index),
+                        )
+                    }
+                }
+            }
+
+            MotionEvent.ACTION_UP -> {
+                val controlId =
+                    selectedLayoutControl
+
+                if (controlId != null) {
+                    moveLayoutControl(
+                        controlId,
+                        event.x,
+                        event.y,
+                    )
+
+                    onLayoutChanged
+                        ?.invoke(
+                            controllerLayout,
+                        )
+                }
+
+                layoutEditPointerId = null
+                performClick()
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                layoutEditPointerId = null
+            }
+        }
+
+        invalidate()
+        return true
+    }
+
+    private fun moveLayoutControl(
+        controlId: ControlId,
+        x: Float,
+        y: Float,
+    ) {
+        if (
+            width <= 0 ||
+            height <= 0
+        ) {
+            return
+        }
+
+        val geometry =
+            controls.firstOrNull {
+                it.id == controlId
+            } ?: return
+
+        val halfWidth =
+            when (
+                geometry.shape
+            ) {
+                Shape.CIRCLE ->
+                    geometry.radius /
+                        width
+                Shape.RECT ->
+                    (
+                        geometry.rect
+                            ?.width()
+                            ?: 0f
+                    ) /
+                        2f /
+                        width
+            }
+
+        val halfHeight =
+            when (
+                geometry.shape
+            ) {
+                Shape.CIRCLE ->
+                    geometry.radius /
+                        height
+                Shape.RECT ->
+                    (
+                        geometry.rect
+                            ?.height()
+                            ?: 0f
+                    ) /
+                        2f /
+                        height
+            }
+
+        val normalizedX =
+            (x / width)
+                .coerceIn(
+                    (halfWidth + 0.01f)
+                        .coerceAtMost(0.49f),
+                    (1f - halfWidth - 0.01f)
+                        .coerceAtLeast(0.51f),
+                )
+
+        val normalizedY =
+            (y / height)
+                .coerceIn(
+                    (halfHeight + 0.01f)
+                        .coerceAtMost(0.49f),
+                    (1f - halfHeight - 0.01f)
+                        .coerceAtLeast(0.51f),
+                )
+
+        controllerLayout =
+            controllerLayout
+                .withPosition(
+                    controlId.name,
+                    normalizedX,
+                    normalizedY,
+                )
+
+        rebuildLayout(
+            width.toFloat(),
+            height.toFloat(),
+        )
+    }
 
     private fun handlePointerDown(event: MotionEvent, pointerIndex: Int) {
         val pointerId = event.getPointerId(pointerIndex)
@@ -339,12 +565,25 @@ class ControllerSurfaceView(
             radius: Float,
             hitScale: Float = 1.16f,
         ) {
+            val position =
+                controllerLayout
+                    .positionFor(
+                        id.name,
+                        x,
+                        y,
+                    )
+
             controls += ControlGeometry.circle(
                 id = id,
-                centerX = width * x,
-                centerY = height * y,
+                centerX =
+                    width * position.x,
+                centerY =
+                    height * position.y,
                 radius = unit * radius,
-                hitRadius = unit * radius * hitScale,
+                hitRadius =
+                    unit *
+                        radius *
+                        hitScale,
             )
         }
 
@@ -356,15 +595,56 @@ class ControllerSurfaceView(
             bottom: Float,
             hitPadding: Float = 0.018f,
         ) {
+            val defaultX =
+                (left + right) /
+                    2f
+            val defaultY =
+                (top + bottom) /
+                    2f
+
+            val position =
+                controllerLayout
+                    .positionFor(
+                        id.name,
+                        defaultX,
+                        defaultY,
+                    )
+
+            val halfWidth =
+                (right - left) /
+                    2f
+            val halfHeight =
+                (bottom - top) /
+                    2f
+
             controls += ControlGeometry.rect(
                 id = id,
-                rect = RectF(
-                    width * left,
-                    height * top,
-                    width * right,
-                    height * bottom,
-                ),
-                hitPadding = unit * hitPadding,
+                rect =
+                    RectF(
+                        width *
+                            (
+                                position.x -
+                                    halfWidth
+                            ),
+                        height *
+                            (
+                                position.y -
+                                    halfHeight
+                            ),
+                        width *
+                            (
+                                position.x +
+                                    halfWidth
+                            ),
+                        height *
+                            (
+                                position.y +
+                                    halfHeight
+                            ),
+                    ),
+                hitPadding =
+                    unit *
+                        hitPadding,
             )
         }
 
@@ -399,7 +679,16 @@ class ControllerSurfaceView(
         control: ControlGeometry,
         state: GamepadState,
     ) {
-        val active = isControlActive(control.id, state)
+        val active =
+            isControlActive(
+                control.id,
+                state,
+            ) ||
+                (
+                    layoutEditing &&
+                        selectedLayoutControl ==
+                        control.id
+                )
         canvas.drawCircle(
             control.centerX,
             control.centerY,
@@ -426,7 +715,16 @@ class ControllerSurfaceView(
         control: ControlGeometry,
         state: GamepadState,
     ) {
-        val active = isControlActive(control.id, state)
+        val active =
+            isControlActive(
+                control.id,
+                state,
+            ) ||
+                (
+                    layoutEditing &&
+                        selectedLayoutControl ==
+                        control.id
+                )
         val rect = control.rect ?: return
         val radius = min(rect.width(), rect.height()) * 0.32f
 
