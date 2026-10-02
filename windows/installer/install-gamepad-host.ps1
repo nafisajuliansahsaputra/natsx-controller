@@ -7,6 +7,28 @@ param(
 $ErrorActionPreference = "Stop"
 
 $serviceName = "NatsxControllerGamepadHost"
+$stateDirectory = Join-Path $env:ProgramData "NATSX\Controller"
+$logPath = Join-Path $stateDirectory "gamepad-host-install.log"
+New-Item -ItemType Directory -Path $stateDirectory -Force | Out-Null
+
+if (Test-Path -LiteralPath $logPath -PathType Leaf) {
+    $logInfo = Get-Item -LiteralPath $logPath
+    if ($logInfo.Length -gt 524288) {
+        Remove-Item -LiteralPath $logPath -Force
+    }
+}
+
+function Write-InstallLog {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    Add-Content -LiteralPath $logPath -Value (
+        "[$([DateTimeOffset]::UtcNow.ToString('O'))] " +
+        $Message)
+}
+
 $appRootPath = (Resolve-Path -LiteralPath $AppRoot).Path
 $hostPath = Join-Path $appRootPath "Natsx.Controller.GamepadHost.exe"
 
@@ -21,8 +43,16 @@ function Invoke-Sc {
         [switch]$AllowFailure
     )
 
+    Write-InstallLog (
+        "sc.exe " +
+        ($Arguments -join " "))
+
     $output = & sc.exe @Arguments 2>&1
     $exitCode = $LASTEXITCODE
+
+    Write-InstallLog (
+        "sc.exe exit=$exitCode output=" +
+        ($output -join " | "))
 
     if ($exitCode -ne 0 -and -not $AllowFailure) {
         throw ("sc.exe " + ($Arguments -join " ") + " failed with exit code $exitCode." + [Environment]::NewLine + ($output -join [Environment]::NewLine))
@@ -52,6 +82,9 @@ function Wait-ServiceState {
 
     throw "Service '$serviceName' did not reach state '$ExpectedStatus'."
 }
+
+Write-InstallLog (
+    "Installing/updating gamepad host from '$hostPath'.")
 
 $existing = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 $existingCim = $null
@@ -131,9 +164,16 @@ try {
         throw "Gamepad-host service command line is incorrect."
     }
 
+    Write-InstallLog (
+        "Gamepad-host service verified Running; StartMode=$($service.StartMode); StartName=$($service.StartName); PathName=$($service.PathName)")
+
     Write-Host "NATSX privileged gamepad-host service installed and running."
 }
 catch {
+    Write-InstallLog (
+        "Gamepad-host install/update failed: " +
+        $_.Exception.ToString())
+
     Invoke-Sc -Arguments @("stop", $serviceName) -AllowFailure | Out-Null
 
     if ($createdNew) {

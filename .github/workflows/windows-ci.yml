@@ -159,12 +159,15 @@ jobs:
           $trustedPeersHash = (Get-FileHash -LiteralPath $trustedPeers -Algorithm SHA256).Hash
           $localPeerIdentityHash = (Get-FileHash -LiteralPath $localPeerIdentity -Algorithm SHA256).Hash
 
+          $setupLogPath = Join-Path $env:RUNNER_TEMP "natsx-first-install.log"
+
           $install = Start-Process -FilePath $installer[0].FullName -ArgumentList @(
             "/VERYSILENT",
             "/SUPPRESSMSGBOXES",
             "/NORESTART",
             "/SP-",
-            "/DIR=$installRoot"
+            "/DIR=$installRoot",
+            "/LOG=$setupLogPath"
           ) -Wait -PassThru
 
           if ($install.ExitCode -ne 0) {
@@ -188,7 +191,28 @@ jobs:
             throw "Privileged gamepad-host executable was not installed."
           }
 
-          $gamepadService = Get-Service -Name "NatsxControllerGamepadHost" -ErrorAction Stop
+          $gamepadService = Get-Service -Name "NatsxControllerGamepadHost" -ErrorAction SilentlyContinue
+
+          if ($null -eq $gamepadService) {
+            $hostInstallLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host-install.log"
+            $hostLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host.log"
+
+            if (Test-Path -LiteralPath $setupLogPath) {
+              Get-Content -LiteralPath $setupLogPath | Write-Host
+            }
+
+            if (Test-Path -LiteralPath $hostInstallLog) {
+              Get-Content -LiteralPath $hostInstallLog | Write-Host
+            }
+
+            if (Test-Path -LiteralPath $hostLog) {
+              Get-Content -LiteralPath $hostLog | Write-Host
+            }
+
+            & sc.exe query "NatsxControllerGamepadHost" 2>&1 | Write-Host
+
+            throw "Privileged gamepad-host service was not registered after setup."
+          }
 
           if ($gamepadService.Status -ne "Running") {
             throw "Privileged gamepad-host service is not running after setup."
