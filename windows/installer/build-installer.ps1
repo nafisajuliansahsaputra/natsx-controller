@@ -1,6 +1,8 @@
 param(
     [string]$PublishDir = "artifacts/windows-receiver",
-    [string]$OutputDir = "artifacts/installer"
+    [string]$OutputDir = "artifacts/installer",
+    [string]$DriverRoot = "artifacts/windows-drivers-production",
+    [switch]$AllowMissingProductionUsbDrivers
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,9 +33,50 @@ foreach ($requiredFile in $requiredPublishedFiles) {
     }
 }
 
+$driverRootPath =
+    if ([System.IO.Path]::IsPathRooted($DriverRoot)) {
+        $DriverRoot
+    }
+    else {
+        Join-Path $repoRoot $DriverRoot
+    }
+
+$bootstrapDriverDir = Join-Path $driverRootPath "aoa-bootstrap"
+$winUsbDriverDir = Join-Path $driverRootPath "aoa-winusb"
+$hasBootstrapDrivers = Test-Path -LiteralPath $bootstrapDriverDir -PathType Container
+$hasWinUsbDrivers = Test-Path -LiteralPath $winUsbDriverDir -PathType Container
+
+if ($hasBootstrapDrivers -xor $hasWinUsbDrivers) {
+    throw "Production USB driver bundle is incomplete. Both aoa-bootstrap and aoa-winusb directories are required."
+}
+
+$includeProductionUsbDrivers =
+    $hasBootstrapDrivers -and
+    $hasWinUsbDrivers
+
+if (-not $includeProductionUsbDrivers -and -not $AllowMissingProductionUsbDrivers) {
+    throw (
+        "Production USB driver bundle is missing at '$driverRootPath'. " +
+        "Feature-complete release installers require Microsoft retail-signed USB drivers. " +
+        "See docs/release/windows-production-driver.md. " +
+        "Use -AllowMissingProductionUsbDrivers only for non-shipping CI installer compilation."
+    )
+}
+
+if ($includeProductionUsbDrivers) {
+    $validator = Join-Path $repoRoot "windows\driver\validate-production-packages.ps1"
+    & $validator -BootstrapPackageDirectory $bootstrapDriverDir -WinUsbPackageDirectory $winUsbDriverDir
+}
+
 $iscc = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
 if ($null -eq $iscc) {
-    $candidate = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+    $programFilesX86 =
+        [Environment]::GetFolderPath(
+            [Environment+SpecialFolder]::ProgramFilesX86)
+
+    $candidate =
+        Join-Path $programFilesX86 "Inno Setup 6\ISCC.exe"
+
     if (Test-Path $candidate) {
         $iscc = Get-Item $candidate
     }
@@ -44,7 +87,23 @@ if ($null -eq $iscc) {
 }
 
 $script = Join-Path $PSScriptRoot "NatsxController.iss"
-& $iscc.Source "/DMyAppVersion=$version" "/DPublishDir=$publishPath" "/O$outputPath" $script
+$isccArguments = @(
+    "/DMyAppVersion=$version",
+    "/DPublishDir=$publishPath",
+    "/O$outputPath"
+)
+
+if ($includeProductionUsbDrivers) {
+    $isccArguments += "/DIncludeUsbDrivers=1"
+    $isccArguments += "/DBootstrapDriverDir=$bootstrapDriverDir"
+    $isccArguments += "/DWinUsbDriverDir=$winUsbDriverDir"
+}
+else {
+    $isccArguments += "/DIncludeUsbDrivers=0"
+    Write-Warning "Compiling a NON-SHIPPING installer without NATSX USB drivers."
+}
+
+& $iscc.Source @isccArguments $script
 
 if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup failed with exit code $LASTEXITCODE."

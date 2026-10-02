@@ -408,7 +408,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ## M15 — Release engineering
 
 - [x] Windows installer strategy.
-- [ ] Driver/backend dependency installation (HIDMaestro complete; production-signed USB AOA driver packages are still required for clean-machine USB Direct).
+- [ ] Driver/backend dependency installation (installer/release gate is wired and HIDMaestro is complete; Microsoft retail-signed USB AOA driver packages plus clean-machine validation are still required for feature-complete production).
 - [x] elevation flow.
 - [x] uninstall cleanup.
 - [x] Android signed release build.

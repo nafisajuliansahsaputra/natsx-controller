@@ -48,3 +48,10 @@ The repository product-license choice is also intentionally unresolved. That is 
 - Never weaken the exact hardware-ID restrictions merely to make driver installation easier.
 - Never persist live session keys across process restart as an upgrade shortcut.
 - Any future protocol-major, trust-schema, or cryptographic primitive change requires a new review.
+
+
+## Windows production-driver gate
+
+The repository now has an explicit production-package validator and installer handoff. The validator requires the Microsoft Windows Hardware Driver Verification EKU (1.3.6.1.4.1.311.10.3.5), rejects the attestation verification EKU (1.3.6.1.4.1.311.10.3.5.1), runs SignTool kernel-policy verification, verifies the bootstrap catalog covers the KMDF binary, rejects CI-test/private certificate material, and revalidates exact hardware-ID scoping.
+
+The release pipeline fails closed when the production bundle or its pinned SHA-256 is missing. CI may compile a clearly NON-SHIPPING installer without those drivers only to validate installer syntax.

@@ -85,9 +85,16 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
       - name: Fetch HIDMaestro SDK
         shell: pwsh
         run: ./windows/eng/fetch-hidmaestro.ps1
+
+      - name: Restore WDK validation tools
+        shell: pwsh
+        run: nuget restore windows/driver/aoa-bootstrap/packages.config -PackagesDirectory windows/driver/aoa-bootstrap/packages -NonInteractive
 
       - name: Restore
         run: dotnet restore windows/Natsx.Controller.slnx
@@ -99,22 +106,47 @@ jobs:
         shell: pwsh
         run: dotnet publish windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver
 
-      - name: Archive Windows Receiver
+      - name: Archive Windows Receiver validation build
         shell: pwsh
         run: Compress-Archive -Path artifacts/windows-receiver/* -DestinationPath artifacts/natsx-controller-windows-x64.zip
+
+      - name: Fetch Microsoft production USB driver bundle
+        shell: pwsh
+        env:
+          DRIVER_BUNDLE_URL: ${{ vars.NATSX_PRODUCTION_DRIVER_BUNDLE_URL }}
+          DRIVER_BUNDLE_SHA256: ${{ vars.NATSX_PRODUCTION_DRIVER_BUNDLE_SHA256 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:DRIVER_BUNDLE_URL) -or
+              [string]::IsNullOrWhiteSpace($env:DRIVER_BUNDLE_SHA256)) {
+            throw "Production driver bundle variables are not configured. Feature-complete release is blocked by design."
+          }
+
+          $zip = Join-Path $env:RUNNER_TEMP "natsx-production-drivers.zip"
+          Invoke-WebRequest -Uri $env:DRIVER_BUNDLE_URL -OutFile $zip -UseBasicParsing
+
+          $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expected = $env:DRIVER_BUNDLE_SHA256.Trim().ToLowerInvariant()
+
+          if ($actual -ne $expected) {
+            throw "Production driver bundle SHA-256 mismatch. Expected $expected, got $actual."
+          }
+
+          $destination = "artifacts/windows-drivers-production"
+          New-Item -ItemType Directory -Path $destination -Force | Out-Null
+          Expand-Archive -LiteralPath $zip -DestinationPath $destination -Force
 
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
 
-      - name: Build Windows installer
+      - name: Build feature-complete Windows installer
         shell: pwsh
         run: ./windows/installer/build-installer.ps1
 
-      - name: Upload Windows Receiver
+      - name: Upload Windows Receiver validation build
         uses: actions/upload-artifact@v4
         with:
-          name: natsx-controller-windows-x64
+          name: natsx-controller-windows-x64-validation
           path: artifacts/natsx-controller-windows-x64.zip
           if-no-files-found: error
 

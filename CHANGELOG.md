@@ -19,6 +19,7 @@ Application releases follow Semantic Versioning. Protocol compatibility is versi
 - Windows Inno Setup installer with elevated virtual-controller driver bootstrap, normal-user launch, and pairing-preserving uninstall cleanup.
 - Bounded local-only crash diagnostics on Windows and Android with no automatic telemetry upload.
 - Dependency/license notices, NuGet vulnerability audit policy, Dependabot coverage, and a documented v1 security review.
+- Fail-closed Windows production USB-driver bundle validation, installer staging/removal hooks, and release SHA-256 pinning.
 
 ### Reliability
 

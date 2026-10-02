@@ -3,7 +3,11 @@
 #endif
 
 #ifndef PublishDir
-  #define PublishDir "..\\..\\artifacts\\windows-receiver"
+  #define PublishDir "..\..\artifacts\windows-receiver"
+#endif
+
+#ifndef IncludeUsbDrivers
+  #define IncludeUsbDrivers 0
 #endif
 
 [Setup]
@@ -11,7 +15,7 @@ AppId={{6C2A8D3B-1D1C-4B91-9C15-4C8A6F1A9E12}
 AppName=NATSX Controller
 AppVersion={#MyAppVersion}
 AppPublisher=NATSX
-DefaultDirName={autopf}\\NATSX Controller
+DefaultDirName={autopf}\NATSX Controller
 DefaultGroupName=NATSX Controller
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
@@ -22,23 +26,30 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
-UninstallDisplayIcon={app}\\Natsx.Controller.Receiver.exe
+UninstallDisplayIcon={app}\Natsx.Controller.Receiver.exe
 
 [Files]
-Source: "{#PublishDir}\\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "install-production-usb-drivers.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "remove-production-usb-drivers.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+#if IncludeUsbDrivers
+Source: "{#BootstrapDriverDir}\*"; DestDir: "{app}\drivers\aoa-bootstrap"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#WinUsbDriverDir}\*"; DestDir: "{app}\drivers\aoa-winusb"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
 
 [Icons]
-Name: "{group}\\NATSX Controller"; Filename: "{app}\\Natsx.Controller.Receiver.exe"
-Name: "{autodesktop}\\NATSX Controller"; Filename: "{app}\\Natsx.Controller.Receiver.exe"; Tasks: desktopicon
+Name: "{group}\NATSX Controller"; Filename: "{app}\Natsx.Controller.Receiver.exe"
+Name: "{autodesktop}\NATSX Controller"; Filename: "{app}\Natsx.Controller.Receiver.exe"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Run]
-Filename: "{app}\\Natsx.Controller.Receiver.exe"; Description: "Launch NATSX Controller"; Flags: nowait postinstall skipifsilent runasoriginaluser
+Filename: "{app}\Natsx.Controller.Receiver.exe"; Description: "Launch NATSX Controller"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [UninstallRun]
-Filename: "{app}\\Natsx.Controller.Receiver.exe"; Parameters: "--uninstall-cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "NatsxControllerUserCleanup"
+Filename: "{sysnative}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\tools\remove-production-usb-drivers.ps1"""; Flags: runhidden waituntilterminated; RunOnceId: "NatsxControllerUsbDriverCleanup"
+Filename: "{app}\Natsx.Controller.Receiver.exe"; Parameters: "--uninstall-cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "NatsxControllerUserCleanup"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
@@ -50,8 +61,30 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
+#if IncludeUsbDrivers
     if not Exec(
-      ExpandConstant('{app}\\Natsx.Controller.Receiver.exe'),
+      ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe'),
+      ExpandConstant('-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{app}\tools\install-production-usb-drivers.ps1" -AppRoot "{app}"'),
+      ExpandConstant('{app}'),
+      SW_HIDE,
+      ewWaitUntilTerminated,
+      ResultCode
+    ) then
+    begin
+      RaiseException('Unable to start NATSX production USB driver installation.');
+    end;
+
+    if ResultCode <> 0 then
+    begin
+      RaiseException(
+        'NATSX production USB driver installation failed with exit code ' +
+        IntToStr(ResultCode) + '.'
+      );
+    end;
+#endif
+
+    if not Exec(
+      ExpandConstant('{app}\Natsx.Controller.Receiver.exe'),
       '--install-driver',
       ExpandConstant('{app}'),
       SW_HIDE,
@@ -67,7 +100,7 @@ begin
       RaiseException(
         'NATSX virtual-controller driver bootstrap failed with exit code ' +
         IntToStr(ResultCode) +
-        '. See %ProgramData%\\NATSX\\Controller\\setup-driver-error.log.'
+        '. See %ProgramData%\NATSX\Controller\setup-driver-error.log.'
       );
     end;
   end;

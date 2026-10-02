@@ -77,3 +77,12 @@ Crash collection is local-only and bounded. See `docs/release/local-diagnostics.
 - The Windows publish output carries the exact pinned HIDMaestro v1.9.2 license as `licenses/HIDMaestro.LICENSE.txt`.
 - NuGet audit is enabled for all transitive packages at moderate-or-higher severity, and warnings are already treated as build errors.
 - Dependabot watches NuGet, Gradle, and GitHub Actions dependencies.
+
+
+## Production USB driver gate
+
+Feature-complete Windows releases require the two production-signed NATSX USB driver packages described in `docs/release/windows-production-driver.md`.
+
+The release workflow consumes a SHA-256-pinned ZIP through repository variables `NATSX_PRODUCTION_DRIVER_BUNDLE_URL` and `NATSX_PRODUCTION_DRIVER_BUNDLE_SHA256`. Missing variables, hash mismatch, development/test certificate material, attestation-only signing, invalid kernel-policy signatures, catalog/binary mismatch, or broadened hardware IDs fail the release.
+
+Ordinary Windows CI compiles the installer with `-AllowMissingProductionUsbDrivers` only as a NON-SHIPPING syntax/packaging smoke test. The release workflow never uses that bypass.

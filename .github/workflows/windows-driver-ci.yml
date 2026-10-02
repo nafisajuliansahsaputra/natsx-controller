@@ -85,6 +85,23 @@ jobs:
         shell: powershell
         run: .\windows\driver\aoa-winusb\sign-ci-test-package.ps1
 
+      - name: Prove production gate rejects CI test packages
+        shell: powershell
+        run: |
+          $accepted = $false
+
+          try {
+            .\windows\driver\validate-production-packages.ps1 -BootstrapPackageDirectory .\windows\driver\aoa-bootstrap\artifacts\oppo-a58-test-package -WinUsbPackageDirectory .\windows\driver\aoa-winusb\artifacts\test-package
+            $accepted = $true
+          }
+          catch {
+            Write-Host "Expected rejection: $($_.Exception.Message)"
+          }
+
+          if ($accepted) {
+            throw "Production package validator unexpectedly accepted ephemeral CI test-signed drivers."
+          }
+
       - name: Upload AOA WinUSB validation package
         if: success()
         uses: actions/upload-artifact@v4
