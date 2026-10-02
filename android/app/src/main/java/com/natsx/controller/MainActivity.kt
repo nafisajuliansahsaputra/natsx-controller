@@ -2,8 +2,13 @@ package com.natsx.controller
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
@@ -30,7 +35,10 @@ import com.natsx.controller.core.transport.bluetooth.BluetoothPermissionGate
 import com.natsx.controller.core.transport.usb.UsbRuntimeStatus
 import com.natsx.controller.core.transport.usb.UsbRuntimeStatusCoordinator
 import com.natsx.controller.core.trust.TrustedPeerRecord
+import com.natsx.controller.feature.controller.ControllerHudState
+import com.natsx.controller.feature.controller.ControllerStatusView
 import com.natsx.controller.feature.controller.ControllerSurfaceView
+import com.natsx.controller.feature.controller.ControllerTransportIndicator
 import com.natsx.controller.feature.controller.StickCalibrationView
 import com.natsx.controller.service.ControllerService
 import kotlin.math.roundToInt
@@ -46,13 +54,34 @@ class MainActivity : Activity() {
     private lateinit var pairingCodeText: TextView
     private lateinit var pairingPeerText: TextView
     private lateinit var usbRuntimeStatus: UsbRuntimeStatusCoordinator
-    private lateinit var usbStatusText: TextView
+    private lateinit var controllerStatusView:
+        ControllerStatusView
     private var currentUsbStatus =
         UsbRuntimeStatus(
             "USB idle",
         )
     private var currentConnectionStatus =
         AndroidConnectionStatus()
+    private var currentBatteryPercent:
+        Int? = null
+    private var currentBatteryCharging =
+        false
+    private var batteryReceiverRegistered =
+        false
+
+    private val batteryStatusReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context?,
+                intent: Intent?,
+            ) {
+                if (intent != null) {
+                    updateBatteryStatus(
+                        intent,
+                    )
+                }
+            }
+        }
 
     private val pairingListener: (PairingPrompt?) -> Unit = { prompt ->
         runOnUiThread {
@@ -122,6 +151,8 @@ class MainActivity : Activity() {
             buildRootView(),
         )
 
+        registerBatteryStatus()
+
         pairingConfirmation.addListener(
             pairingListener,
         )
@@ -161,16 +192,37 @@ class MainActivity : Activity() {
                 val cutout =
                     insets.displayCutout
 
-                controllerView.applySafeInsets(
+                val safeLeft =
                     cutout?.safeInsetLeft
-                        ?: 0,
+                        ?: 0
+                val safeTop =
                     cutout?.safeInsetTop
-                        ?: 0,
+                        ?: 0
+                val safeRight =
                     cutout?.safeInsetRight
-                        ?: 0,
+                        ?: 0
+                val safeBottom =
                     cutout?.safeInsetBottom
-                        ?: 0,
+                        ?: 0
+
+                controllerView.applySafeInsets(
+                    safeLeft,
+                    safeTop,
+                    safeRight,
+                    safeBottom,
                 )
+
+                if (
+                    ::controllerStatusView
+                        .isInitialized
+                ) {
+                    controllerStatusView
+                        .applySafeInsets(
+                            safeLeft,
+                            safeTop,
+                            safeRight,
+                        )
+                }
             } else {
                 controllerView.applySafeInsets(
                     0,
@@ -178,6 +230,18 @@ class MainActivity : Activity() {
                     0,
                     0,
                 )
+
+                if (
+                    ::controllerStatusView
+                        .isInitialized
+                ) {
+                    controllerStatusView
+                        .applySafeInsets(
+                            0,
+                            0,
+                            0,
+                        )
+                }
             }
 
             insets
@@ -191,62 +255,54 @@ class MainActivity : Activity() {
             ),
         )
 
-        usbStatusText =
-            TextView(this).apply {
-                textSize = 13f
-                setTextColor(Color.WHITE)
-                setBackgroundColor(
-                    Color.argb(
-                        190,
-                        16,
-                        16,
-                        20,
-                    ),
-                )
-                setPadding(
-                    dp(12),
-                    dp(8),
-                    dp(12),
-                    dp(8),
-                )
-                maxLines = 10
-                isClickable = true
-                isFocusable = true
-                setOnClickListener {
-                    cycleHapticLevel()
-                }
-                setOnLongClickListener {
-                    showTrustedPcList()
-                    true
-                }
-            }
+        controllerStatusView =
+            ControllerStatusView(
+                this,
+            )
 
         root.addView(
-            usbStatusText,
+            controllerStatusView,
             FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP or Gravity.CENTER_HORIZONTAL,
-            ).apply {
-                topMargin = dp(12)
-            },
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(150),
+                Gravity.TOP,
+            ),
         )
 
         val settingsButton =
             TextView(this).apply {
                 text = "⚙"
-                textSize = 22f
+                textSize = 19f
                 gravity = Gravity.CENTER
-                contentDescription = "Controller settings"
-                setTextColor(Color.WHITE)
-                setBackgroundColor(
-                    Color.argb(
-                        190,
-                        16,
-                        16,
-                        20,
+                contentDescription =
+                    "Controller settings"
+                setTextColor(
+                    Color.rgb(
+                        85,
+                        82,
+                        91,
                     ),
                 )
+                background =
+                    GradientDrawable().apply {
+                        shape =
+                            GradientDrawable.OVAL
+                        setColor(
+                            Color.rgb(
+                                146,
+                                223,
+                                160,
+                            ),
+                        )
+                        setStroke(
+                            dp(1),
+                            Color.rgb(
+                                222,
+                                219,
+                                229,
+                            ),
+                        )
+                    }
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
@@ -257,12 +313,12 @@ class MainActivity : Activity() {
         root.addView(
             settingsButton,
             FrameLayout.LayoutParams(
-                dp(44),
-                dp(44),
-                Gravity.TOP or Gravity.END,
+                dp(40),
+                dp(40),
+                Gravity.BOTTOM or
+                    Gravity.CENTER_HORIZONTAL,
             ).apply {
-                topMargin = dp(12)
-                marginEnd = dp(12)
+                bottomMargin = dp(8)
             },
         )
 
@@ -438,61 +494,73 @@ class MainActivity : Activity() {
     }
 
     private fun renderStatusOverlay() {
-        if (!::usbStatusText.isInitialized) {
+        if (
+            !::controllerStatusView
+                .isInitialized
+        ) {
             return
         }
 
-        val preference =
-            app.transportPreferenceSettings
-                .preference
-                .displayName
-
-        val smartAuto =
-            currentConnectionStatus.smartAutoActiveTransport
-                ?.let {
-                    "Transport • $preference • Active: " +
-                        smartAutoTransportLabel(it)
-                }
-                ?: "Transport • $preference • Waiting for Windows"
-
-        val links =
-            "Links • Wi-Fi ${linkStateLabel(currentConnectionStatus.wifi)}" +
-                " • Bluetooth ${linkStateLabel(currentConnectionStatus.bluetooth)}" +
-                " • USB ${linkStateLabel(currentConnectionStatus.usb)}"
-
-        val controls =
-            "Profile — ${app.inputSettings.profile.displayName}" +
-                " • Haptics — ${hapticLevelLabel(app.hapticSettings.level)} (tap)" +
-                " • PCs ${currentConnectionStatus.trustedPcCount} (hold)"
-
-        val usbDetail =
-            currentUsbStatus
-                .takeIf {
-                    it.isError
-                }
-                ?.let {
-                    "\nUSB — ${it.message}"
-                }
-                .orEmpty()
-
-        usbStatusText.text =
-            smartAuto + "\n" +
-                links + "\n" +
-                controls + usbDetail
-
-        usbStatusText.setTextColor(
-            if (currentUsbStatus.isError) {
-                Color.rgb(
-                    255,
-                    150,
-                    150,
+        val activeTransport =
+            currentConnectionStatus
+                .smartAutoActiveTransport
+                ?.let(
+                    ::controllerTransportIndicator,
                 )
-            } else {
-                Color.WHITE
-            },
+
+        val linkStates =
+            listOf(
+                currentConnectionStatus.wifi,
+                currentConnectionStatus.bluetooth,
+                currentConnectionStatus.usb,
+            )
+
+        val message =
+            when {
+                currentUsbStatus.isError ->
+                    "USB connection issue"
+
+                activeTransport != null ->
+                    null
+
+                linkStates.any {
+                    it ==
+                        AndroidLinkState.RECONNECTING
+                } ->
+                    "Reconnecting…"
+
+                linkStates.any {
+                    it ==
+                        AndroidLinkState.CONNECTING
+                } ->
+                    "Connecting…"
+
+                currentConnectionStatus
+                    .trustedPcCount ==
+                    0 ->
+                    "Pair a Windows receiver"
+
+                else ->
+                    "Waiting for Windows"
+            }
+
+        controllerStatusView.updateState(
+            ControllerHudState(
+                activeTransport =
+                    activeTransport,
+                batteryPercent =
+                    currentBatteryPercent,
+                charging =
+                    currentBatteryCharging,
+                message = message,
+                messageIsError =
+                    currentUsbStatus
+                        .isError,
+            ),
         )
 
-        usbStatusText.bringToFront()
+        controllerStatusView
+            .bringToFront()
 
         if (
             ::pairingOverlay.isInitialized &&
@@ -501,6 +569,100 @@ class MainActivity : Activity() {
         ) {
             pairingOverlay.bringToFront()
         }
+    }
+
+    private fun controllerTransportIndicator(
+        transport: ProtocolTransport,
+    ): ControllerTransportIndicator =
+        when (transport) {
+            ProtocolTransport.WIFI ->
+                ControllerTransportIndicator.WIFI
+
+            ProtocolTransport.BLUETOOTH ->
+                ControllerTransportIndicator.BLUETOOTH
+
+            ProtocolTransport.USB_DIRECT ->
+                ControllerTransportIndicator.USB
+        }
+
+    private fun registerBatteryStatus() {
+        val filter =
+            IntentFilter(
+                Intent.ACTION_BATTERY_CHANGED,
+            )
+
+        val sticky =
+            if (
+                Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.TIRAMISU
+            ) {
+                registerReceiver(
+                    batteryStatusReceiver,
+                    filter,
+                    Context.RECEIVER_NOT_EXPORTED,
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                registerReceiver(
+                    batteryStatusReceiver,
+                    filter,
+                )
+            }
+
+        batteryReceiverRegistered = true
+
+        if (sticky != null) {
+            updateBatteryStatus(
+                sticky,
+            )
+        }
+    }
+
+    private fun updateBatteryStatus(
+        intent: Intent,
+    ) {
+        val level =
+            intent.getIntExtra(
+                BatteryManager.EXTRA_LEVEL,
+                -1,
+            )
+        val scale =
+            intent.getIntExtra(
+                BatteryManager.EXTRA_SCALE,
+                -1,
+            )
+
+        currentBatteryPercent =
+            if (
+                level >= 0 &&
+                scale > 0
+            ) {
+                (
+                    level *
+                        100 /
+                        scale
+                )
+                    .coerceIn(
+                        0,
+                        100,
+                    )
+            } else {
+                null
+            }
+
+        val status =
+            intent.getIntExtra(
+                BatteryManager.EXTRA_STATUS,
+                BatteryManager.BATTERY_STATUS_UNKNOWN,
+            )
+
+        currentBatteryCharging =
+            status ==
+                BatteryManager.BATTERY_STATUS_CHARGING ||
+                status ==
+                BatteryManager.BATTERY_STATUS_FULL
+
+        renderStatusOverlay()
     }
 
     private fun linkStateLabel(
@@ -593,6 +755,25 @@ class MainActivity : Activity() {
                 }
             }
 
+        val hapticsButton =
+            Button(this).apply {
+                setOnClickListener {
+                    cycleHapticLevel()
+                    text =
+                        "Haptics — " +
+                            hapticLevelLabel(
+                                app.hapticSettings.level,
+                            )
+                }
+            }
+
+        val trustedPcButton =
+            Button(this).apply {
+                setOnClickListener {
+                    showTrustedPcList()
+                }
+            }
+
         val leftDeadzoneLabel =
             TextView(this)
         val leftSensitivityLabel =
@@ -657,6 +838,17 @@ class MainActivity : Activity() {
                     app.transportPreferenceSettings
                         .preference
                         .displayName
+
+            hapticsButton.text =
+                "Haptics — " +
+                    hapticLevelLabel(
+                        app.hapticSettings.level,
+                    )
+
+            trustedPcButton.text =
+                "Trusted PCs — " +
+                    currentConnectionStatus
+                        .trustedPcCount
         }
 
         fun setControls(
@@ -762,6 +954,8 @@ class MainActivity : Activity() {
         container.addView(diagnosticsButton)
         container.addView(calibrationButton)
         container.addView(layoutButton)
+        container.addView(hapticsButton)
+        container.addView(trustedPcButton)
         container.addView(leftDeadzoneLabel)
         container.addView(leftDeadzone)
         container.addView(leftSensitivityLabel)
@@ -1427,6 +1621,13 @@ class MainActivity : Activity() {
             app.connectionStatus.removeListener(
                 connectionStatusListener,
             )
+        }
+
+        if (batteryReceiverRegistered) {
+            unregisterReceiver(
+                batteryStatusReceiver,
+            )
+            batteryReceiverRegistered = false
         }
 
         super.onDestroy()
