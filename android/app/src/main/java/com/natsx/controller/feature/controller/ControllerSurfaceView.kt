@@ -512,13 +512,17 @@ class ControllerSurfaceView(
             } ?: return
 
         val contentWidth =
-            width.coerceAtLeast(
-                1f,
-            )
+            width
+                .toFloat()
+                .coerceAtLeast(
+                    1f,
+                )
         val contentHeight =
-            height.coerceAtLeast(
-                1f,
-            )
+            height
+                .toFloat()
+                .coerceAtLeast(
+                    1f,
+                )
 
         val halfWidth =
             when (
@@ -556,10 +560,7 @@ class ControllerSurfaceView(
 
         val normalizedX =
             (
-                (
-                    x -
-                        safeInsetLeft
-                ) /
+                x /
                     contentWidth
             )
                 .coerceIn(
@@ -571,10 +572,7 @@ class ControllerSurfaceView(
 
         val normalizedY =
             (
-                (
-                    y -
-                        safeInsetTop
-                ) /
+                y /
                     contentHeight
             )
                 .coerceIn(
@@ -1651,13 +1649,17 @@ class ControllerSurfaceView(
         }
 
         val contentWidth =
-            width.coerceAtLeast(
-                1f,
-            )
+            width
+                .toFloat()
+                .coerceAtLeast(
+                    1f,
+                )
         val contentHeight =
-            height.coerceAtLeast(
-                1f,
-            )
+            height
+                .toFloat()
+                .coerceAtLeast(
+                    1f,
+                )
 
         val topY =
             0f
