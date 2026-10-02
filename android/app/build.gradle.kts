@@ -2,6 +2,19 @@ plugins {
     id("com.android.application")
 }
 
+val natsxVersionName =
+    rootProject
+        .file("../VERSION")
+        .readText()
+        .trim()
+
+val natsxVersionCode =
+    rootProject
+        .file("../VERSION_CODE")
+        .readText()
+        .trim()
+        .toInt()
+
 android {
     namespace = "com.natsx.controller"
     compileSdk = 36
@@ -10,8 +23,8 @@ android {
         applicationId = "com.natsx.controller"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.1-dev"
+        versionCode = natsxVersionCode
+        versionName = natsxVersionName
 
         testInstrumentationRunner = "android.app.Instrumentation"
     }
