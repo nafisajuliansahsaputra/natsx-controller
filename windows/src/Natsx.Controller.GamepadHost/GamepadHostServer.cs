@@ -26,6 +26,17 @@ internal sealed class GamepadHostServer
     public async Task RunAsync(
         CancellationToken cancellationToken)
     {
+        await using var backend =
+            new HidMaestroVirtualGamepadBackend();
+
+        await backend
+            .StartAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        backend.Submit(
+            GamepadState.Neutral);
+
         while (!cancellationToken.IsCancellationRequested)
         {
             await using NamedPipeServerStream pipe =
@@ -43,6 +54,7 @@ internal sealed class GamepadHostServer
 
                 await HandleClientAsync(
                         pipe,
+                        backend,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -68,6 +80,7 @@ internal sealed class GamepadHostServer
 
     private async Task HandleClientAsync(
         NamedPipeServerStream pipe,
+        HidMaestroVirtualGamepadBackend backend,
         CancellationToken cancellationToken)
     {
         byte[] header =
@@ -96,63 +109,43 @@ internal sealed class GamepadHostServer
                 "Gamepad-host clients must begin with an empty HELLO frame.");
         }
 
-        await using var backend =
-            new HidMaestroVirtualGamepadBackend();
-
-        try
-        {
-            await backend
-                .StartAsync(
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (Exception exception)
-        {
-            await TrySendErrorAsync(
-                    pipe,
-                    "Unable to create the privileged Xbox 360 virtual controller.",
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            throw new InvalidOperationException(
-                "HIDMaestro virtual-controller startup failed.",
-                exception);
-        }
-
         object writeGate =
             new();
 
-        backend.RumbleReceived +=
-            rumble =>
+        void ForwardRumble(
+            RumbleState rumble)
+        {
+            try
             {
-                try
+                Span<byte> frame =
+                    stackalloc byte[
+                        GamepadHostProtocol.HeaderSize +
+                        GamepadHostProtocol.RumblePayloadSize];
+
+                GamepadHostProtocol.EncodeHeader(
+                    frame,
+                    GamepadHostMessageType.Rumble,
+                    GamepadHostProtocol.RumblePayloadSize);
+
+                GamepadHostProtocol.EncodeRumble(
+                    rumble,
+                    frame[
+                        GamepadHostProtocol.HeaderSize..]);
+
+                lock (writeGate)
                 {
-                    Span<byte> frame =
-                        stackalloc byte[
-                            GamepadHostProtocol.HeaderSize +
-                            GamepadHostProtocol.RumblePayloadSize];
-
-                    GamepadHostProtocol.EncodeHeader(
-                        frame,
-                        GamepadHostMessageType.Rumble,
-                        GamepadHostProtocol.RumblePayloadSize);
-
-                    GamepadHostProtocol.EncodeRumble(
-                        rumble,
-                        frame[
-                            GamepadHostProtocol.HeaderSize..]);
-
-                    lock (writeGate)
-                    {
-                        pipe.Write(
-                            frame);
-                        pipe.Flush();
-                    }
+                    pipe.Write(
+                        frame);
+                    pipe.Flush();
                 }
-                catch
-                {
-                }
-            };
+            }
+            catch
+            {
+            }
+        }
+
+        backend.RumbleReceived +=
+            ForwardRumble;
 
         await WriteEmptyFrameAsync(
                 pipe,
@@ -214,6 +207,9 @@ internal sealed class GamepadHostServer
         }
         finally
         {
+            backend.RumbleReceived -=
+                ForwardRumble;
+
             watchdogLifetime.Cancel();
 
             try
