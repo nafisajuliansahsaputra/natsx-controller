@@ -367,7 +367,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Trusted PC list.
 - [ ] Smart Auto connection status.
 - [ ] Gameplay screen.
-- [ ] Connection overlay that does not interrupt controls unnecessarily.
+- [x] Connection overlay that does not interrupt controls unnecessarily.
 - [ ] Controller profile chooser.
 - [ ] Sensitivity/deadzone settings.
 - [x] Haptic settings.

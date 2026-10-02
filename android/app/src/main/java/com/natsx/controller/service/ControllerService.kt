@@ -16,6 +16,8 @@ import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.IBinder
 import com.natsx.controller.NatsxControllerApplication
+import com.natsx.controller.core.connection.AndroidConnectionStatus
+import com.natsx.controller.core.connection.AndroidLinkState
 import com.natsx.controller.core.protocol.PeerId
 import com.natsx.controller.core.session.ControllerRealtimePublisher
 import com.natsx.controller.core.transport.bluetooth.BluetoothAutoReconnectRuntime
@@ -163,6 +165,7 @@ class ControllerService : Service() {
             )
 
         registerUsbReceiver()
+        publishConnectionStatus()
         ensureConnectionBootstrap()
         startUsbAttachWatcher()
 
@@ -582,11 +585,108 @@ class ControllerService : Service() {
                             accessory,
                         )
                     }
+                }.also {
+                    publishConnectionStatus()
                 }
             },
             0,
             USB_ATTACH_POLL_MILLIS,
             TimeUnit.MILLISECONDS,
+        )
+    }
+
+    private fun publishConnectionStatus() {
+        val wifi =
+            wifiRuntime
+        val bluetooth =
+            bluetoothRuntime
+        val bluetoothGate =
+            BluetoothPermissionGate(this)
+
+        val bluetoothState =
+            when {
+                !bluetoothGate.isBluetoothSupported() ->
+                    AndroidLinkState.UNAVAILABLE
+
+                !bluetoothGate.hasRequiredRuntimePermissions() ->
+                    AndroidLinkState.PERMISSION_REQUIRED
+
+                !bluetoothGate.isBluetoothEnabled() ->
+                    AndroidLinkState.OFF
+
+                bluetooth == null ->
+                    AndroidLinkState.IDLE
+
+                else ->
+                    when (bluetooth.state) {
+                        BluetoothReconnectState.IDLE ->
+                            AndroidLinkState.IDLE
+
+                        BluetoothReconnectState.CONNECTING,
+                        BluetoothReconnectState.AWAITING_HEARTBEAT,
+                        ->
+                            AndroidLinkState.CONNECTING
+
+                        BluetoothReconnectState.ACTIVE ->
+                            AndroidLinkState.ACTIVE
+
+                        BluetoothReconnectState.RECONNECTING ->
+                            AndroidLinkState.RECONNECTING
+
+                        BluetoothReconnectState.STOPPED ->
+                            AndroidLinkState.STOPPED
+                    }
+            }
+
+        val wifiState =
+            when (wifi?.state) {
+                null,
+                WifiReconnectState.IDLE,
+                ->
+                    AndroidLinkState.IDLE
+
+                WifiReconnectState.RESOLVING,
+                WifiReconnectState.CONNECTING,
+                WifiReconnectState.AWAITING_HEARTBEAT,
+                ->
+                    AndroidLinkState.CONNECTING
+
+                WifiReconnectState.ACTIVE ->
+                    AndroidLinkState.ACTIVE
+
+                WifiReconnectState.RECONNECTING ->
+                    AndroidLinkState.RECONNECTING
+
+                WifiReconnectState.STOPPED ->
+                    AndroidLinkState.STOPPED
+            }
+
+        val usbState =
+            if (
+                ::usbRuntime.isInitialized &&
+                usbRuntime.isConnected()
+            ) {
+                AndroidLinkState.ACTIVE
+            } else {
+                AndroidLinkState.IDLE
+            }
+
+        app.connectionStatus.publish(
+            AndroidConnectionStatus(
+                wifi = wifiState,
+                bluetooth = bluetoothState,
+                usb = usbState,
+                trustedPcCount =
+                    app.trustedPeerStore
+                        .list()
+                        .size,
+                wifiReconnectAttempts =
+                    wifi?.reconnectAttempts
+                        ?: 0,
+                bluetoothReconnectAttempts =
+                    bluetooth?.reconnectAttempts
+                        ?: 0,
+            ),
         )
     }
 

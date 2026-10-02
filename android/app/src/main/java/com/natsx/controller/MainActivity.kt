@@ -13,6 +13,8 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.natsx.controller.core.connection.AndroidConnectionStatus
+import com.natsx.controller.core.connection.AndroidLinkState
 import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.haptics.HapticLevel
 import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
@@ -34,6 +36,12 @@ class MainActivity : Activity() {
     private lateinit var pairingPeerText: TextView
     private lateinit var usbRuntimeStatus: UsbRuntimeStatusCoordinator
     private lateinit var usbStatusText: TextView
+    private var currentUsbStatus =
+        UsbRuntimeStatus(
+            "USB idle",
+        )
+    private var currentConnectionStatus =
+        AndroidConnectionStatus()
 
     private val pairingListener: (PairingPrompt?) -> Unit = { prompt ->
         runOnUiThread {
@@ -43,9 +51,18 @@ class MainActivity : Activity() {
 
     private val usbStatusListener: (UsbRuntimeStatus) -> Unit = { status ->
         runOnUiThread {
-            showUsbStatus(status)
+            currentUsbStatus = status
+            renderStatusOverlay()
         }
     }
+
+    private val connectionStatusListener:
+        (AndroidConnectionStatus) -> Unit = { status ->
+            runOnUiThread {
+                currentConnectionStatus = status
+                renderStatusOverlay()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,6 +98,10 @@ class MainActivity : Activity() {
 
         usbRuntimeStatus.addListener(
             usbStatusListener,
+        )
+
+        app.connectionStatus.addListener(
+            connectionStatusListener,
         )
 
         requestBluetoothPermissionsIfNeeded()
@@ -314,32 +335,35 @@ class MainActivity : Activity() {
         pairingOverlay.bringToFront()
     }
 
-    private fun showUsbStatus(
-        status: UsbRuntimeStatus,
-    ) {
+    private fun renderStatusOverlay() {
         if (!::usbStatusText.isInitialized) {
             return
         }
 
-        val history =
-            usbRuntimeStatus.historyText()
+        val links =
+            "Links • Wi-Fi ${linkStateLabel(currentConnectionStatus.wifi)}" +
+                " • Bluetooth ${linkStateLabel(currentConnectionStatus.bluetooth)}" +
+                " • USB ${linkStateLabel(currentConnectionStatus.usb)}"
 
-        val connectionText =
-            if (history.isBlank()) {
-                if (status.isError) {
-                    "USB ERROR — ${status.message}"
-                } else {
-                    "USB — ${status.message}"
+        val controls =
+            "Haptics — ${hapticLevelLabel(app.hapticSettings.level)} (tap)" +
+                " • PCs ${currentConnectionStatus.trustedPcCount} (hold)"
+
+        val usbDetail =
+            currentUsbStatus
+                .takeIf {
+                    it.isError
                 }
-            } else {
-                "USB diagnostics\n$history"
-            }
+                ?.let {
+                    "\nUSB — ${it.message}"
+                }
+                .orEmpty()
 
         usbStatusText.text =
-            "$connectionText\nHaptics — ${hapticLevelLabel(app.hapticSettings.level)} (tap) • Trusted PCs (hold)"
+            links + "\n" + controls + usbDetail
 
         usbStatusText.setTextColor(
-            if (status.isError) {
+            if (currentUsbStatus.isError) {
                 Color.rgb(
                     255,
                     150,
@@ -361,6 +385,20 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun linkStateLabel(
+        state: AndroidLinkState,
+    ): String =
+        when (state) {
+            AndroidLinkState.UNAVAILABLE -> "Unavailable"
+            AndroidLinkState.PERMISSION_REQUIRED -> "Permission"
+            AndroidLinkState.OFF -> "Off"
+            AndroidLinkState.IDLE -> "Idle"
+            AndroidLinkState.CONNECTING -> "Connecting"
+            AndroidLinkState.ACTIVE -> "Active"
+            AndroidLinkState.RECONNECTING -> "Reconnecting"
+            AndroidLinkState.STOPPED -> "Stopped"
+        }
+
     private fun cycleHapticLevel() {
         val next =
             when (app.hapticSettings.level) {
@@ -380,9 +418,9 @@ class MainActivity : Activity() {
         app.hapticSettings.level = next
         app.hapticEngine.stopGameRumble()
 
-        showUsbStatus(
-            usbRuntimeStatus.current(),
-        )
+        currentUsbStatus =
+            usbRuntimeStatus.current()
+        renderStatusOverlay()
     }
 
     private fun hapticLevelLabel(
@@ -493,9 +531,11 @@ class MainActivity : Activity() {
             serviceIntent,
         )
 
-        showUsbStatus(
-            usbRuntimeStatus.current(),
-        )
+        currentUsbStatus =
+            usbRuntimeStatus.current()
+        currentConnectionStatus =
+            app.connectionStatus.current()
+        renderStatusOverlay()
     }
 
     private fun requestBluetoothPermissionsIfNeeded() {
@@ -544,6 +584,12 @@ class MainActivity : Activity() {
         if (::usbRuntimeStatus.isInitialized) {
             usbRuntimeStatus.removeListener(
                 usbStatusListener,
+            )
+        }
+
+        if (::app.isInitialized) {
+            app.connectionStatus.removeListener(
+                connectionStatusListener,
             )
         }
 

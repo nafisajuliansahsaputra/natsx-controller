@@ -1,6 +1,7 @@
 package com.natsx.controller
 
 import android.app.Application
+import com.natsx.controller.core.connection.AndroidConnectionStatusCoordinator
 import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.haptics.AndroidHapticEngine
 import com.natsx.controller.core.haptics.HapticSettings
@@ -39,6 +40,12 @@ class NatsxControllerApplication : Application() {
         LazyThreadSafetyMode.SYNCHRONIZED,
     ) {
         PairingConfirmationCoordinator()
+    }
+
+    val connectionStatus: AndroidConnectionStatusCoordinator by lazy(
+        LazyThreadSafetyMode.SYNCHRONIZED,
+    ) {
+        AndroidConnectionStatusCoordinator()
     }
 
     val usbRuntimeStatus: UsbRuntimeStatusCoordinator by lazy(
