@@ -15,6 +15,7 @@ import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.haptics.HapticLevel
 import com.natsx.controller.core.input.AnalogStickProcessor
 import com.natsx.controller.core.input.ControllerInputTuning
+import com.natsx.controller.core.input.ControllerStickCalibration
 import kotlin.math.min
 
 class ControllerSurfaceView(
@@ -46,20 +47,15 @@ class ControllerSurfaceView(
         typeface = android.graphics.Typeface.DEFAULT_BOLD
     }
 
+    private var inputTuning =
+        ControllerInputTuning.Default
+    private var stickCalibration =
+        ControllerStickCalibration.Default
+
     private var leftStickProcessor =
-        AnalogStickProcessor(
-            deadzone =
-                ControllerInputTuning.Default.leftDeadzone,
-            sensitivity =
-                ControllerInputTuning.Default.leftSensitivity,
-        )
+        createLeftStickProcessor()
     private var rightStickProcessor =
-        AnalogStickProcessor(
-            deadzone =
-                ControllerInputTuning.Default.rightDeadzone,
-            sensitivity =
-                ControllerInputTuning.Default.rightSensitivity,
-        )
+        createRightStickProcessor()
 
     private val controls = mutableListOf<ControlGeometry>()
     private val activePointers = mutableMapOf<Int, ControlId>()
@@ -134,21 +130,45 @@ class ControllerSurfaceView(
     fun applyInputTuning(
         tuning: ControllerInputTuning,
     ) {
+        inputTuning = tuning
+        rebuildStickProcessors()
+    }
+
+    fun applyStickCalibration(
+        calibration: ControllerStickCalibration,
+    ) {
+        stickCalibration = calibration
+        rebuildStickProcessors()
+    }
+
+    private fun rebuildStickProcessors() {
         releaseAllInputs()
-
         leftStickProcessor =
-            AnalogStickProcessor(
-                deadzone = tuning.leftDeadzone,
-                sensitivity = tuning.leftSensitivity,
-            )
+            createLeftStickProcessor()
         rightStickProcessor =
-            AnalogStickProcessor(
-                deadzone = tuning.rightDeadzone,
-                sensitivity = tuning.rightSensitivity,
-            )
-
+            createRightStickProcessor()
         invalidate()
     }
+
+    private fun createLeftStickProcessor() =
+        AnalogStickProcessor(
+            deadzone =
+                inputTuning.leftDeadzone,
+            sensitivity =
+                inputTuning.leftSensitivity,
+            calibration =
+                stickCalibration.left,
+        )
+
+    private fun createRightStickProcessor() =
+        AnalogStickProcessor(
+            deadzone =
+                inputTuning.rightDeadzone,
+            sensitivity =
+                inputTuning.rightSensitivity,
+            calibration =
+                stickCalibration.right,
+        )
 
     private fun handlePointerDown(event: MotionEvent, pointerIndex: Int) {
         val pointerId = event.getPointerId(pointerIndex)

@@ -86,6 +86,42 @@ class ControllerInputSettings(
                 ),
             )
 
+    fun calibration(): ControllerStickCalibration =
+        ControllerStickCalibration(
+            left =
+                readStickCalibration(
+                    KEY_LEFT_CALIBRATION_PREFIX,
+                ),
+            right =
+                readStickCalibration(
+                    KEY_RIGHT_CALIBRATION_PREFIX,
+                ),
+        )
+
+    fun updateCalibration(
+        calibration: ControllerStickCalibration,
+    ) {
+        preferences
+            .edit()
+            .apply {
+                putStickCalibration(
+                    KEY_LEFT_CALIBRATION_PREFIX,
+                    calibration.left,
+                )
+                putStickCalibration(
+                    KEY_RIGHT_CALIBRATION_PREFIX,
+                    calibration.right,
+                )
+            }
+            .apply()
+    }
+
+    fun resetCalibration() {
+        updateCalibration(
+            ControllerStickCalibration.Default,
+        )
+    }
+
     fun current(): ControllerInputTuning =
         ControllerInputTuning(
             leftDeadzone =
@@ -133,6 +169,60 @@ class ControllerInputSettings(
         )
     }
 
+    private fun readStickCalibration(
+        prefix: String,
+    ): StickCalibration =
+        StickCalibration(
+            centerOffsetX =
+                preferences
+                    .getFloat(
+                        "${prefix}_center_x",
+                        0f,
+                    )
+                    .coerceIn(
+                        -StickCalibration.MAX_CENTER_OFFSET,
+                        StickCalibration.MAX_CENTER_OFFSET,
+                    ),
+            centerOffsetY =
+                preferences
+                    .getFloat(
+                        "${prefix}_center_y",
+                        0f,
+                    )
+                    .coerceIn(
+                        -StickCalibration.MAX_CENTER_OFFSET,
+                        StickCalibration.MAX_CENTER_OFFSET,
+                    ),
+            travelScale =
+                preferences
+                    .getFloat(
+                        "${prefix}_travel_scale",
+                        1f,
+                    )
+                    .coerceIn(
+                        StickCalibration.MIN_TRAVEL_SCALE,
+                        StickCalibration.MAX_TRAVEL_SCALE,
+                    ),
+        )
+
+    private fun SharedPreferences.Editor.putStickCalibration(
+        prefix: String,
+        calibration: StickCalibration,
+    ) {
+        putFloat(
+            "${prefix}_center_x",
+            calibration.centerOffsetX,
+        )
+        putFloat(
+            "${prefix}_center_y",
+            calibration.centerOffsetY,
+        )
+        putFloat(
+            "${prefix}_travel_scale",
+            calibration.travelScale,
+        )
+    }
+
     private fun persist(
         profile: ControllerProfile,
         tuning: ControllerInputTuning,
@@ -173,5 +263,9 @@ class ControllerInputSettings(
             "left_sensitivity"
         const val KEY_RIGHT_SENSITIVITY =
             "right_sensitivity"
+        const val KEY_LEFT_CALIBRATION_PREFIX =
+            "left_calibration"
+        const val KEY_RIGHT_CALIBRATION_PREFIX =
+            "right_calibration"
     }
 }

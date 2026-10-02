@@ -96,6 +96,9 @@ class MainActivity : Activity() {
                 applyInputTuning(
                     app.inputSettings.current(),
                 )
+                applyStickCalibration(
+                    app.inputSettings.calibration(),
+                )
             }
 
         setContentView(
