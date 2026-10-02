@@ -439,7 +439,7 @@ class ControllerStatusView(
                 innerPadding,
             centerY - height / 2f +
                 innerPadding,
-            centerX - contentCenterX +
+            centerX - width / 2f +
                 innerPadding +
                 availableWidth *
                     fillFraction.coerceIn(
