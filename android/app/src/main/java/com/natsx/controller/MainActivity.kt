@@ -19,6 +19,7 @@ import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.haptics.HapticLevel
 import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
 import com.natsx.controller.core.pairing.PairingPrompt
+import com.natsx.controller.core.protocol.ProtocolTransport
 import com.natsx.controller.core.transport.bluetooth.BluetoothPermissionGate
 import com.natsx.controller.core.transport.usb.UsbRuntimeStatus
 import com.natsx.controller.core.transport.usb.UsbRuntimeStatusCoordinator
@@ -340,6 +341,14 @@ class MainActivity : Activity() {
             return
         }
 
+        val smartAuto =
+            currentConnectionStatus.smartAutoActiveTransport
+                ?.let {
+                    "Smart Auto • Active: " +
+                        smartAutoTransportLabel(it)
+                }
+                ?: "Smart Auto • Waiting for Windows"
+
         val links =
             "Links • Wi-Fi ${linkStateLabel(currentConnectionStatus.wifi)}" +
                 " • Bluetooth ${linkStateLabel(currentConnectionStatus.bluetooth)}" +
@@ -360,7 +369,9 @@ class MainActivity : Activity() {
                 .orEmpty()
 
         usbStatusText.text =
-            links + "\n" + controls + usbDetail
+            smartAuto + "\n" +
+                links + "\n" +
+                controls + usbDetail
 
         usbStatusText.setTextColor(
             if (currentUsbStatus.isError) {
@@ -397,6 +408,15 @@ class MainActivity : Activity() {
             AndroidLinkState.ACTIVE -> "Active"
             AndroidLinkState.RECONNECTING -> "Reconnecting"
             AndroidLinkState.STOPPED -> "Stopped"
+        }
+
+    private fun smartAutoTransportLabel(
+        transport: ProtocolTransport,
+    ): String =
+        when (transport) {
+            ProtocolTransport.WIFI -> "Wi-Fi"
+            ProtocolTransport.BLUETOOTH -> "Bluetooth"
+            ProtocolTransport.USB_DIRECT -> "USB"
         }
 
     private fun cycleHapticLevel() {

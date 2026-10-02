@@ -162,6 +162,8 @@ class ControllerService : Service() {
                 status = app.usbRuntimeStatus,
                 rumbleSink =
                     app.hapticEngine::handleGameRumble,
+                handoverSink =
+                    app.connectionStatus::applyHandoverCommit,
             )
 
         registerUsbReceiver()
@@ -478,6 +480,8 @@ class ControllerService : Service() {
                             permissionGate,
                         rumbleSink =
                             app.hapticEngine::handleGameRumble,
+                        handoverSink =
+                            app.connectionStatus::applyHandoverCommit,
                     )
                     .connect()
             } catch (exception: Exception) {
@@ -671,7 +675,7 @@ class ControllerService : Service() {
                 AndroidLinkState.IDLE
             }
 
-        app.connectionStatus.publish(
+        app.connectionStatus.publishLinks(
             AndroidConnectionStatus(
                 wifi = wifiState,
                 bluetooth = bluetoothState,
