@@ -14,6 +14,7 @@ import com.natsx.controller.core.gamepad.GamepadState
 import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.haptics.HapticLevel
 import com.natsx.controller.core.input.AnalogStickProcessor
+import com.natsx.controller.core.input.ControllerInputTuning
 import kotlin.math.min
 
 class ControllerSurfaceView(
@@ -45,8 +46,20 @@ class ControllerSurfaceView(
         typeface = android.graphics.Typeface.DEFAULT_BOLD
     }
 
-    private val leftStickProcessor = AnalogStickProcessor(deadzone = 0.05f)
-    private val rightStickProcessor = AnalogStickProcessor(deadzone = 0.07f)
+    private var leftStickProcessor =
+        AnalogStickProcessor(
+            deadzone =
+                ControllerInputTuning.Default.leftDeadzone,
+            sensitivity =
+                ControllerInputTuning.Default.leftSensitivity,
+        )
+    private var rightStickProcessor =
+        AnalogStickProcessor(
+            deadzone =
+                ControllerInputTuning.Default.rightDeadzone,
+            sensitivity =
+                ControllerInputTuning.Default.rightSensitivity,
+        )
 
     private val controls = mutableListOf<ControlGeometry>()
     private val activePointers = mutableMapOf<Int, ControlId>()
@@ -115,6 +128,25 @@ class ControllerSurfaceView(
         leftStickProcessor.reset()
         rightStickProcessor.reset()
         stateStore.neutralize()
+        invalidate()
+    }
+
+    fun applyInputTuning(
+        tuning: ControllerInputTuning,
+    ) {
+        releaseAllInputs()
+
+        leftStickProcessor =
+            AnalogStickProcessor(
+                deadzone = tuning.leftDeadzone,
+                sensitivity = tuning.leftSensitivity,
+            )
+        rightStickProcessor =
+            AnalogStickProcessor(
+                deadzone = tuning.rightDeadzone,
+                sensitivity = tuning.rightSensitivity,
+            )
+
         invalidate()
     }
 

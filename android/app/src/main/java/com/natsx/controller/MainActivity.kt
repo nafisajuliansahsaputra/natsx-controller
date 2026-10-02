@@ -87,7 +87,11 @@ class MainActivity : Activity() {
                 hapticLevel = {
                     app.hapticSettings.level
                 },
-            )
+            ).apply {
+                applyInputTuning(
+                    app.inputSettings.current(),
+                )
+            }
 
         setContentView(
             buildRootView(),
