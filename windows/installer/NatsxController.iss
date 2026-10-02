@@ -71,6 +71,8 @@ Type: filesandordirs; Name: "{app}"
 
 [Code]
 var
+  ExistingNatsxInstall: Boolean;
+  GamepadHostExistedBeforeInstall: Boolean;
   GamepadHostPrepared: Boolean;
   InstallCompleted: Boolean;
 
@@ -80,6 +82,18 @@ var
   ScriptPath: String;
 begin
   Result := '';
+
+  ExistingNatsxInstall :=
+    FileExists(
+      ExpandConstant('{app}\Natsx.Controller.Receiver.exe')
+    );
+
+  GamepadHostExistedBeforeInstall :=
+    RegKeyExists(
+      HKLM64,
+      'SYSTEM\CurrentControlSet\Services\NatsxControllerGamepadHost'
+    );
+
   ExtractTemporaryFile('prepare-gamepad-host-upgrade.ps1');
   ScriptPath := ExpandConstant('{tmp}\prepare-gamepad-host-upgrade.ps1');
 
@@ -123,11 +137,22 @@ end;
 
 procedure RollbackPostInstallSideEffects();
 begin
-  RunCleanupScript('remove-gamepad-host.ps1');
-  RunCleanupScript('remove-firewall-rules.ps1');
+  { A failed clean install must leave no NATSX-owned privileged service. }
+  { During upgrade, preserve a service that belonged to the previous install. }
+  if not GamepadHostExistedBeforeInstall then
+  begin
+    RunCleanupScript('remove-gamepad-host.ps1');
+  end;
+
+  { Do not dismantle dependencies of a previously working NATSX install. }
+  { Existing firewall/USB packages remain valid at the same application path. }
+  if not ExistingNatsxInstall then
+  begin
+    RunCleanupScript('remove-firewall-rules.ps1');
 #if IncludeUsbDrivers == "1"
-  RunCleanupScript('remove-production-usb-drivers.ps1');
+    RunCleanupScript('remove-production-usb-drivers.ps1');
 #endif
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -262,7 +287,9 @@ procedure DeinitializeSetup();
 var
   ResultCode: Integer;
 begin
-  if GamepadHostPrepared and (not InstallCompleted) then
+  if GamepadHostPrepared and
+     GamepadHostExistedBeforeInstall and
+     (not InstallCompleted) then
   begin
     Exec(
       ExpandConstant('{sysnative}\sc.exe'),
