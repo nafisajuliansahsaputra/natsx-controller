@@ -382,22 +382,22 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M14 — Reliability and performance
 
-> Reliability coverage now includes deterministic duplicate/out-of-order rejection, packet-loss/failover harnesses, rapid USB flapping protection, equivalent-state make-before-break handover, safety neutralization without stopping the virtual backend, stale Android trusted-session cleanup, and a 10-cycle automated USB attach/takeover/detach/Wi-Fi-fallback soak using continuously fresh session-global sequences. Physical OPPO A58 validation has also confirmed Wi-Fi input, USB preferred takeover, USB unplug fallback back to Wi-Fi without manual reconnect, and Receiver restart recovery. Longer wall-clock soak, background/foreground, sleep/resume, resource profiling, and repeated Bluetooth/Wi-Fi toggles remain open.
+> Reliability coverage now includes deterministic duplicate/out-of-order rejection, packet-loss/failover harnesses, rapid USB flapping protection, equivalent-state make-before-break handover, safety neutralization without stopping the virtual backend, stale Android trusted-session cleanup, a 10-cycle automated USB attach/takeover/detach/Wi-Fi-fallback soak, repeated five-cycle Wi-Fi and Bluetooth heartbeat-loss recovery, lifecycle neutralization on focus/background loss, immediate rumble stop on background, landscape/config-change contract guards, and sticky-service trusted-peer restart bootstrap coverage. Physical OPPO A58 validation has also confirmed Wi-Fi input, USB preferred takeover, USB unplug fallback back to Wi-Fi without manual reconnect, and Receiver restart recovery. Longer wall-clock soak, Windows sleep/resume, and resource/power profiling remain open.
 
 - [ ] 30-minute soak test.
 - [ ] 2-hour soak test.
-- [ ] repeated Wi-Fi toggle test.
-- [ ] repeated Bluetooth recovery test.
+- [x] repeated Wi-Fi toggle test.
+- [x] repeated Bluetooth recovery test.
 - [x] repeated USB reconnect test.
 - [x] transport flapping test.
 - [x] packet reordering test.
 - [x] packet duplication test.
 - [x] packet loss simulation.
-- [ ] Android background/foreground test.
-- [ ] screen rotation/lock behavior test.
+- [x] Android background/foreground test.
+- [x] screen rotation/lock behavior test.
 - [ ] Windows sleep/resume test.
 - [x] receiver restart recovery.
-- [ ] phone app restart recovery.
+- [x] phone app restart recovery.
 - [x] no stuck-input verification.
 - [ ] allocation/profile hot input path.
 - [ ] CPU usage review.
