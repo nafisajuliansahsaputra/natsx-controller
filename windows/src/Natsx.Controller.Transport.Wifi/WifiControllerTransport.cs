@@ -8,7 +8,8 @@ namespace Natsx.Controller.Transport.Wifi;
 public sealed class WifiControllerTransport :
     IControllerTransport,
     IControllerOutputTransport,
-    IControllerStatusOutputTransport
+    IControllerStatusOutputTransport,
+    IControllerPreferenceSource
 {
     private readonly WifiRealtimeReceiver _receiver;
     private readonly IPEndPoint _bindEndPoint;
@@ -26,6 +27,8 @@ public sealed class WifiControllerTransport :
         TransportLifecycle? lifecycle = null)
     {
         _receiver = receiver ?? throw new ArgumentNullException(nameof(receiver));
+        _receiver.TransportPreferenceReceived +=
+            OnTransportPreferenceReceived;
         _bindEndPoint = bindEndPoint ??
             new IPEndPoint(IPAddress.Any, WifiRealtimeReceiver.DefaultPort);
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -36,6 +39,9 @@ public sealed class WifiControllerTransport :
     public event EventHandler<TransportGamepadStateEventArgs>? GamepadStateReceived;
 
     public event EventHandler<TransportRuntimeStateChangedEventArgs>? StateChanged;
+
+    public event Action<TransportKind?>?
+        PreferredTransportRequested;
 
     public TransportKind Kind => TransportKind.Wifi;
 
@@ -209,6 +215,29 @@ public sealed class WifiControllerTransport :
         }
     }
 
+    private void OnTransportPreferenceReceived(
+        TransportPreferencePayload payload)
+    {
+        TransportKind? preferred =
+            payload.Mode switch
+            {
+                TransportPreferenceMode.Auto =>
+                    null,
+                TransportPreferenceMode.Wifi =>
+                    TransportKind.Wifi,
+                TransportPreferenceMode.Bluetooth =>
+                    TransportKind.Bluetooth,
+                TransportPreferenceMode.UsbDirect =>
+                    TransportKind.Usb,
+                _ =>
+                    throw new ArgumentOutOfRangeException(
+                        nameof(payload)),
+            };
+
+        PreferredTransportRequested
+            ?.Invoke(preferred);
+    }
+
     private void OnLifecycleStateChanged(TransportRuntimeState state)
     {
         StateChanged?.Invoke(
@@ -228,6 +257,8 @@ public sealed class WifiControllerTransport :
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         await DisconnectAsync(timeout.Token).ConfigureAwait(false);
         await _receiver.DisposeAsync().ConfigureAwait(false);
+        _receiver.TransportPreferenceReceived -=
+            OnTransportPreferenceReceived;
         _lifecycle.StateChanged -= OnLifecycleStateChanged;
 
         _disposed = true;

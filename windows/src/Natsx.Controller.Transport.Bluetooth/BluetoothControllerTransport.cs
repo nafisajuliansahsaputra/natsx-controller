@@ -8,7 +8,8 @@ namespace Natsx.Controller.Transport.Bluetooth;
 public sealed class BluetoothControllerTransport :
     IControllerTransport,
     IControllerOutputTransport,
-    IControllerStatusOutputTransport
+    IControllerStatusOutputTransport,
+    IControllerPreferenceSource
 {
     private readonly BluetoothRealtimeStreamReceiver _receiver;
     private readonly TransportLifecycle _lifecycle;
@@ -40,6 +41,8 @@ public sealed class BluetoothControllerTransport :
                 _lifecycle,
                 _timeProvider,
                 connectionPolicy);
+        _receiver.TransportPreferenceReceived +=
+            OnTransportPreferenceReceived;
 
         _lifecycle.StateChanged +=
             OnLifecycleStateChanged;
@@ -50,6 +53,9 @@ public sealed class BluetoothControllerTransport :
 
     public event EventHandler<TransportRuntimeStateChangedEventArgs>?
         StateChanged;
+
+    public event Action<TransportKind?>?
+        PreferredTransportRequested;
 
     public TransportKind Kind =>
         TransportKind.Bluetooth;
@@ -337,6 +343,29 @@ public sealed class BluetoothControllerTransport :
         }
     }
 
+    private void OnTransportPreferenceReceived(
+        TransportPreferencePayload payload)
+    {
+        TransportKind? preferred =
+            payload.Mode switch
+            {
+                TransportPreferenceMode.Auto =>
+                    null,
+                TransportPreferenceMode.Wifi =>
+                    TransportKind.Wifi,
+                TransportPreferenceMode.Bluetooth =>
+                    TransportKind.Bluetooth,
+                TransportPreferenceMode.UsbDirect =>
+                    TransportKind.Usb,
+                _ =>
+                    throw new ArgumentOutOfRangeException(
+                        nameof(payload)),
+            };
+
+        PreferredTransportRequested
+            ?.Invoke(preferred);
+    }
+
     private void OnLifecycleStateChanged(
         TransportRuntimeState state)
     {
@@ -361,6 +390,8 @@ public sealed class BluetoothControllerTransport :
         await DisconnectAsync(
             timeout.Token).ConfigureAwait(false);
 
+        _receiver.TransportPreferenceReceived -=
+            OnTransportPreferenceReceived;
         _lifecycle.StateChanged -=
             OnLifecycleStateChanged;
 

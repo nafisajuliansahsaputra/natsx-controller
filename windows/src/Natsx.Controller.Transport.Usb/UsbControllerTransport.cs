@@ -7,7 +7,8 @@ namespace Natsx.Controller.Transport.Usb;
 public sealed class UsbControllerTransport :
     IControllerTransport,
     IControllerOutputTransport,
-    IControllerStatusOutputTransport
+    IControllerStatusOutputTransport,
+    IControllerPreferenceSource
 {
     private readonly UsbRealtimeStreamReceiver _receiver;
     private readonly TransportLifecycle _lifecycle;
@@ -38,6 +39,8 @@ public sealed class UsbControllerTransport :
                 _lifecycle,
                 _timeProvider,
                 connectionPolicy);
+        _receiver.TransportPreferenceReceived +=
+            OnTransportPreferenceReceived;
 
         _lifecycle.StateChanged +=
             OnLifecycleStateChanged;
@@ -48,6 +51,9 @@ public sealed class UsbControllerTransport :
 
     public event EventHandler<TransportRuntimeStateChangedEventArgs>?
         StateChanged;
+
+    public event Action<TransportKind?>?
+        PreferredTransportRequested;
 
     public TransportKind Kind =>
         TransportKind.Usb;
@@ -295,6 +301,29 @@ public sealed class UsbControllerTransport :
         }
     }
 
+    private void OnTransportPreferenceReceived(
+        TransportPreferencePayload payload)
+    {
+        TransportKind? preferred =
+            payload.Mode switch
+            {
+                TransportPreferenceMode.Auto =>
+                    null,
+                TransportPreferenceMode.Wifi =>
+                    TransportKind.Wifi,
+                TransportPreferenceMode.Bluetooth =>
+                    TransportKind.Bluetooth,
+                TransportPreferenceMode.UsbDirect =>
+                    TransportKind.Usb,
+                _ =>
+                    throw new ArgumentOutOfRangeException(
+                        nameof(payload)),
+            };
+
+        PreferredTransportRequested
+            ?.Invoke(preferred);
+    }
+
     private void OnLifecycleStateChanged(
         TransportRuntimeState state)
     {
@@ -319,6 +348,8 @@ public sealed class UsbControllerTransport :
         await DisconnectAsync(
             timeout.Token).ConfigureAwait(false);
 
+        _receiver.TransportPreferenceReceived -=
+            OnTransportPreferenceReceived;
         _lifecycle.StateChanged -=
             OnLifecycleStateChanged;
 

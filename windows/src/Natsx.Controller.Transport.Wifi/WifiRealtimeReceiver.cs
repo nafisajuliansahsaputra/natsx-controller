@@ -60,6 +60,9 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
 
     public bool IsRunning => _receiveLoop is not null;
 
+    public event Action<TransportPreferencePayload>?
+        TransportPreferenceReceived;
+
     public long AcceptedDatagrams => Interlocked.Read(ref _acceptedDatagrams);
 
     public long AcceptedControlDatagrams =>
@@ -388,6 +391,22 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
                             _timeProvider.GetTimestamp());
 
                         _latestState.Writer.TryWrite(state);
+                        break;
+                    }
+
+                    case MessageType.TransportPreference:
+                    {
+                        TransportPreferencePayload preference =
+                            WifiControlDatagramCodec
+                                .DecodeTransportPreference(
+                                    result.Buffer,
+                                    _trustedSession);
+
+                        TransportPreferenceReceived
+                            ?.Invoke(preference);
+
+                        Interlocked.Increment(
+                            ref _acceptedControlDatagrams);
                         break;
                     }
 

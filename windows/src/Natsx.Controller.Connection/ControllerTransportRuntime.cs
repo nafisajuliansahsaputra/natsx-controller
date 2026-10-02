@@ -93,6 +93,18 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         }
     }
 
+    public TransportKind? PreferredTransport
+    {
+        get
+        {
+            lock (_connectionGate)
+            {
+                return _connectionManager
+                    .PreferredTransport;
+            }
+        }
+    }
+
     public ConnectionManagerState State
     {
         get
@@ -761,6 +773,17 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         }
     }
 
+    private void OnPreferredTransportRequested(
+        TransportKind? preferredTransport)
+    {
+        lock (_connectionGate)
+        {
+            _connectionManager
+                .SetPreferredTransport(
+                    preferredTransport);
+        }
+    }
+
     private void OnGamepadStateReceived(
         object? sender,
         TransportGamepadStateEventArgs eventArgs)
@@ -934,6 +957,14 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
                 OnGamepadStateReceived;
             transport.StateChanged +=
                 OnTransportStateChanged;
+
+            if (transport is
+                IControllerPreferenceSource preferenceSource)
+            {
+                preferenceSource
+                    .PreferredTransportRequested +=
+                    OnPreferredTransportRequested;
+            }
         }
     }
 
@@ -957,6 +988,14 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
                 OnGamepadStateReceived;
             registered.StateChanged -=
                 OnTransportStateChanged;
+
+            if (registered is
+                IControllerPreferenceSource preferenceSource)
+            {
+                preferenceSource
+                    .PreferredTransportRequested -=
+                    OnPreferredTransportRequested;
+            }
 
             return _transports.Remove(kind);
         }

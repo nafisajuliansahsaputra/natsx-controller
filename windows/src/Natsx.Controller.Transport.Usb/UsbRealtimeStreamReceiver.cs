@@ -60,6 +60,9 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
                 });
     }
 
+    public event Action<TransportPreferencePayload>?
+        TransportPreferenceReceived;
+
     public ChannelReader<UsbGamepadFrame> States =>
         _latestState.Reader;
 
@@ -385,6 +388,35 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
                         ProtocolConstants.HeaderSize
                         ? (MessageType)frameBytes[6]
                         : 0;
+
+                if (messageType ==
+                    MessageType.TransportPreference)
+                {
+                    try
+                    {
+                        TransportPreferencePayload preference =
+                            UsbControlFrameCodec
+                                .DecodeTransportPreference(
+                                    frameBytes,
+                                    _trustedSession);
+
+                        TransportPreferenceReceived
+                            ?.Invoke(preference);
+
+                        Interlocked.Increment(
+                            ref _acceptedControlFrames);
+                    }
+                    catch (Exception exception) when (
+                        exception is FormatException or
+                        CryptographicException or
+                        ArgumentException)
+                    {
+                        Interlocked.Increment(
+                            ref _rejectedFrames);
+                    }
+
+                    continue;
+                }
 
                 if (messageType ==
                     MessageType.HeartbeatAck)
