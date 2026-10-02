@@ -367,6 +367,8 @@ class ControllerService : Service() {
                 sessionRegistry = app.trustedSessionRegistry,
                 rumbleSink =
                     app.hapticEngine::handleGameRumble,
+                handoverSink =
+                    app.connectionStatus::applyHandoverCommit,
             )
 
         val runtime =

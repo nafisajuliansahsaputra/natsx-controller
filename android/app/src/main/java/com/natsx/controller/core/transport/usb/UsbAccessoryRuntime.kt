@@ -5,6 +5,7 @@ import android.hardware.usb.UsbManager
 import android.os.SystemClock
 import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
 import com.natsx.controller.core.pairing.PairingPrompt
+import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.PairingAbortPayload
 import com.natsx.controller.core.protocol.PairingAbortReason
@@ -34,6 +35,7 @@ class UsbAccessoryRuntime(
     private val pairingConfirmation: PairingConfirmationCoordinator,
     private val status: UsbRuntimeStatusCoordinator,
     private val rumbleSink: (RumblePayload) -> Unit = {},
+    private val handoverSink: (HandoverPayload) -> Unit = {},
 ) : Closeable {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -188,6 +190,7 @@ class UsbAccessoryRuntime(
                     trustedSession = session,
                     inputStream = opened.input,
                     rumbleSink = rumbleSink,
+                    handoverSink = handoverSink,
                 )
 
             broadcaster.addSink(realtimeSender)

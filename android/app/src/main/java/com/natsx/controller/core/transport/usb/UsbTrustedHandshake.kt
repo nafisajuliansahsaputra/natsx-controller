@@ -6,6 +6,8 @@ import com.natsx.controller.core.protocol.AuthChallengePayloadCodec
 import com.natsx.controller.core.protocol.AuthResponsePayload
 import com.natsx.controller.core.protocol.AuthResponsePayloadCodec
 import com.natsx.controller.core.protocol.FrameFlags
+import com.natsx.controller.core.protocol.HandoverPayload
+import com.natsx.controller.core.protocol.HandoverPayloadCodec
 import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.PeerId
 import com.natsx.controller.core.protocol.PeerRole
@@ -158,6 +160,55 @@ object UsbControlFrameCodec {
         }
 
         return RumblePayloadCodec.decode(
+            frame.payload,
+        )
+    }
+
+    fun encodeHandoverCommit(
+        trustedSession: UsbTrustedSession,
+        payload: HandoverPayload,
+        monotonicTimestampMicros: ULong,
+    ): ByteArray =
+        ProtocolFrameCodec.encode(
+            ProtocolFrame(
+                version = ProtocolVersion.Current,
+                messageType =
+                    MessageType.HANDOVER_COMMIT,
+                flags = FrameFlags.AUTHENTICATED,
+                sessionId =
+                    trustedSession.sessionId,
+                sequence = 0u,
+                monotonicTimestampMicros =
+                    monotonicTimestampMicros,
+                payload =
+                    HandoverPayloadCodec.encode(
+                        payload,
+                    ),
+            ),
+            authenticationKey =
+                trustedSession.authenticationKey(),
+        )
+
+    fun decodeHandoverCommit(
+        frameBytes: ByteArray,
+        trustedSession: UsbTrustedSession,
+    ): HandoverPayload {
+        val frame =
+            decodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession,
+            )
+
+        require(
+            frame.messageType ==
+                MessageType.HANDOVER_COMMIT,
+        ) {
+            "Expected HANDOVER_COMMIT, received " +
+                frame.messageType +
+                "."
+        }
+
+        return HandoverPayloadCodec.decode(
             frame.payload,
         )
     }
