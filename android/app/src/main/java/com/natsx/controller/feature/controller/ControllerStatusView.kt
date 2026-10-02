@@ -56,6 +56,17 @@ class ControllerStatusView(
             style = Paint.Style.FILL
         }
 
+    private val lampOutlinePaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_SURFACE_OUTLINE
+            style = Paint.Style.STROKE
+            strokeWidth =
+                (1f * density)
+                    .coerceAtLeast(
+                        1f,
+                    )
+        }
+
     private val tempRect = RectF()
     private val iconPath = Path()
 
@@ -264,6 +275,12 @@ class ControllerStatusView(
             lampHeight / 2f,
             lampHeight / 2f,
             lampPaint,
+        )
+        canvas.drawRoundRect(
+            tempRect,
+            lampHeight / 2f,
+            lampHeight / 2f,
+            lampOutlinePaint,
         )
 
         state.message
@@ -674,5 +691,7 @@ class ControllerStatusView(
             0xFFF6F6FA.toInt()
         const val COLOR_OFFLINE_LAMP =
             0xFFB9BBC2.toInt()
+        const val COLOR_SURFACE_OUTLINE =
+            0xFFDEDBE5.toInt()
     }
 }

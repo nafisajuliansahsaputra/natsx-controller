@@ -1274,6 +1274,11 @@ class ControllerSurfaceView(
             drawPressed(tempRect)
         }
 
+        canvas.drawPath(
+            dpadPath,
+            outlinePaint,
+        )
+
         dpadMarkPaint.strokeWidth =
             (
                 halfThickness *
@@ -1362,7 +1367,11 @@ class ControllerSurfaceView(
                 travel
 
         val active =
-            logicalX != 0 ||
+            pointerOwnership
+                .isControlClaimed(
+                    id,
+                ) ||
+                logicalX != 0 ||
                 logicalY != 0
 
         canvas.drawCircle(
