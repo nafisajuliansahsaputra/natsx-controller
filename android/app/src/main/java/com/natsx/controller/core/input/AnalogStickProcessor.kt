@@ -14,6 +14,7 @@ data class StickOutput(
 class AnalogStickProcessor(
     private val deadzone: Float = 0.05f,
     private val sensitivity: Float = 1f,
+    private val calibration: StickCalibration = StickCalibration.Default,
     private val jitterThreshold: Int = 96,
 ) {
     private var lastOutput = StickOutput(0, 0)
@@ -33,8 +34,18 @@ class AnalogStickProcessor(
     ): StickOutput {
         require(radius > 0f)
 
-        val rawX = (pointerX - centerX) / radius
-        val rawY = -(pointerY - centerY) / radius
+        val normalizedX =
+            (pointerX - centerX) / radius
+        val normalizedY =
+            -(pointerY - centerY) / radius
+
+        val rawX =
+            (normalizedX - calibration.centerOffsetX) /
+                calibration.travelScale
+        val rawY =
+            (normalizedY - calibration.centerOffsetY) /
+                calibration.travelScale
+
         val magnitude = hypot(rawX, rawY)
 
         if (magnitude <= deadzone) {
