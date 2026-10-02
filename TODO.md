@@ -55,7 +55,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Run Windows tests in CI.
 - [x] Build Android project in CI.
 - [x] Run Android unit tests in CI.
-- [ ] Add formatting/lint checks.
+- [x] Add formatting/lint checks.
 
 **Exit criteria:** empty product shells build consistently on clean environments.
 
