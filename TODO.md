@@ -416,7 +416,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] changelog.
 - [x] release checklist.
 - [x] upgrade/migration behavior.
-- [ ] crash/log collection strategy that remains local-first/private.
+- [x] crash/log collection strategy that remains local-first/private.
 - [ ] security review.
 - [ ] license/dependency review.
 

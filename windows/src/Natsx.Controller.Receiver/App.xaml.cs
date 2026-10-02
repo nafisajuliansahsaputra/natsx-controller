@@ -12,6 +12,9 @@ public partial class App : System.Windows.Application
         base.OnStartup(
             eventArgs);
 
+        LocalCrashLog.Install(
+            this);
+
         if (HasArgument(
                 eventArgs.Args,
                 "--install-driver"))
@@ -80,6 +83,10 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
+            LocalCrashLog.Write(
+                "installer-driver-bootstrap",
+                exception);
+
             TryWriteSetupError(
                 exception);
             return 1;

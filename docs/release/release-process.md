@@ -15,7 +15,8 @@
 3. Android signing secrets are configured in GitHub: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD.
 4. Windows production driver/signing posture is approved. Test-signed KMDF packages must not be distributed as production drivers.
 5. Security and dependency/license review is complete.
-6. Changelog is updated for the target version.
+6. Local crash diagnostics behavior has been validated and does not upload data automatically.
+7. Changelog is updated for the target version.
 
 ## Release workflow
 
@@ -62,3 +63,8 @@ Use windows/installer/purge-user-data.ps1 -PurgeTrust only for an explicit full 
 - [ ] Complete dependency/license review.
 - [ ] Update changelog.
 - [ ] Tag v<version>.
+
+
+## Local diagnostics
+
+Crash collection is local-only and bounded. See `docs/release/local-diagnostics.md` for storage paths, privacy boundaries, rotation, and the support-sharing procedure.

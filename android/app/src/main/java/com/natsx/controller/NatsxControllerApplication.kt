@@ -3,6 +3,7 @@ package com.natsx.controller
 import android.app.Application
 import com.natsx.controller.core.connection.AndroidConnectionStatusCoordinator
 import com.natsx.controller.core.connection.TransportPreferenceSettings
+import com.natsx.controller.core.diagnostics.LocalCrashLog
 import com.natsx.controller.core.gamepad.GamepadStateStore
 import com.natsx.controller.core.haptics.AndroidHapticEngine
 import com.natsx.controller.core.haptics.HapticSettings
@@ -23,6 +24,14 @@ import com.natsx.controller.core.transport.wifi.WifiEndpointCache
 import com.natsx.controller.feature.controller.ControllerLayoutSettings
 
 class NatsxControllerApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+
+        LocalCrashLog.install(
+            this,
+        )
+    }
+
     private val trustPreferences by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         getSharedPreferences("natsx_trust_v1", MODE_PRIVATE)
     }
