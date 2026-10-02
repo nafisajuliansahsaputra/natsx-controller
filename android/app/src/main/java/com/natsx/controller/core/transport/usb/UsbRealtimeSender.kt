@@ -5,6 +5,7 @@ import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.ProtocolConstants
 import com.natsx.controller.core.protocol.RumblePayload
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.RealtimeStateSink
 import java.io.Closeable
@@ -59,6 +60,9 @@ class UsbRealtimeSender(
     private val closed =
         AtomicBoolean(false)
 
+    private val lastTransportPreference =
+        AtomicReference<TransportPreferencePayload?>(null)
+
     @Volatile
     var sentFrames: Long = 0
         private set
@@ -112,6 +116,47 @@ class UsbRealtimeSender(
             )
         ) {
             executor.execute(::drainLatest)
+        }
+    }
+
+    fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean {
+        if (closed.get()) {
+            return false
+        }
+
+        if (lastTransportPreference.get() == payload) {
+            return true
+        }
+
+        return try {
+            val frame =
+                UsbControlFrameCodec
+                    .encodeTransportPreference(
+                        trustedSession = trustedSession,
+                        payload = payload,
+                        monotonicTimestampMicros =
+                            monotonicMicroseconds(),
+                    )
+
+            writePacket(
+                UsbStreamFrameCodec
+                    .encode(frame),
+            )
+
+            lastTransportPreference.set(payload)
+            true
+        } catch (_: IOException) {
+            if (!closed.get()) {
+                controlFailures += 1
+            }
+            false
+        } catch (_: RuntimeException) {
+            if (!closed.get()) {
+                controlFailures += 1
+            }
+            false
         }
     }
 

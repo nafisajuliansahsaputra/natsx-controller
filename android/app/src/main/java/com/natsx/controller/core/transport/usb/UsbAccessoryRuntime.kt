@@ -15,6 +15,7 @@ import com.natsx.controller.core.protocol.PairingInitiatorSession
 import com.natsx.controller.core.protocol.ProtocolConstants
 import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.protocol.TransportCapabilities
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import com.natsx.controller.core.session.RealtimeStateBroadcaster
 import com.natsx.controller.core.trust.TrustedPeerRecord
@@ -120,6 +121,21 @@ class UsbAccessoryRuntime(
         synchronized(gate) {
             sender != null
         }
+
+    fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean {
+        val activeSender =
+            synchronized(gate) {
+                sender
+            }
+
+        return activeSender
+            ?.trySendTransportPreference(
+                payload,
+            )
+            ?: false
+    }
 
     private fun connectBlocking(accessory: UsbAccessory) {
         synchronized(gate) {
