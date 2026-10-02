@@ -42,8 +42,8 @@ public sealed class GamepadHostProtocolTests
     [Fact]
     public void DecodeGamepadState_RejectsUnknownButtonBits()
     {
-        Span<byte> payload =
-            stackalloc byte[
+        byte[] payload =
+            new byte[
                 GamepadHostProtocol.GamepadStatePayloadSize];
 
         payload.Clear();
@@ -59,8 +59,8 @@ public sealed class GamepadHostProtocolTests
     [Fact]
     public void DecodeGamepadState_RejectsOpposingDpadDirections()
     {
-        Span<byte> payload =
-            stackalloc byte[
+        byte[] payload =
+            new byte[
                 GamepadHostProtocol.GamepadStatePayloadSize];
 
         payload.Clear();
@@ -105,8 +105,8 @@ public sealed class GamepadHostProtocolTests
     [Fact]
     public void Header_RejectsInvalidMagic()
     {
-        Span<byte> header =
-            stackalloc byte[
+        byte[] header =
+            new byte[
                 GamepadHostProtocol.HeaderSize];
 
         header.Clear();
