@@ -363,7 +363,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M13 — Android UX
 
-> Smart Auto status now comes from authenticated Windows HANDOVER_COMMIT authority feedback instead of Android-side transport guessing. Wi-Fi, Bluetooth, and duplex USB control paths feed one sequence-aware coordinator; duplicate/stale commits are rejected, unsigned sequence wraparound is handled, and runtime restart clears old authority before reconnect.
+> Smart Auto status now comes from authenticated Windows HANDOVER_COMMIT authority feedback instead of Android-side transport guessing. Wi-Fi, Bluetooth, and duplex USB control paths feed one sequence-aware coordinator; duplicate/stale commits are rejected, unsigned sequence wraparound is handled, and runtime restart clears old authority before reconnect. Android diagnostics now exposes authority, link/reconnect state, controller tuning, haptics, trust count, and USB runtime state. Manual transport control is implemented as a persisted authenticated preference (Smart Auto / Prefer Wi-Fi / Prefer Bluetooth / Prefer USB): Windows follows the requested healthy transport while preserving emergency failover when that link becomes unusable.
 
 - [x] Pairing screen.
 - [x] Trusted PC list.
@@ -373,7 +373,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Controller profile chooser.
 - [x] Sensitivity/deadzone settings.
 - [x] Haptic settings.
-- [ ] Manual transport override.
+- [x] Manual transport override.
 - [x] Diagnostics.
 - [ ] Calibration flow.
 - [ ] Custom layout editor.
