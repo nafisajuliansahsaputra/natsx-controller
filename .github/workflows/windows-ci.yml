@@ -67,6 +67,24 @@ jobs:
             throw "PowerShell syntax validation failed."
           }
 
+      - name: Enforce Windows privilege boundaries
+        shell: pwsh
+        run: |
+          $manifest = Get-Content windows/src/Natsx.Controller.Receiver/app.manifest -Raw
+          $hostProgram = Get-Content windows/src/Natsx.Controller.GamepadHost/Program.cs -Raw
+
+          if ($manifest -notmatch 'requestedExecutionLevel\s+level="asInvoker"') {
+            throw "The network-facing Receiver must explicitly remain asInvoker."
+          }
+
+          if ($manifest -match 'requireAdministrator|highestAvailable') {
+            throw "The network-facing Receiver must never request elevation."
+          }
+
+          if ($hostProgram -match '(?i)--console') {
+            throw "Production GamepadHost must expose only the SCM service entry point."
+          }
+
       - name: Enforce installer driver-removal safety
         shell: pwsh
         run: |
