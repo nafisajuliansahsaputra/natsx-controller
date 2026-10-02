@@ -202,47 +202,12 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
             return;
         }
 
-        Span<byte> frame =
-            stackalloc byte[
-                GamepadHostProtocol.HeaderSize +
-                GamepadHostProtocol.GamepadStatePayloadSize];
-
-        GamepadHostProtocol.EncodeHeader(
-            frame,
-            GamepadHostMessageType.GamepadState,
-            GamepadHostProtocol.GamepadStatePayloadSize);
-
-        GamepadHostProtocol.EncodeGamepadState(
-            state,
-            frame[
-                GamepadHostProtocol.HeaderSize..]);
-
-        lock (_writeGate)
+        if (TryWriteLatestState(
+                pipe,
+                countSubmission: true))
         {
-            try
-            {
-                pipe.Write(
-                    frame);
-                pipe.Flush();
-
-                Interlocked.Increment(
-                    ref _submittedStateCount);
-            }
-            catch (IOException)
-            {
-                MarkDisconnected(
-                    pipe);
-            }
-            catch (ObjectDisposedException)
-            {
-                MarkDisconnected(
-                    pipe);
-            }
-            catch (InvalidOperationException)
-            {
-                MarkDisconnected(
-                    pipe);
-            }
+            Interlocked.Increment(
+                ref _submittedStateCount);
         }
     }
 
@@ -293,8 +258,6 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                GamepadState latest;
-
                 lock (_gate)
                 {
                     if (!_desiredStarted)
@@ -306,16 +269,15 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
                         pipe;
                     _connected =
                         true;
-                    latest =
-                        _latestState;
 
                     _initialReady
                         ?.TrySetResult(
                             true);
                 }
 
-                Submit(
-                    latest);
+                TryWriteLatestState(
+                    pipe,
+                    countSubmission: false);
 
                 using var connectionLifetime =
                     CancellationTokenSource
@@ -474,29 +436,12 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
                 cancellationToken)
             .ConfigureAwait(false))
         {
-            GamepadState latest;
-            NamedPipeClientStream? activePipe;
-
-            lock (_gate)
-            {
-                latest =
-                    _latestState;
-
-                activePipe =
-                    _connected
-                        ? _pipe
-                        : null;
-            }
-
-            if (!ReferenceEquals(
-                    activePipe,
-                    pipe))
+            if (!TryWriteLatestState(
+                    pipe,
+                    countSubmission: false))
             {
                 return;
             }
-
-            Submit(
-                latest);
         }
     }
 
@@ -588,6 +533,75 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
         return (
             messageType,
             payloadLength);
+    }
+
+    private bool TryWriteLatestState(
+        NamedPipeClientStream pipe,
+        bool countSubmission)
+    {
+        _ =
+            countSubmission;
+
+        lock (_writeGate)
+        {
+            GamepadState latest;
+
+            lock (_gate)
+            {
+                if (!_connected ||
+                    !ReferenceEquals(
+                        _pipe,
+                        pipe))
+                {
+                    return false;
+                }
+
+                latest =
+                    _latestState;
+            }
+
+            Span<byte> frame =
+                stackalloc byte[
+                    GamepadHostProtocol.HeaderSize +
+                    GamepadHostProtocol.GamepadStatePayloadSize];
+
+            GamepadHostProtocol.EncodeHeader(
+                frame,
+                GamepadHostMessageType.GamepadState,
+                GamepadHostProtocol.GamepadStatePayloadSize);
+
+            GamepadHostProtocol.EncodeGamepadState(
+                latest,
+                frame[
+                    GamepadHostProtocol.HeaderSize..]);
+
+            try
+            {
+                pipe.Write(
+                    frame);
+                pipe.Flush();
+
+                return true;
+            }
+            catch (IOException)
+            {
+                MarkDisconnected(
+                    pipe);
+                return false;
+            }
+            catch (ObjectDisposedException)
+            {
+                MarkDisconnected(
+                    pipe);
+                return false;
+            }
+            catch (InvalidOperationException)
+            {
+                MarkDisconnected(
+                    pipe);
+                return false;
+            }
+        }
     }
 
     private void MarkDisconnected(
