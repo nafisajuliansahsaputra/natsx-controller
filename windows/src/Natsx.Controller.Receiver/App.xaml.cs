@@ -100,7 +100,8 @@ public partial class App : System.Windows.Application
         try
         {
             await using var backend =
-                new HidMaestroVirtualGamepadBackend();
+                new HidMaestroVirtualGamepadBackend(
+                    ensureDriverVersion: true);
 
             await backend.StartAsync();
             return 0;

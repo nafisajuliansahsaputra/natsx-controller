@@ -15,6 +15,8 @@ public sealed class HidMaestroVirtualGamepadBackend : IVirtualGamepadBackend
     public const string ProfileId = "xbox-360-wired";
     public const string IdentityKey = "natsx-controller-primary";
 
+    private readonly bool _ensureDriverVersion;
+
     private HMContext? _context;
     private HMController? _controller;
     private HMGamepadState _nativeState;
@@ -26,6 +28,13 @@ public sealed class HidMaestroVirtualGamepadBackend : IVirtualGamepadBackend
     private HMAxis _rightTrigger = HMAxis.None;
     private long _submittedStateCount;
     private long _rumblePacketCount;
+
+    public HidMaestroVirtualGamepadBackend(
+        bool ensureDriverVersion = false)
+    {
+        _ensureDriverVersion =
+            ensureDriverVersion;
+    }
 
     public bool IsStarted => _controller is not null;
 
@@ -55,11 +64,17 @@ public sealed class HidMaestroVirtualGamepadBackend : IVirtualGamepadBackend
 
         try
         {
-            // HIDMaestro's driver installation is idempotent. The first
-            // installation requires elevation; subsequent calls are a cheap
-            // compatibility/version check and keep controller creation behind
-            // one stable backend boundary.
-            context.InstallDriver();
+            // Install/upgrade is forced only by the elevated Setup bootstrap.
+            // HIDMaestro's InstallDriver path performs a global ghost sweep,
+            // so normal runtime must not invoke it when the shared machine
+            // driver is already present because another HIDMaestro consumer
+            // may own live virtual devices.
+            if (_ensureDriverVersion ||
+                !context.IsDriverInstalled)
+            {
+                context.InstallDriver();
+            }
+
             context.LoadDefaultProfiles();
 
             HMProfile profile = context.GetProfile(ProfileId)
