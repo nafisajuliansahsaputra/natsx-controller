@@ -22,7 +22,12 @@ function Resolve-PackageDirectory {
     return (Resolve-Path -LiteralPath $Path).Path
 }
 
-function Find-SignTool {
+function Find-WdkTool {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
     $programFilesX86 =
         [Environment]::GetFolderPath(
             [Environment+SpecialFolder]::ProgramFilesX86)
@@ -33,16 +38,20 @@ function Find-SignTool {
     ) | Where-Object { Test-Path $_ }
 
     $matches = @(
-        Get-ChildItem -Path $roots -Filter "signtool.exe" -File -Recurse -ErrorAction SilentlyContinue |
+        Get-ChildItem -Path $roots -Filter $Name -File -Recurse -ErrorAction SilentlyContinue |
             Where-Object { $_.DirectoryName -match '(?i)[\\/]x64(?:[\\/]|$)' } |
             Sort-Object FullName -Descending
     )
 
     if ($matches.Count -eq 0) {
-        throw "signtool.exe was not found. Install/restore the Windows Driver Kit before validating production driver packages."
+        throw "$Name was not found. Install/restore the Windows Driver Kit before validating production driver packages."
     }
 
     return $matches[0].FullName
+}
+
+function Find-SignTool {
+    return Find-WdkTool -Name "signtool.exe"
 }
 
 function Assert-File {
@@ -164,6 +173,33 @@ function Assert-CatalogContainsKernelBinary {
     }
 }
 
+function Assert-CatalogContainsFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$CatalogPath,
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(Mandatory = $true)][string]$SignTool
+    )
+
+    & $SignTool verify /pa /v /c $CatalogPath $FilePath
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Production catalog does not validate package member: $FilePath"
+    }
+}
+
+function Assert-InfVerif {
+    param(
+        [Parameter(Mandatory = $true)][string]$InfPath,
+        [Parameter(Mandatory = $true)][string]$InfVerif
+    )
+
+    & $InfVerif /w /v $InfPath
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "InfVerif rejected production INF '$InfPath' with exit code $LASTEXITCODE."
+    }
+}
+
 $bootstrap = Resolve-PackageDirectory -Path $BootstrapPackageDirectory
 $winUsb = Resolve-PackageDirectory -Path $WinUsbPackageDirectory
 
@@ -203,10 +239,17 @@ if ($winUsbInfText -match '(?im)^.*USB\\VID_18D1&PID_2D01\s*$' -or
 }
 
 $signTool = Find-SignTool
+$infVerif = Find-WdkTool -Name "infverif.exe"
+
+Assert-InfVerif -InfPath $bootstrapInf -InfVerif $infVerif
+Assert-InfVerif -InfPath $winUsbInf -InfVerif $infVerif
 
 Assert-RetailMicrosoftCatalogSignature -CatalogPath $bootstrapCat -SignTool $signTool
+Assert-CatalogContainsFile -CatalogPath $bootstrapCat -FilePath $bootstrapInf -SignTool $signTool
 Assert-CatalogContainsKernelBinary -CatalogPath $bootstrapCat -BinaryPath $bootstrapSys -SignTool $signTool
+
 Assert-RetailMicrosoftCatalogSignature -CatalogPath $winUsbCat -SignTool $signTool
+Assert-CatalogContainsFile -CatalogPath $winUsbCat -FilePath $winUsbInf -SignTool $signTool
 
 Write-Host "Production USB driver package validation passed."
 Write-Host "  Bootstrap: $bootstrap"
