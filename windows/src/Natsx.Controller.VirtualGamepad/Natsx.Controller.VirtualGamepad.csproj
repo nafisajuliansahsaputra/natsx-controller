@@ -9,13 +9,14 @@
 
   <PropertyGroup>
     <HidMaestroSdkPath>$(MSBuildThisFileDirectory)..\..\lib\HIDMaestro\HIDMaestro.Core.dll</HidMaestroSdkPath>
+    <HidMaestroLicensePath>$(MSBuildThisFileDirectory)..\..\lib\HIDMaestro\HIDMaestro.LICENSE.txt</HidMaestroLicensePath>
     <HidMaestroFetchScript>$(MSBuildThisFileDirectory)..\..\eng\fetch-hidmaestro.ps1</HidMaestroFetchScript>
   </PropertyGroup>
 
   <Target
     Name="EnsureHidMaestroSdk"
     BeforeTargets="PrepareForBuild"
-    Condition="'$(DesignTimeBuild)' != 'true' and !Exists('$(HidMaestroSdkPath)')">
+    Condition="'$(DesignTimeBuild)' != 'true' and (!Exists('$(HidMaestroSdkPath)') or !Exists('$(HidMaestroLicensePath)'))">
     <Message
       Importance="high"
       Text="HIDMaestro SDK is missing. Bootstrapping pinned SDK v1.9.2..." />
@@ -25,6 +26,9 @@
     <Error
       Condition="!Exists('$(HidMaestroSdkPath)')"
       Text="HIDMaestro.Core.dll is still missing after bootstrap. Run windows\eng\fetch-hidmaestro.ps1 manually and inspect its diagnostic output." />
+    <Error
+      Condition="!Exists('$(HidMaestroLicensePath)')"
+      Text="HIDMaestro license is still missing after bootstrap. Refusing to build a redistributable Windows package without the upstream notice." />
   </Target>
 
   <ItemGroup>
