@@ -103,9 +103,24 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path artifacts/windows-receiver/* -DestinationPath artifacts/natsx-controller-windows-x64.zip
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: ./windows/installer/build-installer.ps1
+
       - name: Upload Windows Receiver
         uses: actions/upload-artifact@v4
         with:
           name: natsx-controller-windows-x64
           path: artifacts/natsx-controller-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-controller-windows-installer
+          path: artifacts/installer/*.exe
           if-no-files-found: error
