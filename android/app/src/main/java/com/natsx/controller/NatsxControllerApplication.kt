@@ -20,6 +20,7 @@ import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import com.natsx.controller.core.transport.usb.UsbRuntimeStatusCoordinator
 import com.natsx.controller.core.transport.wifi.SharedPreferencesWifiEndpointCache
 import com.natsx.controller.core.transport.wifi.WifiEndpointCache
+import com.natsx.controller.feature.controller.ControllerLayoutSettings
 
 class NatsxControllerApplication : Application() {
     private val trustPreferences by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -95,6 +96,14 @@ class NatsxControllerApplication : Application() {
         LazyThreadSafetyMode.SYNCHRONIZED,
     ) {
         ControllerInputSettings(
+            inputPreferences,
+        )
+    }
+
+    val controllerLayoutSettings: ControllerLayoutSettings by lazy(
+        LazyThreadSafetyMode.SYNCHRONIZED,
+    ) {
+        ControllerLayoutSettings(
             inputPreferences,
         )
     }
