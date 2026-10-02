@@ -51,6 +51,12 @@ class ControllerStatusView(
             style = Paint.Style.FILL
         }
 
+    private val messagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = COLOR_TEXT
+        textAlign = Paint.Align.CENTER
+        typeface = android.graphics.Typeface.createFromAsset(context.assets, "controller/jakarta-bold.ttf")
+    }
+
     private val lampPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
@@ -154,6 +160,12 @@ class ControllerStatusView(
             27f * viewport.scale, 20f * viewport.scale, ControllerTransportIndicator.WIFI)
         drawTransportAsset(canvas, "imgAkarIconsBluetooth", viewport.x(1303.201f), viewport.y(245f),
             30f * viewport.scale, 30f * viewport.scale, ControllerTransportIndicator.BLUETOOTH)
+
+        state.message?.let { message ->
+            messagePaint.textSize = 20f * viewport.scale
+            val baseline = viewport.y(214f) - (messagePaint.ascent() + messagePaint.descent()) / 2f
+            canvas.drawText(message, viewport.x(1198.201f), baseline, messagePaint)
+        }
 
         val lampWidth = 500.402f * viewport.scale
         val lampHeight = 5f * viewport.scale

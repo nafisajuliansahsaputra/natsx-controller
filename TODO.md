@@ -371,7 +371,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ## M13 — Android UX
 
 - [x] Reference controller skin: cached depth, corrected D-pad/ABXY and shared safe-area geometry. Local APK/instrumentation build, lint, 126 existing unit tests and two temporary native Skia render/touch tests pass at 1870×841, 2400×1080 and 1920×1080. Repeatable Android instrumentation and screenshot workflow included.
-- [x] Correct reference skin to one 2400×1080 artboard with 50px margins, uniform scaling, explicit rounded key contours and opaque recessed cap shading; margin/scaling and native shading regressions included.
+- [x] Implement the initial 2400×1080 construction-guide skin (superseded by the Figma finishing geometry below).
 - [x] Implement Figma frame 1:2 geometry, original analog/D-pad/icon layers, Plus Jakarta Sans Bold, and matching cached depth for LB/RB and utility keys.
 - [ ] Physical-device frame-time, battery and extended gameplay validation of the reference skin.
 
@@ -457,3 +457,12 @@ Do not start these unless the product scope changes:
 - [ ] Media remote.
 - [ ] Presentation remote.
 - [ ] Cloud account system.
+
+## Figma finishing and input regression
+
+- [x] Fill the window without an extra canvas border; keep control circles round.
+- [x] Move the third analog circle with its inner circles and bound radial visual travel.
+- [x] Match white bevel contours on LT/RT, LB/RB and all five utility keys.
+- [x] Restore the canonical app identity and show authenticated receiver readiness.
+- [x] Add repeatable Activity-to-authenticated-USB-output loopback verification.
+- [ ] Confirm the updated APK against a physical phone and Windows receiver/game.

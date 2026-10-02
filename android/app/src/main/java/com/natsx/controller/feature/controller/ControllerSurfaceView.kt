@@ -673,9 +673,18 @@ class ControllerSurfaceView(
         val scale = viewport.scale
 
         fun circle(id: ControlId, x: Float, y: Float, radius: Float, hitScale: Float = 1.16f) {
-            val position = controllerLayout.positionFor(id.name, x / 2400f, y / 1080f)
-            controls += ControlGeometry.circle(id, viewport.x(position.x * 2400f),
-                viewport.y(position.y * 1080f), radius * scale, radius * scale * hitScale)
+            val saved = controllerLayout.positions[id.name]
+            val group = when (id) {
+                ControlId.DPAD_UP, ControlId.DPAD_DOWN, ControlId.DPAD_LEFT, ControlId.DPAD_RIGHT -> 900f to 780f
+                ControlId.A, ControlId.B, ControlId.X, ControlId.Y -> 2074.91f to 539.91f
+                else -> x to y
+            }
+            // Stretch anchors to the screen; keep each circle/cross/face-button group uniform.
+            val centerX = if (saved != null) viewport.x(saved.x * 2400f)
+                else viewport.x(group.first) + (x - group.first) * scale
+            val centerY = if (saved != null) viewport.y(saved.y * 1080f)
+                else viewport.y(group.second) + (y - group.second) * scale
+            controls += ControlGeometry.circle(id, centerX, centerY, radius * scale, radius * scale * hitScale)
         }
 
         fun rect(id: ControlId, left: Float, top: Float, right: Float, bottom: Float) {
@@ -700,8 +709,8 @@ class ControllerSurfaceView(
         rect(ControlId.GUIDE, 965f, 375f, 1434.301f, 450f)
 
         // Processing radii/travel remain independent of the 500px decorative analog plates.
-        circle(ControlId.LEFT_STICK, 325f, 540f, 142.56f, 1.28f)
-        circle(ControlId.RIGHT_STICK, 1500f, 780f, 113.4f, 1.60f)
+        circle(ControlId.LEFT_STICK, 325f, 540f, 142.56f, 1.40f)
+        circle(ControlId.RIGHT_STICK, 1500f, 780f, 113.4f, 1.76f)
         circle(ControlId.DPAD_UP, 900f, 620f, 80f, 1.10f)
         circle(ControlId.DPAD_LEFT, 740f, 780f, 80f, 1.10f)
         circle(ControlId.DPAD_RIGHT, 1060f, 780f, 80f, 1.10f)

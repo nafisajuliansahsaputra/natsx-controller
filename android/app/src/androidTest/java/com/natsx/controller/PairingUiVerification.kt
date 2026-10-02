@@ -36,8 +36,8 @@ internal object PairingUiVerification {
                     }
                     // Pending approval must neutralize and block gameplay touches.
                     val viewport = com.natsx.controller.feature.controller.ControllerDesignViewport.fit(root.width.toFloat(), root.height.toFloat())
-                    touch(root, MotionEvent.ACTION_DOWN, viewport.x(2074.91f), viewport.y(700.91f))
-                    touch(root, MotionEvent.ACTION_UP, viewport.x(2074.91f), viewport.y(700.91f))
+                    touch(root, MotionEvent.ACTION_DOWN, viewport.x(2074.91f), viewport.y(539.91f) + 161f * viewport.scale)
+                    touch(root, MotionEvent.ACTION_UP, viewport.x(2074.91f), viewport.y(539.91f) + 161f * viewport.scale)
                     check(app.gamepadStateStore.snapshot() == GamepadState.Neutral)
                     val action = if (approved) "Confirm" else "Reject"
                     check(views(root).filterIsInstance<Button>().single { it.text.toString() == action }.performClick())
@@ -49,9 +49,9 @@ internal object PairingUiVerification {
                     }
                     // A must pass through the complete HUD hierarchy again after approval ends.
                     val viewport = com.natsx.controller.feature.controller.ControllerDesignViewport.fit(root.width.toFloat(), root.height.toFloat())
-                    touch(root, MotionEvent.ACTION_DOWN, viewport.x(2074.91f), viewport.y(700.91f))
+                    touch(root, MotionEvent.ACTION_DOWN, viewport.x(2074.91f), viewport.y(539.91f) + 161f * viewport.scale)
                     check(app.gamepadStateStore.snapshot().buttons and GamepadButtons.A != 0) { "HUD blocked A input" }
-                    touch(root, MotionEvent.ACTION_UP, viewport.x(2074.91f), viewport.y(700.91f))
+                    touch(root, MotionEvent.ACTION_UP, viewport.x(2074.91f), viewport.y(539.91f) + 161f * viewport.scale)
                     check(app.gamepadStateStore.snapshot() == GamepadState.Neutral)
                 }
             } finally {

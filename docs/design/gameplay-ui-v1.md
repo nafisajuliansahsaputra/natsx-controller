@@ -129,57 +129,37 @@ Responsive adaptation may move controls by a few percent, but must not change th
 
 ---
 
-## 6. Reference geometry — 2400 × 1080 with 50px margins
+## 6. Figma geometry and fullscreen presentation
 
-The latest user clarification fixes the landscape design artboard at **2400 ×
-1080 physical pixels**, with **50px margins on all four sides**. The original
-1870 × 841 reference and the subsequent 2048 × 921 construction guide are
-resized previews of this aspect ratio. The construction guide now takes
-precedence for silhouettes and geometry; retain the original recessed cap
-finish and cached rendering. Use one
-uniform `ControllerDesignViewport` transform for rendering, hit testing,
-layout editing, logo and HUD. Do not stretch X and Y independently.
+The current reference is Figma frame 1:2, **2400 × 1080**, documented with exact
+bounds in [the source manifest](controller-figma/README.md). It supersedes the
+older construction guide. Its 50px shoulder offsets are part of the design;
+do not add another outer margin around the complete canvas.
 
-| Control | Artboard geometry (px) |
-|---|---|
-| LT / RT | (50,50)–(434,214) / (1966,50)–(2350,214) |
-| LB / RB | (482,50)–(866,214) / (1534,50)–(1918,214) |
-| Left / right stick | center (377,542) / (1484,798); plate radius 232; cap radius 117 |
-| D-pad | center (917,798); plate radius 232; cross half-thickness 82; cross ends clipped to circular rim |
-| Up / left / right / down target | (917,630) / (749,798) / (1085,798) / (917,966) |
-| Y / X / B / A | (2024,392) / (1873,540) / (2175,540) / (2024,692); radius 82 |
-| View / Menu | (788,263)–(951,346) / (1449,263)–(1612,346) |
-| LS / RS | (863,395)–(1026,478) / (1374,395)–(1537,478) |
-| Guide | (1119,524)–(1281,606) |
-| Logo | (1150.8,165.2)–(1249.2,263.6) |
-| Lamp | center (1200,369); width 164, height 16 |
+`ControllerDesignViewport` fills the available window. Horizontal and vertical
+anchors follow the complete window independently, while circle diameters,
+button dimensions and local D-pad/ABXY offsets use one uniform scale. This
+keeps circles round and the control groups coherent on other aspect ratios.
+Saved custom positions remain normalized to the window. Android hides both
+system bars and draws through display cutouts; insets do not shrink the canvas.
 
-Margins are measured to colored silhouettes, excluding soft shadow falloff and
-anti-aliasing. Top/left/right shoulders and bottom D-pad/right-stick plates
-sit 50px from the artboard edges. Shoulder gaps are 48px in the construction
-guide. On other resolutions, scale the complete artboard uniformly and center
-it. Ordinary cutouts fitting inside the existing margin add no second margin;
-unusually large insets shrink the artboard only as needed. A 16:9 viewport
-receives vertical spare space instead of stretched controls. Custom saved
-positions remain artboard-normalized and editable.
+Analog plates have diameter 500, dark sockets 445, the movable light-green
+third circle 380, and its inner circles 280 and 250. The complete third circle
+and its two children move together. Visual travel is clamped to 32.5 reference
+pixels radially, leaving the dark socket fixed. Processing radii, calibration
+and transmitted analog values remain independent of this visual travel.
 
-Shoulders use rounded trapezoids. Mint keys have a vertical outer side and a
-single inward slope, mirrored on the right. Guide has a wider top and rounded
-narrower bottom. ABXY is circular. These colored silhouettes are the actual
-specified bounds; nested socket outlines no longer shrink the keys. D-pad
-uses a square-cornered cross clipped to the full circle, with subtle top/bottom
-step shading and no decorative white outline or marks. Stick plates have a
-neutral face and soft rim shadow; the smaller green caps retain recessed
-shading. The center panel extends to a rounded tip at y=474.
+All buttons have a white backplate following the same silhouette as the colored
+face. Shoulder bevels use 12px rims; utility and circular keys use 6px rims.
+LT/RT use the original contour for their plate instead of a separately expanded
+rounded rectangle. Native concentric gradients prevent raster seams around the
+analog circles. Shadows, bevels and pressed sprites are cached at layout time;
+gameplay draws cached sprites without per-frame blur or bitmap allocation.
 
-`ControllerSkin` rasterizes gradients, highlights, modest shadows, labels and
-cap stippling only on geometry changes. Gameplay frames draw cached sprites
-and translate the shared cap from the processed stick values. Raster
-resolution remains capped at 2400 × 1080 with no new production dependency or
-animation loop. Analog processing radii, calibration and transport behavior
-retain the existing settings. Native pixel-row checks compare cap diameter,
-mint-key wall, shoulder slope and D-pad diameter with measurements from the
-construction guide, alongside pointer, cache and Activity pairing checks.
+Connection messages distinguish pairing, USB permission, connecting and a
+disconnected receiver. Only authenticated receiver authority clears the
+message. The canonical application ID is `com.natsx.controller`, avoiding an
+independent preview installation with separate pairing identity and runtime.
 
 ---
 

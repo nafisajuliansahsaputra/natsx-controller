@@ -11,11 +11,13 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.graphics.Typeface
 import com.natsx.controller.core.gamepad.DpadState
 import kotlin.math.ceil
 import kotlin.math.min
+import kotlin.math.sqrt
 
 /** Original Figma layers and native key silhouettes. Raster/shadow work happens on layout only. */
 internal class ControllerSkin(private val context: Context) {
@@ -48,31 +50,28 @@ internal class ControllerSkin(private val context: Context) {
         // Do not recycle old bitmaps while RenderThread may still hold them.
         buttons.clear(); nodes.clear(); dpadArms.clear()
         nodes.putAll(geometry.associateBy { it.id })
-        unit = min(usableW, usableH)
+        unit = min(usableW / 2400f, usableH / 1080f) * 1080f
         rasterScale = min(1f, min(1080f / h, 2400f / w))
         background = raster(RectF(0f, 0f, w, h)) { c ->
             c.drawColor(Color.parseColor("#F5F5F5"))
-            c.save(); c.translate(insetX, insetY); c.scale(px, px)
+            c.save(); c.translate(insetX, insetY); c.scale(usableW / 2400f, usableH / 1080f)
             layer(c, "panel", 749f, 0f, 902f, 325f)
             layer(c, "imgVector", 1746f, 846f, 654f, 234f)
             layer(c, "imgVector1", 0f, 846f, 667f, 234f)
             c.restore()
             for (node in geometry) if (node.id.endsWith("_STICK")) {
-                layer(c, "analog_plate", node.x - 274f * px, node.y - 274f * px, 548f * px, 548f * px)
-                // Socket center is 249.5px in the original 500px analog frame.
-                layer(c, "analog_socket", node.x - 241f * px, node.y - 241f * px, 481f * px, 481f * px)
-                layer(c, "analog_ring", node.x - 190f * px, node.y - 190f * px, 380f * px, 380f * px)
+                drawStickBase(c, node.x, node.y)
             }
             drawDpadBase(c)
         }
         for (node in geometry) {
             if (node.id.endsWith("_STICK") || node.id.startsWith("DPAD_")) continue
             val r = node.rect ?: RectF(node.x - node.radius, node.y - node.radius, node.x + node.radius, node.y + node.radius)
-            val bounds = RectF(r).apply { inset(-40f * px, -40f * px) }
+            val bounds = RectF().also { keyPath(node.id, r).computeBounds(it, true) }.apply { inset(-48f * px, -48f * px) }
             buttons[node.id] = Button(raster(bounds) { drawKey(it, node.id, r, false) },
                 raster(bounds) { drawKey(it, node.id, r, true) })
         }
-        val capBounds = RectF(-152f * px, -152f * px, 152f * px, 152f * px)
+        val capBounds = RectF(-202f * px, -202f * px, 202f * px, 202f * px)
         cap = Button(raster(capBounds) { drawCap(it, false) }, raster(capBounds) { drawCap(it, true) })
     }
 
@@ -96,7 +95,9 @@ internal class ControllerSkin(private val context: Context) {
         val sprite = cap ?: return
         val nx = (x / if (x < 0) 32768f else 32767f).coerceIn(-1f, 1f)
         val ny = (y / if (y < 0) 32768f else 32767f).coerceIn(-1f, 1f)
-        c.save(); c.translate(node.x + nx * node.travel, node.y - ny * node.travel)
+        val magnitude = sqrt(nx * nx + ny * ny).coerceAtLeast(1f)
+        val travel = min(node.travel, 32.5f * px) / magnitude
+        c.save(); c.translate(node.x + nx * travel, node.y - ny * travel)
         drawSprite(c, if (active) sprite.pressed else sprite.idle); c.restore()
     }
     fun drawDpad(c: Canvas, dpad: Int) {
@@ -107,10 +108,62 @@ internal class ControllerSkin(private val context: Context) {
         c.drawCircle(x, y, 19f * px, editorPaint)
     }
 
+    private fun drawStickBase(c: Canvas, x: Float, y: Float) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.FILL_AND_STROKE
+            strokeWidth = 24f * px
+            maskFilter = BlurMaskFilter(12f * px, BlurMaskFilter.Blur.NORMAL)
+        }
+        c.drawCircle(x, y, 250f * px, p)
+        p.maskFilter = null; p.style = Paint.Style.FILL
+        c.drawCircle(x, y, 250f * px, p)
+        p.color = Color.parseColor("#801C4B1E")
+        p.style = Paint.Style.FILL_AND_STROKE; p.strokeWidth = 12f * px
+        p.maskFilter = BlurMaskFilter(12f * px, BlurMaskFilter.Blur.NORMAL)
+        c.drawCircle(x, y, 222.5f * px, p)
+        p.maskFilter = null; p.style = Paint.Style.FILL
+        drawRecessedCircle(c, x, y, 222.5f * px, "#37B039", "#29802C", p)
+    }
+
+    private fun drawRecessedCircle(c: Canvas, x: Float, y: Float, r: Float,
+        fill: String, edge: String, p: Paint) {
+        p.shader = RadialGradient(x, y, r,
+            intArrayOf(Color.parseColor(fill), Color.parseColor(fill), Color.parseColor(edge)),
+            floatArrayOf(0f, (1f - 18f * px / r).coerceAtLeast(0f), 1f), Shader.TileMode.CLAMP)
+        c.drawCircle(x, y, r, p)
+        p.shader = null
+    }
+
     private fun drawCap(c: Canvas, active: Boolean) {
-        layer(c, "analog_cap_ring", -152f * px, -152f * px, 304f * px, 304f * px)
-        layer(c, "analog_cap", -125f * px, -125f * px, 250f * px, 250f * px)
-        if (active) c.drawCircle(0f, 0f, 125f * px, feedbackPaint)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        // The 380px light-green disc (third circle from the center) owns the whole cap.
+        // Analytic concentric circles avoid the seams/resampling artifacts of stacked exports.
+        drawRecessedCircle(c, 0f, 0f, 190f * px, "#93E294", "#588F59", p)
+        p.color = Color.parseColor("#80FFFFFF")
+        p.maskFilter = BlurMaskFilter(12f * px, BlurMaskFilter.Blur.NORMAL)
+        c.drawCircle(0f, 0f, 140f * px, p)
+        p.maskFilter = null; p.color = Color.parseColor("#B2EBB2")
+        c.drawCircle(0f, 0f, 140f * px, p)
+        p.shader = RadialGradient(0f, 0f, 125f * px,
+            intArrayOf(Color.parseColor("#B2EBB2"), Color.parseColor("#5DCB5F"), Color.parseColor("#55BA57")),
+            floatArrayOf(0f, 0.93f, 1f), Shader.TileMode.CLAMP)
+        c.drawCircle(0f, 0f, 125f * px, p)
+        p.shader = null
+        if (active) c.drawCircle(0f, 0f, 190f * px, feedbackPaint)
+    }
+
+    private fun drawWhiteBevel(c: Canvas, key: Path, rim: Float) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.FILL_AND_STROKE
+            strokeJoin = Paint.Join.ROUND
+            strokeWidth = 2f * (rim + 12f * px)
+            maskFilter = BlurMaskFilter(12f * px, BlurMaskFilter.Blur.NORMAL)
+        }
+        c.drawPath(key, p)
+        p.maskFilter = null; p.strokeWidth = 2f * rim
+        c.drawPath(key, p)
     }
 
     /** Figma rounded rectangles under their original affine transforms, unioned without seams. */
@@ -148,15 +201,8 @@ internal class ControllerSkin(private val context: Context) {
         val mint = id in listOf("BACK", "START", "L3", "R3", "GUIDE")
         val circle = id in listOf("A", "B", "X", "Y")
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        if (circle) layer(c, "imgEllipse15", r.centerX() - 119f * px, r.centerY() - 119f * px, 238f * px, 238f * px)
-        if (id == "LT" || id == "RT") {
-            val plate = RectF(r).apply { inset(-12f * px, -12f * px) }
-            p.color = Color.WHITE; p.style = Paint.Style.FILL_AND_STROKE; p.strokeWidth = 24f * px
-            p.setShadowLayer(12f * px, 0f, 0f, Color.WHITE)
-            c.drawRoundRect(plate, 42f * px, 42f * px, p)
-            p.clearShadowLayer(); p.style = Paint.Style.FILL
-        }
         val key = keyPath(id, r)
+        drawWhiteBevel(c, key, (if (circle || mint) 6f else 12f) * px)
         val depth = (if (mint) 6f else 12f) * px
         // Add the same drop depth to the originally flat LB/RB and utility keys.
         p.color = Color.parseColor("#803A264F")
