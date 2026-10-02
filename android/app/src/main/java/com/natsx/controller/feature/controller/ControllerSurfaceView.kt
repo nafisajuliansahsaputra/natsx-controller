@@ -16,6 +16,7 @@ import com.natsx.controller.core.haptics.HapticLevel
 import com.natsx.controller.core.input.AnalogStickProcessor
 import com.natsx.controller.core.input.ControllerInputTuning
 import com.natsx.controller.core.input.ControllerStickCalibration
+import kotlin.math.max
 import kotlin.math.min
 
 class ControllerSurfaceView(
@@ -82,8 +83,15 @@ class ControllerSurfaceView(
 
     private val dpadBasePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = COLOR_LAVENDER_EDGE
+            color = COLOR_SURFACE_RAISED
             style = Paint.Style.FILL
+        }
+
+    private val dpadRingPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_CENTER_PANEL_OUTLINE
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
         }
 
     private val centerPanelPaint =
@@ -307,15 +315,19 @@ class ControllerSurfaceView(
         right: Int,
         bottom: Int,
     ) {
-        val nextLeft =
-            left.coerceAtLeast(0)
+        val horizontalInset =
+            max(
+                left.coerceAtLeast(0),
+                right.coerceAtLeast(0),
+            )
                 .toFloat()
+        val nextLeft =
+            horizontalInset
         val nextTop =
             top.coerceAtLeast(0)
                 .toFloat()
         val nextRight =
-            right.coerceAtLeast(0)
-                .toFloat()
+            horizontalInset
         val nextBottom =
             bottom.coerceAtLeast(0)
                 .toFloat()
@@ -944,25 +956,25 @@ class ControllerSurfaceView(
         rect(ControlId.RB, 0.635f, 0.032f, 0.800f, 0.178f)
         rect(ControlId.RT, 0.820f, 0.032f, 0.980f, 0.178f)
 
-        rect(ControlId.BACK, 0.326f, 0.232f, 0.392f, 0.318f)
-        rect(ControlId.L3, 0.362f, 0.365f, 0.428f, 0.452f)
-        rect(ControlId.R3, 0.572f, 0.365f, 0.638f, 0.452f)
-        rect(ControlId.START, 0.608f, 0.232f, 0.674f, 0.318f)
+        rect(ControlId.BACK, 0.307f, 0.225f, 0.373f, 0.314f)
+        rect(ControlId.L3, 0.347f, 0.362f, 0.413f, 0.451f)
+        rect(ControlId.R3, 0.587f, 0.362f, 0.653f, 0.451f)
+        rect(ControlId.START, 0.627f, 0.225f, 0.693f, 0.314f)
         rect(ControlId.GUIDE, 0.466f, 0.475f, 0.534f, 0.570f)
 
-        circle(ControlId.LEFT_STICK, 0.140f, 0.505f, 0.132f, 1.24f)
+        circle(ControlId.LEFT_STICK, 0.120f, 0.480f, 0.132f, 1.28f)
 
-        circle(ControlId.DPAD_UP, 0.380f, 0.585f, 0.052f, 1.18f)
-        circle(ControlId.DPAD_LEFT, 0.325f, 0.700f, 0.052f, 1.18f)
-        circle(ControlId.DPAD_RIGHT, 0.435f, 0.700f, 0.052f, 1.18f)
-        circle(ControlId.DPAD_DOWN, 0.380f, 0.815f, 0.052f, 1.18f)
+        circle(ControlId.DPAD_UP, 0.365f, 0.555f, 0.056f, 1.18f)
+        circle(ControlId.DPAD_LEFT, 0.295f, 0.700f, 0.056f, 1.18f)
+        circle(ControlId.DPAD_RIGHT, 0.435f, 0.700f, 0.056f, 1.18f)
+        circle(ControlId.DPAD_DOWN, 0.365f, 0.845f, 0.056f, 1.18f)
 
-        circle(ControlId.RIGHT_STICK, 0.640f, 0.690f, 0.105f, 1.32f)
+        circle(ControlId.RIGHT_STICK, 0.640f, 0.655f, 0.105f, 1.35f)
 
-        circle(ControlId.Y, 0.840f, 0.365f, 0.063f, 1.18f)
-        circle(ControlId.X, 0.770f, 0.505f, 0.063f, 1.18f)
-        circle(ControlId.B, 0.910f, 0.505f, 0.063f, 1.18f)
-        circle(ControlId.A, 0.840f, 0.645f, 0.063f, 1.18f)
+        circle(ControlId.Y, 0.840f, 0.360f, 0.068f, 1.18f)
+        circle(ControlId.X, 0.770f, 0.502f, 0.068f, 1.18f)
+        circle(ControlId.B, 0.910f, 0.502f, 0.068f, 1.18f)
+        circle(ControlId.A, 0.840f, 0.644f, 0.068f, 1.18f)
     }
 
     private fun drawCircleControl(
@@ -992,9 +1004,9 @@ class ControllerSurfaceView(
                     control.id ==
                         ControlId.LEFT_STICK
                 ) {
-                    1.55f
+                    1.78f
                 } else {
-                    1.82f
+                    2.12f
                 }
 
             val outerRadius =
@@ -1871,7 +1883,7 @@ class ControllerSurfaceView(
                     ) /
                     2f
             ) *
-                1.08f
+                1.24f
 
         canvas.drawCircle(
             centerX,
@@ -1883,11 +1895,40 @@ class ControllerSurfaceView(
             centerX,
             centerY,
             outerRadius,
-            outlinePaint,
+            dpadRingPaint,
         )
 
-        canvas.drawPath(
-            dpadPath,
+        val armRadius =
+            halfThickness *
+                0.26f
+
+        tempRect.set(
+            centerX -
+                halfThickness,
+            topEdge,
+            centerX +
+                halfThickness,
+            bottomEdge,
+        )
+        canvas.drawRoundRect(
+            tempRect,
+            armRadius,
+            armRadius,
+            lavenderFillPaint,
+        )
+
+        tempRect.set(
+            leftEdge,
+            centerY -
+                halfThickness,
+            rightEdge,
+            centerY +
+                halfThickness,
+        )
+        canvas.drawRoundRect(
+            tempRect,
+            armRadius,
+            armRadius,
             lavenderFillPaint,
         )
 
@@ -1957,11 +1998,6 @@ class ControllerSurfaceView(
             )
             drawPressed(tempRect)
         }
-
-        canvas.drawPath(
-            dpadPath,
-            outlinePaint,
-        )
 
         dpadMarkPaint.strokeWidth =
             (
@@ -2035,13 +2071,13 @@ class ControllerSurfaceView(
                     id ==
                         ControlId.LEFT_STICK
                 ) {
-                    1.55f
+                    1.78f
                 } else {
-                    1.82f
+                    2.12f
                 }
         val knobRadius =
             visualOuterRadius *
-                0.56f
+                0.58f
         val travel =
             control.radius *
                 0.50f

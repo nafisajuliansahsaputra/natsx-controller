@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
+import kotlin.math.max
 import kotlin.math.min
 
 class ControllerStatusView(
@@ -33,12 +34,6 @@ class ControllerStatusView(
 
     private val batteryFillPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-        }
-
-    private val logoPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = COLOR_LAVENDER
             style = Paint.Style.FILL
         }
 
@@ -98,12 +93,17 @@ class ControllerStatusView(
         top: Int,
         right: Int,
     ) {
+        val horizontalInset =
+            max(
+                left.coerceAtLeast(0),
+                right.coerceAtLeast(0),
+            )
         val nextLeft =
-            left.coerceAtLeast(0)
+            horizontalInset
         val nextTop =
             top.coerceAtLeast(0)
         val nextRight =
-            right.coerceAtLeast(0)
+            horizontalInset
 
         if (
             safeInsetLeft == nextLeft &&
@@ -230,16 +230,6 @@ class ControllerStatusView(
                 43f *
                     density *
                     scale
-        drawLogoMark(
-            canvas = canvas,
-            centerX = contentCenterX,
-            centerY = logoCenterY,
-            size =
-                38f *
-                    density *
-                    scale,
-        )
-
         val lampWidth =
             58f * density * scale
         val lampHeight =
@@ -309,98 +299,6 @@ class ControllerStatusView(
                     paint = messagePaint,
                 )
             }
-    }
-
-    private fun drawLogoMark(
-        canvas: Canvas,
-        centerX: Float,
-        centerY: Float,
-        size: Float,
-    ) {
-        val bandWidth =
-            size *
-                0.22f
-
-        iconPath.reset()
-        iconPath.moveTo(
-            centerX -
-                size * 0.34f,
-            centerY -
-                size * 0.28f,
-        )
-        iconPath.lineTo(
-            centerX -
-                size * 0.34f +
-                bandWidth,
-            centerY -
-                size * 0.28f,
-        )
-        iconPath.lineTo(
-            centerX +
-                size * 0.30f,
-            centerY +
-                size * 0.20f,
-        )
-        iconPath.lineTo(
-            centerX +
-                size * 0.30f -
-                bandWidth,
-            centerY +
-                size * 0.20f,
-        )
-        iconPath.close()
-        canvas.drawPath(
-            iconPath,
-            logoPaint,
-        )
-
-        iconPath.reset()
-        iconPath.moveTo(
-            centerX -
-                size * 0.10f,
-            centerY -
-                size * 0.20f,
-        )
-        iconPath.lineTo(
-            centerX +
-                size * 0.10f,
-            centerY -
-                size * 0.20f,
-        )
-        iconPath.lineTo(
-            centerX +
-                size * 0.10f,
-            centerY -
-                size * 0.02f,
-        )
-        iconPath.lineTo(
-            centerX -
-                size * 0.10f,
-            centerY -
-                size * 0.02f,
-        )
-        iconPath.close()
-        canvas.drawPath(
-            iconPath,
-            logoPaint,
-        )
-
-        tempRect.set(
-            centerX -
-                size * 0.30f,
-            centerY +
-                size * 0.05f,
-            centerX -
-                size * 0.12f,
-            centerY +
-                size * 0.23f,
-        )
-        canvas.drawRoundRect(
-            tempRect,
-            size * 0.035f,
-            size * 0.035f,
-            logoPaint,
-        )
     }
 
     private fun transportPaint(
