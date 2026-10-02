@@ -71,9 +71,14 @@ jobs:
         shell: pwsh
         run: |
           $cleanup = Get-Content windows/installer/remove-production-usb-drivers.ps1 -Raw
+          $installer = Get-Content windows/installer/NatsxController.iss -Raw
 
           if ($cleanup -match '(?i)/force') {
             throw "Production USB driver cleanup must never use pnputil /force."
+          }
+
+          if ($installer -match '(?i)RemoveAllVirtualControllers|purge-hidmaestro|uninstall-hidmaestro') {
+            throw "Normal NATSX uninstall must not remove the shared HIDMaestro machine dependency."
           }
 
       - name: Cache HIDMaestro SDK

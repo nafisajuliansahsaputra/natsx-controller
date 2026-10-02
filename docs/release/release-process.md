@@ -132,3 +132,12 @@ The Windows installer creates one inbound firewall rule named `NATSX.Controller.
 Those ports cover secure first-pair/recovery, LAN discovery/trusted control, and realtime Wi-Fi controller traffic. Pairing still requires explicit SAS confirmation and realtime/control traffic still requires the authenticated NATSX protocol.
 
 Normal uninstall removes only that exact NATSX rule. Setup rollback also removes it if a later privileged bootstrap step fails.
+
+
+## Shared HIDMaestro dependency ownership
+
+HIDMaestro is installed machine-wide and its upstream SDK exposes an uninstall-grade global cleanup that removes all HIDMaestro virtual controllers and installed HIDMaestro packages.
+
+NATSX does **not** call that global cleanup during normal uninstall. The installer cannot prove that NATSX is the only HIDMaestro consumer on the machine, so removing a shared machine dependency could break another application. Normal NATSX uninstall removes NATSX-owned files, settings/startup state, firewall rule, and NATSX AOA driver packages while leaving the shared HIDMaestro installation available.
+
+A true HIDMaestro machine purge is therefore an explicit administrator maintenance operation outside normal NATSX uninstall and must only be performed when the operator has confirmed no other application depends on HIDMaestro.
