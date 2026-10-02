@@ -363,20 +363,20 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M13 — Android UX
 
-> Smart Auto status now comes from authenticated Windows HANDOVER_COMMIT authority feedback instead of Android-side transport guessing. Wi-Fi, Bluetooth, and duplex USB control paths feed one sequence-aware coordinator; duplicate/stale commits are rejected, unsigned sequence wraparound is handled, and runtime restart clears old authority before reconnect. Android diagnostics now exposes authority, link/reconnect state, controller tuning, haptics, trust count, and USB runtime state. Manual transport control is implemented as a persisted authenticated preference (Smart Auto / Prefer Wi-Fi / Prefer Bluetooth / Prefer USB): Windows follows the requested healthy transport while preserving emergency failover when that link becomes unusable.
+> Smart Auto status now comes from authenticated Windows HANDOVER_COMMIT authority feedback instead of Android-side transport guessing. Wi-Fi, Bluetooth, and duplex USB control paths feed one sequence-aware coordinator; duplicate/stale commits are rejected, unsigned sequence wraparound is handled, and runtime restart clears old authority before reconnect. Android diagnostics exposes authority, link/reconnect state, controller tuning, haptics, trust count, USB runtime state, calibration, and custom-layout status. Manual transport control is a persisted authenticated preference (Smart Auto / Prefer Wi-Fi / Prefer Bluetooth / Prefer USB): Windows follows the requested healthy transport while preserving emergency failover. The v1 gameplay screen now includes immersive multi-touch controls, profiles/tuning, guided thumb-center/travel calibration, and a persisted drag-to-reposition layout editor; more sophisticated layout editing remains post-v1.
 
 - [x] Pairing screen.
 - [x] Trusted PC list.
 - [x] Smart Auto connection status.
-- [ ] Gameplay screen.
+- [x] Gameplay screen.
 - [x] Connection overlay that does not interrupt controls unnecessarily.
 - [x] Controller profile chooser.
 - [x] Sensitivity/deadzone settings.
 - [x] Haptic settings.
 - [x] Manual transport override.
 - [x] Diagnostics.
-- [ ] Calibration flow.
-- [ ] Custom layout editor.
+- [x] Calibration flow.
+- [x] Custom layout editor.
 
 ---
 
