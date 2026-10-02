@@ -147,6 +147,47 @@ public static class WifiControlDatagramCodec
             frame.Payload);
     }
 
+    public static byte[] EncodeTransportPreference(
+        WifiTrustedSession trustedSession,
+        TransportPreferencePayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(
+            trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.TransportPreference,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                TransportPreferencePayloadCodec
+                    .Encode(payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static TransportPreferencePayload DecodeTransportPreference(
+        ReadOnlySpan<byte> datagram,
+        WifiTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                datagram,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.TransportPreference)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.TransportPreference}, received {frame.MessageType}.");
+        }
+
+        return TransportPreferencePayloadCodec
+            .Decode(frame.Payload);
+    }
+
     public static byte[] EncodeHandoverCommit(
         WifiTrustedSession trustedSession,
         HandoverPayload payload,

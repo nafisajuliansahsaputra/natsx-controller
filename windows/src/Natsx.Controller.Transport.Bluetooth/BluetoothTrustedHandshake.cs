@@ -267,6 +267,47 @@ public static class BluetoothControlFrameCodec
             frame.Payload);
     }
 
+    public static byte[] EncodeTransportPreference(
+        BluetoothTrustedSession trustedSession,
+        TransportPreferencePayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(
+            trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.TransportPreference,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                TransportPreferencePayloadCodec
+                    .Encode(payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static TransportPreferencePayload DecodeTransportPreference(
+        ReadOnlySpan<byte> frameBytes,
+        BluetoothTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.TransportPreference)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.TransportPreference}, received {frame.MessageType}.");
+        }
+
+        return TransportPreferencePayloadCodec
+            .Decode(frame.Payload);
+    }
+
     public static byte[] EncodeHandoverCommit(
         BluetoothTrustedSession trustedSession,
         HandoverPayload payload,

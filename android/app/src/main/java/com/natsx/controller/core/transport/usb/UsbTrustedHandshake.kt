@@ -17,6 +17,8 @@ import com.natsx.controller.core.protocol.ProtocolVersion
 import com.natsx.controller.core.protocol.ProtocolTransport
 import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.protocol.RumblePayloadCodec
+import com.natsx.controller.core.protocol.TransportPreferencePayload
+import com.natsx.controller.core.protocol.TransportPreferencePayloadCodec
 import com.natsx.controller.core.protocol.SessionId
 import com.natsx.controller.core.protocol.SessionReadyPayload
 import com.natsx.controller.core.protocol.SessionReadyPayloadCodec
@@ -162,6 +164,53 @@ object UsbControlFrameCodec {
         return RumblePayloadCodec.decode(
             frame.payload,
         )
+    }
+
+    fun encodeTransportPreference(
+        trustedSession: UsbTrustedSession,
+        payload: TransportPreferencePayload,
+        monotonicTimestampMicros: ULong,
+    ): ByteArray =
+        ProtocolFrameCodec.encode(
+            ProtocolFrame(
+                version = ProtocolVersion.Current,
+                messageType =
+                    MessageType.TRANSPORT_PREFERENCE,
+                flags = FrameFlags.AUTHENTICATED,
+                sessionId =
+                    trustedSession.sessionId,
+                sequence = 0u,
+                monotonicTimestampMicros =
+                    monotonicTimestampMicros,
+                payload =
+                    TransportPreferencePayloadCodec
+                        .encode(payload),
+            ),
+            authenticationKey =
+                trustedSession.authenticationKey(),
+        )
+
+    fun decodeTransportPreference(
+        frameBytes: ByteArray,
+        trustedSession: UsbTrustedSession,
+    ): TransportPreferencePayload {
+        val frame =
+            decodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession,
+            )
+
+        require(
+            frame.messageType ==
+                MessageType.TRANSPORT_PREFERENCE,
+        ) {
+            "Expected TRANSPORT_PREFERENCE, received " +
+                frame.messageType +
+                "."
+        }
+
+        return TransportPreferencePayloadCodec
+            .decode(frame.payload)
     }
 
     fun encodeHandoverCommit(
