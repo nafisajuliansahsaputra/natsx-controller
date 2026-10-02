@@ -2,8 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
-using System.Security.AccessControl;
-using System.Security.Principal;
+using Microsoft.Win32.SafeHandles;
 using System.Text;
 using Natsx.Controller.Core;
 using Natsx.Controller.VirtualGamepad;
@@ -236,43 +235,75 @@ internal sealed class GamepadHostServer
 
     private static NamedPipeServerStream CreateServerPipe()
     {
-        var security =
-            new PipeSecurity();
+        const string sddl =
+            "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;AU)";
 
-        security.AddAccessRule(
-            new PipeAccessRule(
-                new SecurityIdentifier(
-                    WellKnownSidType.LocalSystemSid,
-                    null),
-                PipeAccessRights.FullControl,
-                AccessControlType.Allow));
+        if (!ConvertStringSecurityDescriptorToSecurityDescriptor(
+                sddl,
+                1,
+                out IntPtr securityDescriptor,
+                out _))
+        {
+            throw new Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "Unable to create the gamepad-host pipe security descriptor.");
+        }
 
-        security.AddAccessRule(
-            new PipeAccessRule(
-                new SecurityIdentifier(
-                    WellKnownSidType.BuiltinAdministratorsSid,
-                    null),
-                PipeAccessRights.FullControl,
-                AccessControlType.Allow));
+        try
+        {
+            var securityAttributes =
+                new SecurityAttributes
+                {
+                    Length =
+                        Marshal.SizeOf<SecurityAttributes>(),
+                    SecurityDescriptor =
+                        securityDescriptor,
+                    InheritHandle =
+                        false,
+                };
 
-        security.AddAccessRule(
-            new PipeAccessRule(
-                new SecurityIdentifier(
-                    WellKnownSidType.AuthenticatedUserSid,
-                    null),
-                PipeAccessRights.ReadWrite,
-                AccessControlType.Allow));
+            string path =
+                @"\\.\pipe\" +
+                GamepadHostProtocol.PipeName;
 
-        return NamedPipeServerStreamAcl.Create(
-            GamepadHostProtocol.PipeName,
-            PipeDirection.InOut,
-            1,
-            PipeTransmissionMode.Byte,
-            PipeOptions.Asynchronous |
-            PipeOptions.WriteThrough,
-            0,
-            0,
-            security);
+            SafeFileHandle handle =
+                CreateNamedPipe(
+                    path,
+                    PipeAccessDuplex |
+                    FileFlagOverlapped,
+                    PipeTypeByte |
+                    PipeReadModeByte |
+                    PipeWait |
+                    PipeRejectRemoteClients,
+                    1,
+                    4096,
+                    4096,
+                    0,
+                    ref securityAttributes);
+
+            if (handle.IsInvalid)
+            {
+                int error =
+                    Marshal.GetLastWin32Error();
+
+                handle.Dispose();
+
+                throw new Win32Exception(
+                    error,
+                    "Unable to create the privileged gamepad-host named pipe.");
+            }
+
+            return new NamedPipeServerStream(
+                PipeDirection.InOut,
+                isAsync: true,
+                isConnected: false,
+                handle);
+        }
+        finally
+        {
+            LocalFree(
+                securityDescriptor);
+        }
     }
 
     private static async Task<(
@@ -385,6 +416,69 @@ internal sealed class GamepadHostServer
         {
         }
     }
+
+    private const uint PipeAccessDuplex =
+        0x00000003;
+
+    private const uint FileFlagOverlapped =
+        0x40000000;
+
+    private const uint PipeTypeByte =
+        0x00000000;
+
+    private const uint PipeReadModeByte =
+        0x00000000;
+
+    private const uint PipeWait =
+        0x00000000;
+
+    private const uint PipeRejectRemoteClients =
+        0x00000008;
+
+    [StructLayout(
+        LayoutKind.Sequential)]
+    private struct SecurityAttributes
+    {
+        public int Length;
+        public IntPtr SecurityDescriptor;
+
+        [MarshalAs(
+            UnmanagedType.Bool)]
+        public bool InheritHandle;
+    }
+
+    [DllImport(
+        "kernel32.dll",
+        CharSet = CharSet.Unicode,
+        SetLastError = true,
+        EntryPoint = "CreateNamedPipeW")]
+    private static extern SafeFileHandle CreateNamedPipe(
+        string name,
+        uint openMode,
+        uint pipeMode,
+        uint maxInstances,
+        uint outBufferSize,
+        uint inBufferSize,
+        uint defaultTimeout,
+        ref SecurityAttributes securityAttributes);
+
+    [DllImport(
+        "advapi32.dll",
+        CharSet = CharSet.Unicode,
+        SetLastError = true,
+        EntryPoint = "ConvertStringSecurityDescriptorToSecurityDescriptorW")]
+    [return: MarshalAs(
+        UnmanagedType.Bool)]
+    private static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(
+        string stringSecurityDescriptor,
+        uint stringSdRevision,
+        out IntPtr securityDescriptor,
+        out uint securityDescriptorSize);
+
+    [DllImport(
+        "kernel32.dll")]
+    private static extern IntPtr LocalFree(
+        IntPtr memory);
 
     [DllImport(
         "kernel32.dll",
