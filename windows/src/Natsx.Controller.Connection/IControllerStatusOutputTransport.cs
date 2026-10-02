@@ -1,3 +1,5 @@
+using Natsx.Controller.Core;
+
 namespace Natsx.Controller.Connection;
 
 /// <summary>
