@@ -1,6 +1,7 @@
 package com.natsx.controller
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -19,6 +20,7 @@ import com.natsx.controller.core.pairing.PairingPrompt
 import com.natsx.controller.core.transport.bluetooth.BluetoothPermissionGate
 import com.natsx.controller.core.transport.usb.UsbRuntimeStatus
 import com.natsx.controller.core.transport.usb.UsbRuntimeStatusCoordinator
+import com.natsx.controller.core.trust.TrustedPeerRecord
 import com.natsx.controller.feature.controller.ControllerSurfaceView
 import com.natsx.controller.service.ControllerService
 
@@ -125,6 +127,10 @@ class MainActivity : Activity() {
                 isFocusable = true
                 setOnClickListener {
                     cycleHapticLevel()
+                }
+                setOnLongClickListener {
+                    showTrustedPcList()
+                    true
                 }
             }
 
@@ -330,7 +336,7 @@ class MainActivity : Activity() {
             }
 
         usbStatusText.text =
-            "$connectionText\nHaptics — ${hapticLevelLabel(app.hapticSettings.level)} (tap to change)"
+            "$connectionText\nHaptics — ${hapticLevelLabel(app.hapticSettings.level)} (tap) • Trusted PCs (hold)"
 
         usbStatusText.setTextColor(
             if (status.isError) {
@@ -388,6 +394,109 @@ class MainActivity : Activity() {
             HapticLevel.MEDIUM -> "Medium"
             HapticLevel.HIGH -> "High"
         }
+
+    private fun showTrustedPcList() {
+        val peers =
+            app.trustedPeerStore.list()
+
+        if (peers.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Trusted PCs")
+                .setMessage(
+                    "No trusted Windows receiver is saved yet.",
+                )
+                .setPositiveButton(
+                    "Close",
+                    null,
+                )
+                .show()
+            return
+        }
+
+        val labels =
+            peers.map { peer ->
+                val name =
+                    peer.displayName
+                        ?.takeIf {
+                            it.isNotBlank()
+                        }
+                        ?: "NATSX Windows Receiver"
+
+                "$name\n${peer.peerId}"
+            }.toTypedArray()
+
+        AlertDialog.Builder(this)
+            .setTitle("Trusted PCs")
+            .setItems(
+                labels,
+            ) { _, index ->
+                showForgetTrustedPcConfirmation(
+                    peers[index],
+                )
+            }
+            .setNegativeButton(
+                "Close",
+                null,
+            )
+            .show()
+    }
+
+    private fun showForgetTrustedPcConfirmation(
+        peer: TrustedPeerRecord,
+    ) {
+        val name =
+            peer.displayName
+                ?.takeIf {
+                    it.isNotBlank()
+                }
+                ?: "NATSX Windows Receiver"
+
+        AlertDialog.Builder(this)
+            .setTitle("Forget trusted PC?")
+            .setMessage(
+                "$name will need secure pairing again before it can control this phone session.",
+            )
+            .setNegativeButton(
+                "Cancel",
+                null,
+            )
+            .setPositiveButton(
+                "Forget",
+            ) { _, _ ->
+                forgetTrustedPc(peer)
+            }
+            .show()
+    }
+
+    private fun forgetTrustedPc(
+        peer: TrustedPeerRecord,
+    ) {
+        controllerView.releaseAllInputs()
+        app.hapticEngine.stopGameRumble()
+        app.trustedSessionRegistry.remove(
+            peer.peerId,
+        )
+        app.trustedPeerStore.remove(
+            peer.peerId,
+        )
+
+        val serviceIntent =
+            Intent(
+                this,
+                ControllerService::class.java,
+            )
+
+        stopService(
+            serviceIntent,
+        )
+        startForegroundService(
+            serviceIntent,
+        )
+
+        showUsbStatus(
+            usbRuntimeStatus.current(),
+        )
+    }
 
     private fun requestBluetoothPermissionsIfNeeded() {
         val permissionGate = BluetoothPermissionGate(this)

@@ -364,7 +364,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ## M13 — Android UX
 
 - [x] Pairing screen.
-- [ ] Trusted PC list.
+- [x] Trusted PC list.
 - [ ] Smart Auto connection status.
 - [ ] Gameplay screen.
 - [ ] Connection overlay that does not interrupt controls unnecessarily.
