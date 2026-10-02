@@ -22,8 +22,8 @@ public sealed class GamepadHostProtocolTests
                 17,
                 249);
 
-        Span<byte> payload =
-            stackalloc byte[
+        byte[] payload =
+            new byte[
                 GamepadHostProtocol.GamepadStatePayloadSize];
 
         GamepadHostProtocol.EncodeGamepadState(
@@ -78,8 +78,8 @@ public sealed class GamepadHostProtocolTests
     [Fact]
     public void Header_RoundTrips()
     {
-        Span<byte> header =
-            stackalloc byte[
+        byte[] header =
+            new byte[
                 GamepadHostProtocol.HeaderSize];
 
         GamepadHostProtocol.EncodeHeader(

@@ -266,7 +266,7 @@ internal sealed class GamepadHostServer
                 @"\\.\pipe\" +
                 GamepadHostProtocol.PipeName;
 
-            SafeFileHandle handle =
+            SafePipeHandle handle =
                 CreateNamedPipe(
                     path,
                     PipeAccessDuplex |
@@ -452,7 +452,7 @@ internal sealed class GamepadHostServer
         CharSet = CharSet.Unicode,
         SetLastError = true,
         EntryPoint = "CreateNamedPipeW")]
-    private static extern SafeFileHandle CreateNamedPipe(
+    private static extern SafePipeHandle CreateNamedPipe(
         string name,
         uint openMode,
         uint pipeMode,

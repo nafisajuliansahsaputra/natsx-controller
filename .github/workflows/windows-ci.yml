@@ -187,6 +187,45 @@ jobs:
             throw "Privileged gamepad-host service command line is incorrect."
           }
 
+          $reconnectProbe = Start-Process -FilePath $receiver -ArgumentList "--verify-gamepad-host-reconnect" -PassThru
+          Start-Sleep -Seconds 2
+
+          Stop-Service -Name "NatsxControllerGamepadHost" -Force -ErrorAction Stop
+          (Get-Service -Name "NatsxControllerGamepadHost").WaitForStatus(
+            [System.ServiceProcess.ServiceControllerStatus]::Stopped,
+            [TimeSpan]::FromSeconds(15)
+          )
+
+          Start-Sleep -Milliseconds 750
+
+          Start-Service -Name "NatsxControllerGamepadHost" -ErrorAction Stop
+          (Get-Service -Name "NatsxControllerGamepadHost").WaitForStatus(
+            [System.ServiceProcess.ServiceControllerStatus]::Running,
+            [TimeSpan]::FromSeconds(15)
+          )
+
+          $reconnectProbe.WaitForExit(20000) | Out-Null
+
+          if (-not $reconnectProbe.HasExited) {
+            Stop-Process -Id $reconnectProbe.Id -Force -ErrorAction SilentlyContinue
+            throw "Gamepad-host reconnect probe did not exit."
+          }
+
+          if ($reconnectProbe.ExitCode -ne 0) {
+            $setupLog = Join-Path $env:ProgramData "NATSX\Controller\setup-driver-error.log"
+            $hostLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host.log"
+
+            if (Test-Path -LiteralPath $setupLog) {
+              Get-Content -LiteralPath $setupLog | Write-Host
+            }
+
+            if (Test-Path -LiteralPath $hostLog) {
+              Get-Content -LiteralPath $hostLog | Write-Host
+            }
+
+            throw "Receiver failed to reconnect automatically after gamepad-host service restart."
+          }
+
           $firewallRule = Get-NetFirewallRule -Name "NATSX.Controller.LanUdp" -ErrorAction Stop
           $firewallPort = $firewallRule | Get-NetFirewallPortFilter
           $firewallAddress = $firewallRule | Get-NetFirewallAddressFilter

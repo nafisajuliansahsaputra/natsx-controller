@@ -48,15 +48,18 @@ internal sealed class GamepadHostWindowsService : ServiceBase
                     {
                         if (task.IsFaulted)
                         {
+                            Exception fatalException =
+                                (Exception?)task.Exception ??
+                                new InvalidOperationException(
+                                    "The gamepad-host service stopped unexpectedly.");
+
                             GamepadHostLog.Write(
                                 "service-fatal",
-                                task.Exception ??
-                                new InvalidOperationException(
-                                    "The gamepad-host service stopped unexpectedly."));
+                                fatalException);
 
                             Environment.FailFast(
                                 "NATSX Gamepad Host service failed.",
-                                task.Exception);
+                                fatalException);
                         }
                     },
                     CancellationToken.None,

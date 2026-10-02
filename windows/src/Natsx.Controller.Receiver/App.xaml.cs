@@ -29,6 +29,18 @@ public partial class App : System.Windows.Application
 
         if (HasArgument(
                 eventArgs.Args,
+                "--verify-gamepad-host-reconnect"))
+        {
+            int exitCode =
+                await VerifyGamepadHostReconnectAsync();
+
+            Shutdown(
+                exitCode);
+            return;
+        }
+
+        if (HasArgument(
+                eventArgs.Args,
                 "--verify-gamepad-host"))
         {
             int exitCode =
@@ -126,6 +138,76 @@ public partial class App : System.Windows.Application
 
             TryWriteSetupError(
                 exception);
+            return 1;
+        }
+    }
+
+    private static async Task<int> VerifyGamepadHostReconnectAsync()
+    {
+        try
+        {
+            await using var backend =
+                new PipeVirtualGamepadBackend();
+
+            await backend.StartAsync();
+
+            bool sawDisconnect =
+                false;
+
+            bool sawReconnect =
+                false;
+
+            DateTimeOffset deadline =
+                DateTimeOffset.UtcNow.AddSeconds(
+                    15);
+
+            while (DateTimeOffset.UtcNow <
+                deadline)
+            {
+                bool connected =
+                    backend.IsStarted;
+
+                if (!connected)
+                {
+                    sawDisconnect =
+                        true;
+                }
+
+                if (sawDisconnect &&
+                    connected)
+                {
+                    sawReconnect =
+                        true;
+                    break;
+                }
+
+                backend.Submit(
+                    Natsx.Controller.Core.GamepadState.Neutral);
+
+                await Task.Delay(
+                    50);
+            }
+
+            await backend.StopAsync();
+
+            if (!sawDisconnect ||
+                !sawReconnect)
+            {
+                throw new InvalidOperationException(
+                    "The Receiver did not observe a full gamepad-host disconnect and automatic reconnect cycle.");
+            }
+
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            LocalCrashLog.Write(
+                "gamepad-host-reconnect-smoke",
+                exception);
+
+            TryWriteSetupError(
+                exception);
+
             return 1;
         }
     }
