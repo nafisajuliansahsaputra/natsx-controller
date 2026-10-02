@@ -58,7 +58,8 @@ class ControllerSurfaceView(
         createRightStickProcessor()
 
     private val controls = mutableListOf<ControlGeometry>()
-    private val activePointers = mutableMapOf<Int, ControlId>()
+    private val pointerOwnership =
+        PointerOwnershipTracker<ControlId>()
 
     private var controllerLayout =
         ControllerLayout.Default
@@ -142,7 +143,7 @@ class ControllerSurfaceView(
     }
 
     fun releaseAllInputs() {
-        activePointers.clear()
+        pointerOwnership.clear()
         leftStickProcessor.reset()
         rightStickProcessor.reset()
         stateStore.neutralize()
@@ -477,13 +478,32 @@ class ControllerSurfaceView(
         val x = event.getX(pointerIndex)
         val y = event.getY(pointerIndex)
 
-        val target = controls.firstOrNull { control ->
-            control.contains(x, y) &&
-                activePointers.values.none { it == control.id }
-        } ?: return
+        val target =
+            controls.firstOrNull { control ->
+                control.contains(
+                    x,
+                    y,
+                ) &&
+                    !pointerOwnership
+                        .isControlClaimed(
+                            control.id,
+                        )
+            } ?: return
 
-        activePointers[pointerId] = target.id
-        activate(target.id, x, y)
+        if (
+            !pointerOwnership.tryClaim(
+                pointerId,
+                target.id,
+            )
+        ) {
+            return
+        }
+
+        activate(
+            target.id,
+            x,
+            y,
+        )
 
         if (
             target.id != ControlId.LEFT_STICK &&
@@ -523,7 +543,9 @@ class ControllerSurfaceView(
                     index,
                 )
             val controlId =
-                activePointers[pointerId]
+                pointerOwnership.controlFor(
+                    pointerId,
+                )
                     ?: continue
             val x =
                 event.getX(
@@ -557,7 +579,7 @@ class ControllerSurfaceView(
                             y,
                         )
                     ) {
-                        activePointers.remove(
+                        pointerOwnership.release(
                             pointerId,
                         )
                         release(
@@ -570,8 +592,14 @@ class ControllerSurfaceView(
     }
 
     private fun handlePointerUp(pointerId: Int) {
-        val controlId = activePointers.remove(pointerId) ?: return
-        release(controlId)
+        val controlId =
+            pointerOwnership.release(
+                pointerId,
+            ) ?: return
+
+        release(
+            controlId,
+        )
     }
 
     private fun activate(

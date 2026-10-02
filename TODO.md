@@ -177,7 +177,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Add landscape orientation enforcement.
 - [x] Add keep-screen-awake behavior during gameplay.
 - [x] Add configurable haptic strength.
-- [ ] Validate common multi-touch combinations used in eFootball.
+- [x] Validate common multi-touch combinations used in eFootball.
 
 **Exit criteria:** layout is comfortable enough for extended eFootball play before visual polish begins.
 
