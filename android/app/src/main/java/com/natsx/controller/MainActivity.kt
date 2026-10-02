@@ -29,6 +29,7 @@ import com.natsx.controller.core.transport.usb.UsbRuntimeStatus
 import com.natsx.controller.core.transport.usb.UsbRuntimeStatusCoordinator
 import com.natsx.controller.core.trust.TrustedPeerRecord
 import com.natsx.controller.feature.controller.ControllerSurfaceView
+import com.natsx.controller.feature.controller.StickCalibrationView
 import com.natsx.controller.service.ControllerService
 import kotlin.math.roundToInt
 
@@ -516,6 +517,17 @@ class MainActivity : Activity() {
                 }
             }
 
+        val calibrationButton =
+            Button(this).apply {
+                text =
+                    "Calibration — " +
+                        calibrationStatusLabel()
+
+                setOnClickListener {
+                    showStickCalibration()
+                }
+            }
+
         val leftDeadzoneLabel =
             TextView(this)
         val leftSensitivityLabel =
@@ -683,6 +695,7 @@ class MainActivity : Activity() {
         container.addView(profileButton)
         container.addView(transportButton)
         container.addView(diagnosticsButton)
+        container.addView(calibrationButton)
         container.addView(leftDeadzoneLabel)
         container.addView(leftDeadzone)
         container.addView(leftSensitivityLabel)
@@ -815,6 +828,25 @@ class MainActivity : Activity() {
                             app.hapticSettings.level,
                         ),
                 )
+
+                val calibration =
+                    app.inputSettings
+                        .calibration()
+
+                appendLine(
+                    "Left calibration: center " +
+                        "${(calibration.left.centerOffsetX * 100f).roundToInt()}%," +
+                        " ${(calibration.left.centerOffsetY * 100f).roundToInt()}%" +
+                        " • range " +
+                        "${(calibration.left.travelScale * 100f).roundToInt()}%",
+                )
+                appendLine(
+                    "Right calibration: center " +
+                        "${(calibration.right.centerOffsetX * 100f).roundToInt()}%," +
+                        " ${(calibration.right.centerOffsetY * 100f).roundToInt()}%" +
+                        " • range " +
+                        "${(calibration.right.travelScale * 100f).roundToInt()}%",
+                )
                 appendLine()
                 appendLine("USB runtime")
                 append(
@@ -857,6 +889,88 @@ class MainActivity : Activity() {
                 }
                 show()
             }
+    }
+
+    private fun calibrationStatusLabel(): String =
+        if (
+            app.inputSettings.calibration() ==
+            com.natsx.controller.core.input
+                .ControllerStickCalibration.Default
+        ) {
+            "Default"
+        } else {
+            "Calibrated"
+        }
+
+    private fun showStickCalibration() {
+        controllerView.releaseAllInputs()
+
+        lateinit var dialog:
+            AlertDialog
+
+        val calibrationView =
+            StickCalibrationView(
+                context = this,
+            ) { calibration ->
+                app.inputSettings
+                    .updateCalibration(
+                        calibration,
+                    )
+
+                controllerView
+                    .applyStickCalibration(
+                        calibration,
+                    )
+
+                renderStatusOverlay()
+
+                if (
+                    ::dialog.isInitialized &&
+                    dialog.isShowing
+                ) {
+                    dialog.dismiss()
+                }
+            }
+
+        dialog =
+            AlertDialog.Builder(this)
+                .setTitle("Stick calibration")
+                .setMessage(
+                    "Calibrate natural thumb center and comfortable travel. " +
+                        "This does not disable deadzone or Smart Auto.",
+                )
+                .setView(calibrationView)
+                .setNegativeButton(
+                    "Cancel",
+                    null,
+                )
+                .setNeutralButton(
+                    "Reset",
+                ) { _, _ ->
+                    app.inputSettings
+                        .resetCalibration()
+
+                    controllerView
+                        .applyStickCalibration(
+                            app.inputSettings
+                                .calibration(),
+                        )
+
+                    renderStatusOverlay()
+                }
+                .create()
+
+        dialog.setOnDismissListener {
+            applyImmersiveMode()
+        }
+
+        dialog.show()
+
+        calibrationView.layoutParams =
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(360),
+            )
     }
 
     private fun showTransportPreferenceChooser(
