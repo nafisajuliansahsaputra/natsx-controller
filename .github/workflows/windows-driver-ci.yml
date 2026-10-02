@@ -37,7 +37,7 @@ jobs:
         shell: powershell
         run: |
           $errors = @()
-          Get-ChildItem windows/driver/aoa-bootstrap, windows/driver/aoa-winusb -Filter *.ps1 -File | ForEach-Object {
+          Get-ChildItem windows/driver, windows/driver/aoa-bootstrap, windows/driver/aoa-winusb -Filter *.ps1 -File | ForEach-Object {
             $tokens = $null
             $parseErrors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile(
@@ -68,6 +68,70 @@ jobs:
       - name: Build x64 Release
         shell: pwsh
         run: msbuild windows/driver/aoa-bootstrap/Natsx.AoaBootstrap.Driver.vcxproj /m /p:Configuration=Release /p:Platform=x64
+
+      - name: Build reproducible HLK submission payload
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim() -replace '-dev
+
+      - name: Test-sign OPPO A58 validation package
+        shell: powershell
+        run: .\windows\driver\aoa-bootstrap\sign-oppo-a58-ci-test-package.ps1
+
+      - name: Prepare and validate AOA WinUSB test package
+        shell: powershell
+        run: .\windows\driver\aoa-winusb\build-test-package.ps1
+
+      - name: Test-sign AOA WinUSB validation package
+        shell: powershell
+        run: .\windows\driver\aoa-winusb\sign-ci-test-package.ps1
+
+      - name: Prove production gate rejects CI test packages
+        shell: powershell
+        run: |
+          $accepted = $false
+
+          try {
+            .\windows\driver\validate-production-packages.ps1 -BootstrapPackageDirectory .\windows\driver\aoa-bootstrap\artifacts\oppo-a58-test-package -WinUsbPackageDirectory .\windows\driver\aoa-winusb\artifacts\test-package
+            $accepted = $true
+          }
+          catch {
+            Write-Host "Expected rejection: $($_.Exception.Message)"
+          }
+
+          if ($accepted) {
+            throw "Production package validator unexpectedly accepted ephemeral CI test-signed drivers."
+          }
+
+      - name: Upload HLK submission payload
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-windows-driver-hlk-payload
+          path: artifacts/windows-driver-hlk-payload/**
+          if-no-files-found: error
+
+      - name: Upload AOA WinUSB validation package
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-aoa-winusb-driver-x64
+          path: windows/driver/aoa-winusb/artifacts/test-package/**
+          if-no-files-found: error
+
+      - name: Upload driver prototype
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-aoa-bootstrap-driver-x64
+          path: |
+            windows/driver/aoa-bootstrap/x64/Release/*.sys
+            windows/driver/aoa-bootstrap/x64/Release/*.pdb
+            windows/driver/aoa-bootstrap/x64/Release/*.cer
+            windows/driver/aoa-bootstrap/artifacts/oppo-a58-test-package/**
+          if-no-files-found: error
+, ''
+          .\windows\driver\build-hlk-submission-payload.ps1 -Version $version
 
       - name: Prepare and validate OPPO A58 test package
         shell: powershell

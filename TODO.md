@@ -399,7 +399,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] receiver restart recovery.
 - [x] phone app restart recovery.
 - [x] no stuck-input verification.
-- [ ] allocation/profile hot input path.
+- [x] allocation/profile hot input path.
 - [ ] CPU usage review.
 - [ ] battery impact review.
 
