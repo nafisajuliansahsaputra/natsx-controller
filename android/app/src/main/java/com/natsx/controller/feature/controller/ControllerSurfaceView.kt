@@ -24,7 +24,7 @@ class ControllerSurfaceView(
         HapticLevel.MEDIUM
     },
 ) : View(context) {
-    private val skin = ControllerSkin()
+    private val skin = ControllerSkin(context)
 
     private var inputTuning =
         ControllerInputTuning.Default
@@ -688,29 +688,28 @@ class ControllerSurfaceView(
             controls += ControlGeometry.rect(id, RectF(x - halfW, y - halfH, x + halfW, y + halfH), 14f * scale)
         }
 
-        // Measured from the user's 2048x921 construction guide on a 2400x1080 artboard.
-        // These bounds describe the colored silhouettes, excluding shadow falloff.
-        rect(ControlId.LT, 50f, 50f, 434f, 214f)
-        rect(ControlId.LB, 482f, 50f, 866f, 214f)
-        rect(ControlId.RB, 1534f, 50f, 1918f, 214f)
-        rect(ControlId.RT, 1966f, 50f, 2350f, 214f)
-        rect(ControlId.BACK, 788f, 263f, 951f, 346f)
-        rect(ControlId.L3, 863f, 395f, 1026f, 478f)
-        rect(ControlId.R3, 1374f, 395f, 1537f, 478f)
-        rect(ControlId.START, 1449f, 263f, 1612f, 346f)
-        rect(ControlId.GUIDE, 1119f, 524f, 1281f, 606f)
+        // Figma frame 1:2, 2400x1080. Bounds exclude decorative shadow/white halos.
+        rect(ControlId.LT, 50f, 50f, 400f, 200f)
+        rect(ControlId.LB, 450f, 50f, 800f, 200f)
+        rect(ControlId.RB, 1600f, 50f, 1950f, 200f)
+        rect(ControlId.RT, 2000f, 50f, 2350f, 200f)
+        rect(ControlId.BACK, 699f, 250f, 886.301f, 325f)
+        rect(ControlId.L3, 771f, 375f, 958.301f, 450f)
+        rect(ControlId.R3, 1441f, 375f, 1628.301f, 450f)
+        rect(ControlId.START, 1514f, 250f, 1701.301f, 325f)
+        rect(ControlId.GUIDE, 965f, 375f, 1434.301f, 450f)
 
-        // Preserve processing/calibration radii while the visible cap/plate follows the guide.
-        circle(ControlId.LEFT_STICK, 377f, 542f, 142.56f, 1.28f)
-        circle(ControlId.RIGHT_STICK, 1484f, 798f, 113.4f, 1.60f)
-        circle(ControlId.DPAD_UP, 917f, 630f, 82f, 1.10f)
-        circle(ControlId.DPAD_LEFT, 749f, 798f, 82f, 1.10f)
-        circle(ControlId.DPAD_RIGHT, 1085f, 798f, 82f, 1.10f)
-        circle(ControlId.DPAD_DOWN, 917f, 966f, 82f, 1.10f)
-        circle(ControlId.Y, 2024f, 392f, 82f, 1.14f)
-        circle(ControlId.X, 1873f, 540f, 82f, 1.14f)
-        circle(ControlId.B, 2175f, 540f, 82f, 1.14f)
-        circle(ControlId.A, 2024f, 692f, 82f, 1.14f)
+        // Processing radii/travel remain independent of the 500px decorative analog plates.
+        circle(ControlId.LEFT_STICK, 325f, 540f, 142.56f, 1.28f)
+        circle(ControlId.RIGHT_STICK, 1500f, 780f, 113.4f, 1.60f)
+        circle(ControlId.DPAD_UP, 900f, 620f, 80f, 1.10f)
+        circle(ControlId.DPAD_LEFT, 740f, 780f, 80f, 1.10f)
+        circle(ControlId.DPAD_RIGHT, 1060f, 780f, 80f, 1.10f)
+        circle(ControlId.DPAD_DOWN, 900f, 940f, 80f, 1.10f)
+        circle(ControlId.Y, 2074.91f, 378.91f, 88.91f, 1.14f)
+        circle(ControlId.X, 1915.91f, 539.91f, 88.91f, 1.14f)
+        circle(ControlId.B, 2235.91f, 539.91f, 88.91f, 1.14f)
+        circle(ControlId.A, 2074.91f, 700.91f, 88.91f, 1.14f)
 
         skin.rebuild(width, height, viewport.left, viewport.top, viewport.width, viewport.height,
             controls.map { control ->

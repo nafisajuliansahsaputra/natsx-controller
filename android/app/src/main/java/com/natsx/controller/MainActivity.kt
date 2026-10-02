@@ -279,9 +279,9 @@ class MainActivity : Activity() {
                 )
                 setColorFilter(
                     Color.rgb(
-                        168,
-                        139,
-                        223,
+                        195,
+                        177,
+                        225,
                     ),
                 )
                 scaleType =
@@ -325,9 +325,10 @@ class MainActivity : Activity() {
             } else {
                 com.natsx.controller.feature.controller.ControllerDesignViewport.fit(root.width.toFloat(), root.height.toFloat())
             }
-            val size = (98.4f * viewport.scale).toInt().coerceAtLeast(1)
+            settingsLogoButton.translationX = -1.799f * viewport.scale
+            val size = (60f * viewport.scale).toInt().coerceAtLeast(1)
             val params = settingsLogoButton.layoutParams as FrameLayout.LayoutParams
-            val margin = viewport.y(165.2f).toInt()
+            val margin = viewport.y(120f).toInt()
             if (params.width != size || params.height != size || params.topMargin != margin) {
                 params.width = size
                 params.height = size

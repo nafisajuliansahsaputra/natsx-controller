@@ -61,45 +61,29 @@ class SkinVerificationInstrumentation : Instrumentation() {
         // Composite the logo from the production resource at its proportional settings position.
         val logo = android.graphics.BitmapFactory.decodeResource(targetContext.resources, R.drawable.natsx_logo)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-            colorFilter = android.graphics.PorterDuffColorFilter(Color.rgb(168, 139, 223), android.graphics.PorterDuff.Mode.SRC_IN)
+            colorFilter = android.graphics.PorterDuffColorFilter(Color.rgb(195, 177, 225), android.graphics.PorterDuff.Mode.SRC_IN)
         }
         val logoViewport = com.natsx.controller.feature.controller.ControllerDesignViewport.fit(w.toFloat(), h.toFloat())
-        canvas.drawBitmap(logo, null, android.graphics.RectF(logoViewport.x(1150.8f), logoViewport.y(165.2f), logoViewport.x(1249.2f), logoViewport.y(263.6f)), paint)
-        val capX = logoViewport.x(377f).toInt()
-        val topGreen = Color.green(bitmap.getPixel(capX, logoViewport.y(475f).toInt()))
-        val bottomGreen = Color.green(bitmap.getPixel(capX, logoViewport.y(610f).toInt()))
-        check(bottomGreen - topGreen > 25) { "Recessed cap shading must not inherit the stipple alpha" }
-        fun rowBounds(y: Float, left: Int, right: Int, green: Boolean): Pair<Float, Float> {
-            val matches = (logoViewport.x(left.toFloat()).toInt()..logoViewport.x(right.toFloat()).toInt()).filter { x ->
-                val pixel = bitmap.getPixel(x, logoViewport.y(y).toInt())
-                if (green) Color.green(pixel) - Color.red(pixel) > 30
-                else Color.blue(pixel) - Color.green(pixel) > 20 && Color.red(pixel) - Color.green(pixel) > 8
-            }
-            check(matches.isNotEmpty()) { "Reference silhouette missing at row $y" }
-            return (matches.first() - logoViewport.left) / logoViewport.scale to
-                (matches.last() - logoViewport.left) / logoViewport.scale
-        }
-        fun close(actual: Float, measured: Float, tolerance: Float = 8f) {
-            check(kotlin.math.abs(actual - measured) <= tolerance) { "Contour $actual differs from guide $measured" }
-        }
-        rowBounds(542f, 230, 530, true).let { close(it.first, 260f); close(it.second, 493f) }
-        rowBounds(798f, 1330, 1640, true).let { close(it.first, 1366f); close(it.second, 1600f) }
-        rowBounds(437f, 820, 1060, true).let { close(it.first, 864f); close(it.second, 1010f) }
-        rowBounds(135f, 460, 900, false).let { close(it.first, 483f); close(it.second, 835f) }
-        rowBounds(798f, 650, 1180, false).let { close(it.first, 684f); close(it.second, 1149f) }
+        canvas.drawBitmap(logo, null, android.graphics.RectF(logoViewport.x(1168.201f), logoViewport.y(120f), logoViewport.x(1228.201f), logoViewport.y(180f)), paint)
+        // Figma cap is a radial gradient and native layers retain the saturated outer ring.
+        val center = bitmap.getPixel(logoViewport.x(325f).toInt(), logoViewport.y(540f).toInt())
+        val rim = bitmap.getPixel(logoViewport.x(535f).toInt(), logoViewport.y(540f).toInt())
+        check(Color.green(center) > Color.red(center) + 20)
+        check(Color.green(rim) > Color.red(rim) + 50)
+        check(Color.green(center) > Color.green(rim))
         val directory = File(targetContext.getExternalFilesDir(null), "skin-verification").apply { mkdirs() }
         File(directory, "controller-${w}x$h.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         // Include non-zero cutout and bottom gesture insets in the real pointer checks.
         view.applySafeInsets(32, 8, 0, 16)
         val viewport = com.natsx.controller.feature.controller.ControllerDesignViewport.fit(w.toFloat(), h.toFloat(), 32f, 8f, 0f, 16f)
         fun point(x: Float, y: Float) = viewport.x(x) to viewport.y(y)
-        val points = arrayListOf(point(377f, 542f), point(2150f, 134f), point(2024f, 692f), point(1484f, 798f))
+        val points = arrayListOf(point(325f, 540f), point(2175f, 125f), point(2074.91f, 700.91f), point(1500f, 780f))
         touch(view, MotionEvent.ACTION_DOWN, points.take(1))
         for (count in 2..4) touch(view, MotionEvent.ACTION_POINTER_DOWN or ((count - 1) shl 8), points.take(count))
         check(store.snapshot().rightTrigger == 255)
         check(store.snapshot().buttons and GamepadButtons.A != 0)
-        points[0] = point(486f, 520f)
-        points[3] = point(1485f, 682f)
+        points[0] = point(434f, 518f)
+        points[3] = point(1501f, 664f)
         touch(view, MotionEvent.ACTION_MOVE, points)
         check(store.snapshot().leftX > 0 && store.snapshot().rightY > 0)
         touch(view, MotionEvent.ACTION_POINTER_UP or (2 shl 8), points)
@@ -107,7 +91,7 @@ class SkinVerificationInstrumentation : Instrumentation() {
         check(store.snapshot().rightTrigger == 255 && store.snapshot().leftX > 0)
         touch(view, MotionEvent.ACTION_CANCEL, points)
         check(store.snapshot() == GamepadState.Neutral)
-        val diagonal = listOf(point(917f, 630f), point(1085f, 798f))
+        val diagonal = listOf(point(900f, 620f), point(1060f, 780f))
         touch(view, MotionEvent.ACTION_DOWN, diagonal.take(1))
         touch(view, MotionEvent.ACTION_POINTER_DOWN or (1 shl 8), diagonal)
         check(store.snapshot().dpad == (DpadState.UP or DpadState.RIGHT))

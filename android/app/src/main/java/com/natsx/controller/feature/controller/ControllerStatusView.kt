@@ -13,6 +13,20 @@ import kotlin.math.min
 class ControllerStatusView(
     context: Context,
 ) : View(context) {
+    private val iconBitmaps = listOf("imgGroup", "imgBiUsbSymbol", "imgGroup1", "imgAkarIconsBluetooth").associateWith { name ->
+        context.assets.open("controller/$name.png").use { android.graphics.BitmapFactory.decodeStream(it)!! }
+    }
+    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val activeFilter = android.graphics.PorterDuffColorFilter(COLOR_ACTIVE, android.graphics.PorterDuff.Mode.SRC_IN)
+    private val inactiveFilter = android.graphics.PorterDuffColorFilter(COLOR_INACTIVE, android.graphics.PorterDuff.Mode.SRC_IN)
+
+    private fun drawTransportAsset(canvas: Canvas, name: String, x: Float, y: Float, w: Float, h: Float,
+        transport: ControllerTransportIndicator) {
+        iconPaint.colorFilter = if (state.activeTransport == transport) activeFilter else inactiveFilter
+        tempRect.set(x, y, x + w, y + h)
+        canvas.drawBitmap(iconBitmaps.getValue(name), null, tempRect, iconPaint)
+    }
+
     private val density =
         resources.displayMetrics.density
 
@@ -35,12 +49,6 @@ class ControllerStatusView(
     private val batteryFillPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
-        }
-
-    private val messagePaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = COLOR_TEXT
-            textAlign = Paint.Align.CENTER
         }
 
     private val lampPaint =
@@ -133,69 +141,23 @@ class ControllerStatusView(
 
         val viewport = ControllerDesignViewport.fit(width.toFloat(), height.toFloat(),
             safeInsetLeft.toFloat(), safeInsetTop.toFloat(), safeInsetRight.toFloat(), safeInsetBottom.toFloat())
-        val contentWidth = viewport.width
-        val contentHeight = viewport.height
-        val contentCenterX = viewport.x(1200f)
-        val iconSize = contentHeight * 0.028f
-        val gap = contentWidth * 0.018f
-        val groupWidth = iconSize * 4f + gap * 3f
-        val firstCenterX = contentCenterX - groupWidth / 2f + iconSize / 2f
-        val iconCenterY = viewport.y(62f)
-        val stroke = (contentHeight * 0.0028f).coerceAtLeast(1.5f)
-
+        val contentCenterX = viewport.x(1198.201f)
+        val iconSize = 30f * viewport.scale
+        val iconCenterY = viewport.y(260f)
+        val stroke = (2f * viewport.scale).coerceAtLeast(1f)
         inactivePaint.strokeWidth = stroke
         activePaint.strokeWidth = stroke
+        drawBattery(canvas, viewport.x(1078.201f), iconCenterY, iconSize)
+        drawTransportAsset(canvas, "imgBiUsbSymbol", viewport.x(1143.201f), viewport.y(245f),
+            30f * viewport.scale, 30f * viewport.scale, ControllerTransportIndicator.USB)
+        drawTransportAsset(canvas, "imgGroup1", viewport.x(1224.701f), viewport.y(250.25f),
+            27f * viewport.scale, 20f * viewport.scale, ControllerTransportIndicator.WIFI)
+        drawTransportAsset(canvas, "imgAkarIconsBluetooth", viewport.x(1303.201f), viewport.y(245f),
+            30f * viewport.scale, 30f * viewport.scale, ControllerTransportIndicator.BLUETOOTH)
 
-        drawWifi(
-            canvas = canvas,
-            centerX = firstCenterX,
-            centerY = iconCenterY,
-            size = iconSize,
-            paint =
-                transportPaint(
-                    ControllerTransportIndicator.WIFI,
-                ),
-        )
-
-        drawBattery(
-            canvas = canvas,
-            centerX =
-                firstCenterX +
-                    iconSize +
-                    gap,
-            centerY = iconCenterY,
-            size = iconSize,
-        )
-
-        drawBluetooth(
-            canvas = canvas,
-            centerX =
-                firstCenterX +
-                    (iconSize + gap) * 2f,
-            centerY = iconCenterY,
-            size = iconSize,
-            paint =
-                transportPaint(
-                    ControllerTransportIndicator.BLUETOOTH,
-                ),
-        )
-
-        drawUsb(
-            canvas = canvas,
-            centerX =
-                firstCenterX +
-                    (iconSize + gap) * 3f,
-            centerY = iconCenterY,
-            size = iconSize,
-            paint =
-                transportPaint(
-                    ControllerTransportIndicator.USB,
-                ),
-        )
-
-        val lampWidth = 164f * viewport.scale
-        val lampHeight = 16f * viewport.scale
-        val lampCenterY = viewport.y(369f)
+        val lampWidth = 500.402f * viewport.scale
+        val lampHeight = 5f * viewport.scale
+        val lampCenterY = viewport.y(52.5f)
 
         lampPaint.color =
             when (state.activeTransport) {
@@ -234,368 +196,46 @@ class ControllerStatusView(
 
     }
 
-    private fun transportPaint(
-        transport:
-            ControllerTransportIndicator,
-    ): Paint =
-        if (state.activeTransport == transport) {
-            activePaint
-        } else {
-            inactivePaint
+    private fun drawBattery(canvas: Canvas, centerX: Float, centerY: Float, size: Float) {
+        val scale = size / 30f
+        val left = centerX - size / 2f
+        val top = centerY - 7.5f * scale
+        val percent = state.batteryPercent
+        batteryFillPaint.color = when {
+            percent == null -> COLOR_INACTIVE
+            percent < 15 -> COLOR_CRITICAL
+            percent < 30 -> COLOR_WARNING
+            else -> COLOR_ACTIVE
         }
-
-    private fun drawWifi(
-        canvas: Canvas,
-        centerX: Float,
-        centerY: Float,
-        size: Float,
-        paint: Paint,
-    ) {
-        val half =
-            size * 0.48f
-
-        for (index in 0..2) {
-            val radius =
-                half *
-                    (
-                        1f -
-                            index *
-                            0.27f
-                    )
-
-            tempRect.set(
-                centerX - radius,
-                centerY - radius * 0.70f,
-                centerX + radius,
-                centerY + radius * 1.30f,
-            )
-
-            canvas.drawArc(
-                tempRect,
-                220f,
-                100f,
-                false,
-                paint,
-            )
-        }
-
-        val previousStyle =
-            paint.style
-        paint.style = Paint.Style.FILL
-        canvas.drawCircle(
-            centerX,
-            centerY + size * 0.28f,
-            size * 0.07f,
-            paint,
-        )
-        paint.style = previousStyle
-    }
-
-    private fun drawBattery(
-        canvas: Canvas,
-        centerX: Float,
-        centerY: Float,
-        size: Float,
-    ) {
-        val width =
-            size * 1.08f
-        val height =
-            size * 0.58f
-
-        inactivePaint.strokeWidth =
-            (2f * density)
-                .coerceAtLeast(
-                    1.5f,
-                )
-
-        tempRect.set(
-            centerX - width / 2f,
-            centerY - height / 2f,
-            centerX + width / 2f,
-            centerY + height / 2f,
-        )
-
-        canvas.drawRoundRect(
-            tempRect,
-            height * 0.15f,
-            height * 0.15f,
-            inactivePaint,
-        )
-
-        val terminalWidth =
-            size * 0.10f
-
-        tempRect.set(
-            centerX + width / 2f +
-                inactivePaint.strokeWidth,
-            centerY - height * 0.17f,
-            centerX + width / 2f +
-                terminalWidth,
-            centerY + height * 0.17f,
-        )
-
-        val previousStyle =
-            inactivePaint.style
-        inactivePaint.style = Paint.Style.FILL
-        canvas.drawRoundRect(
-            tempRect,
-            terminalWidth * 0.25f,
-            terminalWidth * 0.25f,
-            inactivePaint,
-        )
-        inactivePaint.style = previousStyle
-
-        val percent =
-            state.batteryPercent
-                ?: 0
-
-        batteryFillPaint.color =
-            when {
-                state.batteryPercent == null ->
-                    COLOR_INACTIVE
-
-                percent < 15 ->
-                    COLOR_CRITICAL
-
-                percent < 30 ->
-                    COLOR_WARNING
-
-                else ->
-                    COLOR_ACTIVE
-            }
-
-        val innerPadding =
-            size * 0.10f
-        val availableWidth =
-            width -
-                innerPadding * 2f
-        val fillFraction =
-            if (state.batteryPercent == null) {
-                0.28f
-            } else {
-                percent / 100f
-            }
-
-        tempRect.set(
-            centerX - width / 2f +
-                innerPadding,
-            centerY - height / 2f +
-                innerPadding,
-            centerX - width / 2f +
-                innerPadding +
-                availableWidth *
-                    fillFraction.coerceIn(
-                        0.08f,
-                        1f,
-                    ),
-            centerY + height / 2f -
-                innerPadding,
-        )
-
-        canvas.drawRoundRect(
-            tempRect,
-            height * 0.08f,
-            height * 0.08f,
-            batteryFillPaint,
-        )
-
+        iconPaint.colorFilter = if (percent == null) inactiveFilter else activeFilter
+        tempRect.set(left, top, left + size, top + 15f * scale)
+        canvas.drawBitmap(iconBitmaps.getValue("imgGroup"), null, tempRect, iconPaint)
+        // Keep the original outline/terminal and update only the live charge bar.
+        tempRect.set(left + 3.75f * scale, top + 3.75f * scale, left + 22.5f * scale, top + 11.25f * scale)
+        lampOutlinePaint.style = Paint.Style.FILL
+        lampOutlinePaint.color = Color.rgb(245, 245, 245)
+        canvas.drawRect(tempRect, lampOutlinePaint)
+        lampOutlinePaint.style = Paint.Style.STROKE
+        lampOutlinePaint.color = COLOR_SURFACE_OUTLINE
+        val fraction = if (percent == null) 0.28f else percent / 100f
+        tempRect.right = tempRect.left + 18.75f * scale * fraction.coerceIn(0f, 1f)
+        canvas.drawRect(tempRect, batteryFillPaint)
         if (state.charging) {
-            val boltPaint =
-                if (percent >= 30) {
-                    activePaint
-                } else {
-                    inactivePaint
-                }
-
             iconPath.reset()
-            iconPath.moveTo(
-                centerX + size * 0.02f,
-                centerY - size * 0.24f,
-            )
-            iconPath.lineTo(
-                centerX - size * 0.10f,
-                centerY + size * 0.02f,
-            )
-            iconPath.lineTo(
-                centerX + size * 0.01f,
-                centerY + size * 0.02f,
-            )
-            iconPath.lineTo(
-                centerX - size * 0.04f,
-                centerY + size * 0.25f,
-            )
-            iconPath.lineTo(
-                centerX + size * 0.13f,
-                centerY - size * 0.04f,
-            )
-            iconPath.lineTo(
-                centerX + size * 0.02f,
-                centerY - size * 0.04f,
-            )
-
-            canvas.drawPath(
-                iconPath,
-                boltPaint,
-            )
+            iconPath.moveTo(centerX + 1f * scale, top + 2f * scale)
+            iconPath.lineTo(centerX - 3f * scale, centerY + 1f * scale)
+            iconPath.lineTo(centerX, centerY + 1f * scale)
+            iconPath.lineTo(centerX - 1f * scale, top + 13f * scale)
+            iconPath.lineTo(centerX + 3f * scale, centerY - 1f * scale)
+            iconPath.lineTo(centerX, centerY - 1f * scale)
+            iconPath.close()
+            canvas.drawPath(iconPath, batteryFillPaint)
         }
-    }
-
-    private fun drawBluetooth(
-        canvas: Canvas,
-        centerX: Float,
-        centerY: Float,
-        size: Float,
-        paint: Paint,
-    ) {
-        val halfHeight =
-            size * 0.48f
-        val halfWidth =
-            size * 0.26f
-
-        iconPath.reset()
-        iconPath.moveTo(
-            centerX,
-            centerY - halfHeight,
-        )
-        iconPath.lineTo(
-            centerX + halfWidth,
-            centerY - size * 0.22f,
-        )
-        iconPath.lineTo(
-            centerX - halfWidth,
-            centerY + size * 0.22f,
-        )
-        iconPath.lineTo(
-            centerX,
-            centerY + halfHeight,
-        )
-        iconPath.lineTo(
-            centerX,
-            centerY - halfHeight,
-        )
-        iconPath.lineTo(
-            centerX - halfWidth,
-            centerY - size * 0.22f,
-        )
-        iconPath.lineTo(
-            centerX + halfWidth,
-            centerY + size * 0.22f,
-        )
-
-        canvas.drawPath(
-            iconPath,
-            paint,
-        )
-    }
-
-    private fun drawUsb(
-        canvas: Canvas,
-        centerX: Float,
-        centerY: Float,
-        size: Float,
-        paint: Paint,
-    ) {
-        val top =
-            centerY - size * 0.48f
-        val bottom =
-            centerY + size * 0.46f
-
-        canvas.drawLine(
-            centerX,
-            bottom,
-            centerX,
-            top,
-            paint,
-        )
-
-        canvas.drawLine(
-            centerX,
-            centerY - size * 0.02f,
-            centerX - size * 0.30f,
-            centerY - size * 0.24f,
-            paint,
-        )
-
-        canvas.drawLine(
-            centerX,
-            centerY + size * 0.12f,
-            centerX + size * 0.30f,
-            centerY - size * 0.12f,
-            paint,
-        )
-
-        val previousStyle =
-            paint.style
-        paint.style = Paint.Style.FILL
-
-        iconPath.reset()
-        iconPath.moveTo(
-            centerX,
-            top - size * 0.10f,
-        )
-        iconPath.lineTo(
-            centerX - size * 0.10f,
-            top + size * 0.08f,
-        )
-        iconPath.lineTo(
-            centerX + size * 0.10f,
-            top + size * 0.08f,
-        )
-        iconPath.close()
-        canvas.drawPath(
-            iconPath,
-            paint,
-        )
-
-        canvas.drawCircle(
-            centerX - size * 0.30f,
-            centerY - size * 0.24f,
-            size * 0.07f,
-            paint,
-        )
-
-        tempRect.set(
-            centerX + size * 0.23f,
-            centerY - size * 0.19f,
-            centerX + size * 0.37f,
-            centerY - size * 0.05f,
-        )
-        canvas.drawRect(
-            tempRect,
-            paint,
-        )
-
-        paint.style = previousStyle
-    }
-
-    private fun drawCenteredText(
-        canvas: Canvas,
-        text: String,
-        x: Float,
-        y: Float,
-        paint: Paint,
-    ) {
-        val metrics =
-            paint.fontMetrics
-        val baseline =
-            y -
-                (
-                    metrics.ascent +
-                        metrics.descent
-                ) /
-                2f
-
-        canvas.drawText(
-            text,
-            x,
-            baseline,
-            paint,
-        )
     }
 
     private companion object {
         const val COLOR_ACTIVE =
-            0xFF69D67A.toInt()
+            0xFFB2EBB2.toInt()
         const val COLOR_INACTIVE =
             0xFFB8BBC2.toInt()
         const val COLOR_WARNING =
@@ -609,11 +249,11 @@ class ControllerStatusView(
         const val COLOR_LAVENDER =
             0xFFA88BDF.toInt()
         const val COLOR_USB_LAMP =
-            0xFFAA8BE8.toInt()
+            0xFFB2EBB2.toInt()
         const val COLOR_WIFI_LAMP =
-            0xFF69D67A.toInt()
+            0xFFB2EBB2.toInt()
         const val COLOR_BLUETOOTH_LAMP =
-            0xFFF6F6FA.toInt()
+            0xFFB2EBB2.toInt()
         const val COLOR_OFFLINE_LAMP =
             0xFFB9BBC2.toInt()
         const val COLOR_SURFACE_OUTLINE =
