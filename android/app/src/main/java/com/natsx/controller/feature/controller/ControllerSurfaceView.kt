@@ -2,8 +2,8 @@ package com.natsx.controller.feature.controller
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -25,27 +25,60 @@ class ControllerSurfaceView(
         HapticLevel.MEDIUM
     },
 ) : View(context) {
-    private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        style = Paint.Style.STROKE
-        strokeWidth = 3f
-    }
+    private val outlinePaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_SURFACE_OUTLINE
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+        }
 
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(52, 52, 56)
-        style = Paint.Style.FILL
-    }
+    private val lavenderFillPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_LAVENDER
+            style = Paint.Style.FILL
+        }
 
-    private val activeFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(92, 92, 98)
-        style = Paint.Style.FILL
-    }
+    private val lavenderPressedPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_LAVENDER_PRESSED
+            style = Paint.Style.FILL
+        }
 
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        textAlign = Paint.Align.CENTER
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
-    }
+    private val mintFillPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_MINT
+            style = Paint.Style.FILL
+        }
+
+    private val mintPressedPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_MINT_PRESSED
+            style = Paint.Style.FILL
+        }
+
+    private val stickBasePaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_SURFACE_RAISED
+            style = Paint.Style.FILL
+        }
+
+    private val dpadMarkPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_TEXT_ON_COLOR
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+        }
+
+    private val textPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_TEXT_ON_COLOR
+            textAlign = Paint.Align.CENTER
+            typeface =
+                android.graphics.Typeface.DEFAULT_BOLD
+        }
+
+    private val dpadPath = Path()
+    private val tempRect = RectF()
 
     private var inputTuning =
         ControllerInputTuning.Default
@@ -80,7 +113,7 @@ class ControllerSurfaceView(
     init {
         isClickable = true
         isFocusable = true
-        setBackgroundColor(Color.rgb(9, 9, 11))
+        setBackgroundColor(COLOR_SURFACE_BASE)
     }
 
     override fun onSizeChanged(
@@ -98,15 +131,52 @@ class ControllerSurfaceView(
 
         val state = stateStore.snapshot()
 
+        if (!layoutEditing) {
+            drawDpad(
+                canvas,
+                state,
+            )
+        }
+
         controls.forEach { control ->
+            if (
+                !layoutEditing &&
+                isDpadControl(
+                    control.id,
+                )
+            ) {
+                return@forEach
+            }
+
             when (control.shape) {
-                Shape.CIRCLE -> drawCircleControl(canvas, control, state)
-                Shape.RECT -> drawRectControl(canvas, control, state)
+                Shape.CIRCLE ->
+                    drawCircleControl(
+                        canvas,
+                        control,
+                        state,
+                    )
+
+                Shape.RECT ->
+                    drawRectControl(
+                        canvas,
+                        control,
+                        state,
+                    )
             }
         }
 
-        drawStickKnob(canvas, ControlId.LEFT_STICK, state.leftX, state.leftY)
-        drawStickKnob(canvas, ControlId.RIGHT_STICK, state.rightX, state.rightY)
+        drawStickKnob(
+            canvas,
+            ControlId.LEFT_STICK,
+            state.leftX,
+            state.leftY,
+        )
+        drawStickKnob(
+            canvas,
+            ControlId.RIGHT_STICK,
+            state.rightX,
+            state.rightY,
+        )
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -818,30 +888,30 @@ class ControllerSurfaceView(
             )
         }
 
-        rect(ControlId.LT, 0.025f, 0.035f, 0.125f, 0.165f)
-        rect(ControlId.LB, 0.145f, 0.035f, 0.245f, 0.165f)
-        rect(ControlId.RB, 0.755f, 0.035f, 0.855f, 0.165f)
-        rect(ControlId.RT, 0.875f, 0.035f, 0.975f, 0.165f)
+        rect(ControlId.LT, 0.025f, 0.035f, 0.175f, 0.170f)
+        rect(ControlId.LB, 0.195f, 0.035f, 0.345f, 0.170f)
+        rect(ControlId.RB, 0.655f, 0.035f, 0.805f, 0.170f)
+        rect(ControlId.RT, 0.825f, 0.035f, 0.975f, 0.170f)
 
-        circle(ControlId.BACK, 0.435f, 0.30f, 0.033f, 1.20f)
-        circle(ControlId.L3, 0.485f, 0.30f, 0.033f, 1.20f)
-        circle(ControlId.R3, 0.535f, 0.30f, 0.033f, 1.20f)
-        circle(ControlId.START, 0.585f, 0.30f, 0.033f, 1.20f)
-        circle(ControlId.GUIDE, 0.510f, 0.145f, 0.028f, 1.25f)
+        rect(ControlId.BACK, 0.325f, 0.235f, 0.385f, 0.315f)
+        rect(ControlId.L3, 0.350f, 0.355f, 0.410f, 0.435f)
+        rect(ControlId.R3, 0.590f, 0.355f, 0.650f, 0.435f)
+        rect(ControlId.START, 0.615f, 0.235f, 0.675f, 0.315f)
+        rect(ControlId.GUIDE, 0.470f, 0.455f, 0.530f, 0.545f)
 
-        circle(ControlId.LEFT_STICK, 0.165f, 0.625f, 0.125f, 1.10f)
+        circle(ControlId.LEFT_STICK, 0.155f, 0.575f, 0.132f, 1.12f)
 
-        circle(ControlId.DPAD_UP, 0.475f, 0.535f, 0.040f, 1.14f)
-        circle(ControlId.DPAD_LEFT, 0.435f, 0.625f, 0.040f, 1.14f)
-        circle(ControlId.DPAD_RIGHT, 0.515f, 0.625f, 0.040f, 1.14f)
-        circle(ControlId.DPAD_DOWN, 0.475f, 0.715f, 0.040f, 1.14f)
+        circle(ControlId.DPAD_UP, 0.380f, 0.555f, 0.047f, 1.16f)
+        circle(ControlId.DPAD_LEFT, 0.325f, 0.655f, 0.047f, 1.16f)
+        circle(ControlId.DPAD_RIGHT, 0.435f, 0.655f, 0.047f, 1.16f)
+        circle(ControlId.DPAD_DOWN, 0.380f, 0.755f, 0.047f, 1.16f)
 
-        circle(ControlId.RIGHT_STICK, 0.640f, 0.655f, 0.070f, 1.20f)
+        circle(ControlId.RIGHT_STICK, 0.640f, 0.655f, 0.102f, 1.18f)
 
-        circle(ControlId.Y, 0.815f, 0.455f, 0.054f, 1.18f)
-        circle(ControlId.X, 0.745f, 0.610f, 0.054f, 1.18f)
-        circle(ControlId.B, 0.885f, 0.610f, 0.054f, 1.18f)
-        circle(ControlId.A, 0.815f, 0.765f, 0.054f, 1.18f)
+        circle(ControlId.Y, 0.840f, 0.445f, 0.058f, 1.18f)
+        circle(ControlId.X, 0.770f, 0.605f, 0.058f, 1.18f)
+        circle(ControlId.B, 0.910f, 0.605f, 0.058f, 1.18f)
+        circle(ControlId.A, 0.840f, 0.765f, 0.058f, 1.18f)
     }
 
     private fun drawCircleControl(
@@ -859,11 +929,37 @@ class ControllerSurfaceView(
                         selectedLayoutControl ==
                         control.id
                 )
+
+        val fill =
+            when {
+                control.id ==
+                    ControlId.LEFT_STICK ||
+                    control.id ==
+                    ControlId.RIGHT_STICK ->
+                    stickBasePaint
+
+                isUtilityControl(
+                    control.id,
+                ) ->
+                    if (active) {
+                        mintPressedPaint
+                    } else {
+                        mintFillPaint
+                    }
+
+                else ->
+                    if (active) {
+                        lavenderPressedPaint
+                    } else {
+                        lavenderFillPaint
+                    }
+            }
+
         canvas.drawCircle(
             control.centerX,
             control.centerY,
             control.radius,
-            if (active) activeFillPaint else fillPaint,
+            fill,
         )
 
         canvas.drawCircle(
@@ -873,10 +969,27 @@ class ControllerSurfaceView(
             outlinePaint,
         )
 
-        val label = controlLabel(control.id)
+        val label =
+            controlLabel(
+                control.id,
+            )
+
         if (label.isNotEmpty()) {
-            textPaint.textSize = control.radius * if (label.length > 2) 0.50f else 0.70f
-            drawCenteredText(canvas, label, control.centerX, control.centerY, textPaint)
+            textPaint.textSize =
+                control.radius *
+                    if (label.length > 2) {
+                        0.46f
+                    } else {
+                        0.70f
+                    }
+
+            drawCenteredText(
+                canvas,
+                label,
+                control.centerX,
+                control.centerY,
+                textPaint,
+            )
         }
     }
 
@@ -895,19 +1008,313 @@ class ControllerSurfaceView(
                         selectedLayoutControl ==
                         control.id
                 )
-        val rect = control.rect ?: return
-        val radius = min(rect.width(), rect.height()) * 0.32f
+
+        val rect =
+            control.rect
+                ?: return
+
+        val radius =
+            min(
+                rect.width(),
+                rect.height(),
+            ) *
+                if (
+                    isUtilityControl(
+                        control.id,
+                    )
+                ) {
+                    0.28f
+                } else {
+                    0.30f
+                }
+
+        val fill =
+            if (
+                isUtilityControl(
+                    control.id,
+                )
+            ) {
+                if (active) {
+                    mintPressedPaint
+                } else {
+                    mintFillPaint
+                }
+            } else {
+                if (active) {
+                    lavenderPressedPaint
+                } else {
+                    lavenderFillPaint
+                }
+            }
 
         canvas.drawRoundRect(
             rect,
             radius,
             radius,
-            if (active) activeFillPaint else fillPaint,
+            fill,
         )
-        canvas.drawRoundRect(rect, radius, radius, outlinePaint)
 
-        textPaint.textSize = rect.height() * 0.42f
-        drawCenteredText(canvas, controlLabel(control.id), rect.centerX(), rect.centerY(), textPaint)
+        canvas.drawRoundRect(
+            rect,
+            radius,
+            radius,
+            outlinePaint,
+        )
+
+        textPaint.textSize =
+            rect.height() *
+                if (
+                    isUtilityControl(
+                        control.id,
+                    )
+                ) {
+                    0.38f
+                } else {
+                    0.42f
+                }
+
+        drawCenteredText(
+            canvas,
+            controlLabel(
+                control.id,
+            ),
+            rect.centerX(),
+            rect.centerY(),
+            textPaint,
+        )
+    }
+
+    private fun drawDpad(
+        canvas: Canvas,
+        state: GamepadState,
+    ) {
+        val up =
+            controls.firstOrNull {
+                it.id ==
+                    ControlId.DPAD_UP
+            } ?: return
+        val down =
+            controls.firstOrNull {
+                it.id ==
+                    ControlId.DPAD_DOWN
+            } ?: return
+        val left =
+            controls.firstOrNull {
+                it.id ==
+                    ControlId.DPAD_LEFT
+            } ?: return
+        val right =
+            controls.firstOrNull {
+                it.id ==
+                    ControlId.DPAD_RIGHT
+            } ?: return
+
+        val centerX =
+            (
+                left.centerX +
+                    right.centerX
+            ) /
+                2f
+        val centerY =
+            (
+                up.centerY +
+                    down.centerY
+            ) /
+                2f
+        val halfThickness =
+            min(
+                min(
+                    up.radius,
+                    down.radius,
+                ),
+                min(
+                    left.radius,
+                    right.radius,
+                ),
+            ) *
+                0.84f
+
+        val leftEdge =
+            left.centerX -
+                left.radius
+        val rightEdge =
+            right.centerX +
+                right.radius
+        val topEdge =
+            up.centerY -
+                up.radius
+        val bottomEdge =
+            down.centerY +
+                down.radius
+
+        dpadPath.reset()
+        dpadPath.moveTo(
+            centerX - halfThickness,
+            topEdge,
+        )
+        dpadPath.lineTo(
+            centerX + halfThickness,
+            topEdge,
+        )
+        dpadPath.lineTo(
+            centerX + halfThickness,
+            centerY - halfThickness,
+        )
+        dpadPath.lineTo(
+            rightEdge,
+            centerY - halfThickness,
+        )
+        dpadPath.lineTo(
+            rightEdge,
+            centerY + halfThickness,
+        )
+        dpadPath.lineTo(
+            centerX + halfThickness,
+            centerY + halfThickness,
+        )
+        dpadPath.lineTo(
+            centerX + halfThickness,
+            bottomEdge,
+        )
+        dpadPath.lineTo(
+            centerX - halfThickness,
+            bottomEdge,
+        )
+        dpadPath.lineTo(
+            centerX - halfThickness,
+            centerY + halfThickness,
+        )
+        dpadPath.lineTo(
+            leftEdge,
+            centerY + halfThickness,
+        )
+        dpadPath.lineTo(
+            leftEdge,
+            centerY - halfThickness,
+        )
+        dpadPath.lineTo(
+            centerX - halfThickness,
+            centerY - halfThickness,
+        )
+        dpadPath.close()
+
+        canvas.drawPath(
+            dpadPath,
+            lavenderFillPaint,
+        )
+        canvas.drawPath(
+            dpadPath,
+            outlinePaint,
+        )
+
+        val corner =
+            halfThickness *
+                0.20f
+
+        fun drawPressed(
+            rect: RectF,
+        ) {
+            canvas.drawRoundRect(
+                rect,
+                corner,
+                corner,
+                lavenderPressedPaint,
+            )
+        }
+
+        if (
+            state.dpad and
+                DpadState.UP != 0
+        ) {
+            tempRect.set(
+                centerX - halfThickness,
+                topEdge,
+                centerX + halfThickness,
+                centerY,
+            )
+            drawPressed(tempRect)
+        }
+
+        if (
+            state.dpad and
+                DpadState.DOWN != 0
+        ) {
+            tempRect.set(
+                centerX - halfThickness,
+                centerY,
+                centerX + halfThickness,
+                bottomEdge,
+            )
+            drawPressed(tempRect)
+        }
+
+        if (
+            state.dpad and
+                DpadState.LEFT != 0
+        ) {
+            tempRect.set(
+                leftEdge,
+                centerY - halfThickness,
+                centerX,
+                centerY + halfThickness,
+            )
+            drawPressed(tempRect)
+        }
+
+        if (
+            state.dpad and
+                DpadState.RIGHT != 0
+        ) {
+            tempRect.set(
+                centerX,
+                centerY - halfThickness,
+                rightEdge,
+                centerY + halfThickness,
+            )
+            drawPressed(tempRect)
+        }
+
+        dpadMarkPaint.strokeWidth =
+            (
+                halfThickness *
+                    0.12f
+            )
+                .coerceAtLeast(
+                    1.5f,
+                )
+
+        val markLength =
+            halfThickness *
+                0.34f
+
+        canvas.drawLine(
+            up.centerX,
+            up.centerY - markLength,
+            up.centerX,
+            up.centerY + markLength,
+            dpadMarkPaint,
+        )
+        canvas.drawLine(
+            down.centerX,
+            down.centerY - markLength,
+            down.centerX,
+            down.centerY + markLength,
+            dpadMarkPaint,
+        )
+        canvas.drawLine(
+            left.centerX - markLength,
+            left.centerY,
+            left.centerX + markLength,
+            left.centerY,
+            dpadMarkPaint,
+        )
+        canvas.drawLine(
+            right.centerX - markLength,
+            right.centerY,
+            right.centerX + markLength,
+            right.centerY,
+            dpadMarkPaint,
+        )
     }
 
     private fun drawStickKnob(
@@ -916,23 +1323,82 @@ class ControllerSurfaceView(
         logicalX: Int,
         logicalY: Int,
     ) {
-        val control = controls.firstOrNull { it.id == id } ?: return
-        val x = logicalX / 32767f
+        val control =
+            controls.firstOrNull {
+                it.id == id
+            } ?: return
+
+        val x =
+            logicalX /
+                32767f
         val y =
             if (logicalY >= 0) {
-                logicalY / 32767f
+                logicalY /
+                    32767f
             } else {
-                logicalY / 32768f
+                logicalY /
+                    32768f
             }
 
-        val knobRadius = control.radius * 0.42f
-        val travel = control.radius * 0.48f
-        val knobX = control.centerX + x.coerceIn(-1f, 1f) * travel
-        val knobY = control.centerY - y.coerceIn(-1f, 1f) * travel
+        val knobRadius =
+            control.radius *
+                0.50f
+        val travel =
+            control.radius *
+                0.43f
+        val knobX =
+            control.centerX +
+                x.coerceIn(
+                    -1f,
+                    1f,
+                ) *
+                travel
+        val knobY =
+            control.centerY -
+                y.coerceIn(
+                    -1f,
+                    1f,
+                ) *
+                travel
 
-        canvas.drawCircle(knobX, knobY, knobRadius, activeFillPaint)
-        canvas.drawCircle(knobX, knobY, knobRadius, outlinePaint)
+        val active =
+            logicalX != 0 ||
+                logicalY != 0
+
+        canvas.drawCircle(
+            knobX,
+            knobY,
+            knobRadius,
+            if (active) {
+                mintPressedPaint
+            } else {
+                mintFillPaint
+            },
+        )
+        canvas.drawCircle(
+            knobX,
+            knobY,
+            knobRadius,
+            outlinePaint,
+        )
     }
+
+    private fun isDpadControl(
+        id: ControlId,
+    ): Boolean =
+        id == ControlId.DPAD_UP ||
+            id == ControlId.DPAD_DOWN ||
+            id == ControlId.DPAD_LEFT ||
+            id == ControlId.DPAD_RIGHT
+
+    private fun isUtilityControl(
+        id: ControlId,
+    ): Boolean =
+        id == ControlId.BACK ||
+            id == ControlId.START ||
+            id == ControlId.L3 ||
+            id == ControlId.R3 ||
+            id == ControlId.GUIDE
 
     private fun isControlActive(
         id: ControlId,
@@ -975,15 +1441,15 @@ class ControllerSurfaceView(
             ControlId.RB -> "RB"
             ControlId.LT -> "LT"
             ControlId.RT -> "RT"
-            ControlId.L3 -> "L3"
-            ControlId.R3 -> "R3"
-            ControlId.BACK -> "‹"
-            ControlId.START -> "›"
-            ControlId.GUIDE -> "●"
-            ControlId.DPAD_UP -> "▲"
-            ControlId.DPAD_DOWN -> "▼"
-            ControlId.DPAD_LEFT -> "◀"
-            ControlId.DPAD_RIGHT -> "▶"
+            ControlId.L3 -> "LS"
+            ControlId.R3 -> "RS"
+            ControlId.BACK -> "□"
+            ControlId.START -> "≡"
+            ControlId.GUIDE -> "N"
+            ControlId.DPAD_UP -> ""
+            ControlId.DPAD_DOWN -> ""
+            ControlId.DPAD_LEFT -> ""
+            ControlId.DPAD_RIGHT -> ""
         }
     }
 
@@ -997,6 +1463,25 @@ class ControllerSurfaceView(
         val metrics = paint.fontMetrics
         val baseline = y - (metrics.ascent + metrics.descent) / 2f
         canvas.drawText(text, x, baseline, paint)
+    }
+
+    private companion object {
+        const val COLOR_SURFACE_BASE =
+            0xFFF4F3F7.toInt()
+        const val COLOR_SURFACE_RAISED =
+            0xFFFAFAFC.toInt()
+        const val COLOR_SURFACE_OUTLINE =
+            0xFFDEDBE5.toInt()
+        const val COLOR_LAVENDER =
+            0xFFB7A5E2.toInt()
+        const val COLOR_LAVENDER_PRESSED =
+            0xFF9D89CF.toInt()
+        const val COLOR_MINT =
+            0xFF92DFA0.toInt()
+        const val COLOR_MINT_PRESSED =
+            0xFF71C982.toInt()
+        const val COLOR_TEXT_ON_COLOR =
+            0xFFFAFAFC.toInt()
     }
 
     private enum class ControlId {
