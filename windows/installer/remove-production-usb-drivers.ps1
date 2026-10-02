@@ -65,7 +65,7 @@ catch {
 $failures = @()
 
 foreach ($publishedName in @($publishedNames | Sort-Object -Unique)) {
-    & $pnputil /delete-driver $publishedName /uninstall /force
+    & $pnputil /delete-driver $publishedName /uninstall
 
     if ($LASTEXITCODE -ne 0) {
         $failures += "$publishedName (exit $LASTEXITCODE)"
@@ -85,6 +85,8 @@ Add-Content -LiteralPath $logPath -Value (
     "[$([DateTimeOffset]::UtcNow.ToString('O'))] Driver cleanup incomplete: " +
     ($failures -join ", "))
 
-# Do not block application uninstall if Windows temporarily holds a driver
-# package. The retained state/log allows explicit follow-up cleanup.
+# Do not force Driver Store deletion. If Windows still owns the package, keep
+# the state/log for an explicit follow-up after the device is detached/rebooted.
+# Application uninstall remains non-blocking because removing program files is
+# safer than forcing a live kernel-driver package out of the Driver Store.
 exit 0

@@ -67,6 +67,15 @@ jobs:
             throw "PowerShell syntax validation failed."
           }
 
+      - name: Enforce installer driver-removal safety
+        shell: pwsh
+        run: |
+          $cleanup = Get-Content windows/installer/remove-production-usb-drivers.ps1 -Raw
+
+          if ($cleanup -match '(?i)/force') {
+            throw "Production USB driver cleanup must never use pnputil /force."
+          }
+
       - name: Cache HIDMaestro SDK
         uses: actions/cache@v4
         with:
