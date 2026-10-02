@@ -363,9 +363,11 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M13 — Android UX
 
+> Smart Auto status now comes from authenticated Windows HANDOVER_COMMIT authority feedback instead of Android-side transport guessing. Wi-Fi, Bluetooth, and duplex USB control paths feed one sequence-aware coordinator; duplicate/stale commits are rejected, unsigned sequence wraparound is handled, and runtime restart clears old authority before reconnect.
+
 - [x] Pairing screen.
 - [x] Trusted PC list.
-- [ ] Smart Auto connection status.
+- [x] Smart Auto connection status.
 - [ ] Gameplay screen.
 - [x] Connection overlay that does not interrupt controls unnecessarily.
 - [ ] Controller profile chooser.
