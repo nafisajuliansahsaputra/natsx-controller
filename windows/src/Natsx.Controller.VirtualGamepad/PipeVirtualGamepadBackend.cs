@@ -203,8 +203,7 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
         }
 
         if (TryWriteLatestState(
-                pipe,
-                countSubmission: true))
+                pipe))
         {
             Interlocked.Increment(
                 ref _submittedStateCount);
@@ -269,15 +268,17 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
                         pipe;
                     _connected =
                         true;
-
-                    _initialReady
-                        ?.TrySetResult(
-                            true);
                 }
 
-                TryWriteLatestState(
-                    pipe,
-                    countSubmission: false);
+                if (!TryWriteLatestState(
+                        pipe))
+                {
+                    continue;
+                }
+
+                _initialReady
+                    ?.TrySetResult(
+                        true);
 
                 using var connectionLifetime =
                     CancellationTokenSource
@@ -437,8 +438,7 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
             .ConfigureAwait(false))
         {
             if (!TryWriteLatestState(
-                    pipe,
-                    countSubmission: false))
+                    pipe))
             {
                 return;
             }
@@ -536,12 +536,8 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
     }
 
     private bool TryWriteLatestState(
-        NamedPipeClientStream pipe,
-        bool countSubmission)
+        NamedPipeClientStream pipe)
     {
-        _ =
-            countSubmission;
-
         lock (_writeGate)
         {
             GamepadState latest;
