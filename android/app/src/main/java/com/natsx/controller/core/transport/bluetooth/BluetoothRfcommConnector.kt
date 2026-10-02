@@ -7,6 +7,7 @@ import android.content.Context
 import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.PeerId
 import com.natsx.controller.core.protocol.RumblePayload
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.RealtimeStateSink
@@ -46,6 +47,10 @@ class AndroidBluetoothRfcommSocket(
 
 interface BluetoothRealtimeLink : RealtimeStateSink, Closeable {
     val lastHeartbeatReceivedNanos: Long
+
+    fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean
 }
 
 fun interface BluetoothRealtimeLinkFactory {
@@ -68,6 +73,19 @@ class BluetoothRfcommRealtimeLink internal constructor(
         }
 
         sender.publish(envelope)
+    }
+
+    override fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean {
+        if (closed) {
+            return false
+        }
+
+        return sender
+            .trySendTransportPreference(
+                payload,
+            )
     }
 
     override fun close() {
