@@ -370,8 +370,8 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Smart Auto connection status.
 - [ ] Gameplay screen.
 - [x] Connection overlay that does not interrupt controls unnecessarily.
-- [ ] Controller profile chooser.
-- [ ] Sensitivity/deadzone settings.
+- [x] Controller profile chooser.
+- [x] Sensitivity/deadzone settings.
 - [x] Haptic settings.
 - [ ] Manual transport override.
 - [ ] Diagnostics.
