@@ -125,6 +125,15 @@ jobs:
 
           $installRoot = Join-Path $env:RUNNER_TEMP "natsx-controller-installed"
 
+          $trustRoot = Join-Path $env:LOCALAPPDATA "NATSX\Controller"
+          $trustedPeers = Join-Path $trustRoot "trusted-peers-v1.json"
+          $localPeerIdentity = Join-Path $trustRoot "local-peer-id-v1.txt"
+          New-Item -ItemType Directory -Path $trustRoot -Force | Out-Null
+          Set-Content -LiteralPath $trustedPeers -Value '{"ci":"preserve-trust"}' -Encoding UTF8
+          Set-Content -LiteralPath $localPeerIdentity -Value 'ci-preserve-identity' -Encoding UTF8
+          $trustedPeersHash = (Get-FileHash -LiteralPath $trustedPeers -Algorithm SHA256).Hash
+          $localPeerIdentityHash = (Get-FileHash -LiteralPath $localPeerIdentity -Algorithm SHA256).Hash
+
           $install = Start-Process -FilePath $installer[0].FullName -ArgumentList @(
             "/VERYSILENT",
             "/SUPPRESSMSGBOXES",
@@ -157,6 +166,12 @@ jobs:
             throw "Inno Setup uninstaller was not created."
           }
 
+          $receiverSettingsKey = "HKCU:\Software\NATSX\Controller Receiver"
+          $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+          New-Item -Path $receiverSettingsKey -Force | Out-Null
+          New-ItemProperty -Path $receiverSettingsKey -Name "CloseToTray" -Value 0 -PropertyType DWord -Force | Out-Null
+          New-ItemProperty -Path $runKey -Name "NATSX Controller Receiver" -Value '"C:\ci\Natsx.Controller.Receiver.exe" --background' -PropertyType String -Force | Out-Null
+
           $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList @(
             "/VERYSILENT",
             "/SUPPRESSMSGBOXES",
@@ -172,3 +187,25 @@ jobs:
           if (Test-Path -LiteralPath $receiver) {
             throw "Receiver executable remained after uninstall."
           }
+
+          if (-not (Test-Path -LiteralPath $trustedPeers -PathType Leaf) -or
+              -not (Test-Path -LiteralPath $localPeerIdentity -PathType Leaf)) {
+            throw "Normal uninstall removed pairing/trust identity data."
+          }
+
+          if ((Get-FileHash -LiteralPath $trustedPeers -Algorithm SHA256).Hash -ne $trustedPeersHash -or
+              (Get-FileHash -LiteralPath $localPeerIdentity -Algorithm SHA256).Hash -ne $localPeerIdentityHash) {
+            throw "Normal uninstall modified pairing/trust identity data."
+          }
+
+          if (Test-Path -LiteralPath $receiverSettingsKey) {
+            throw "Receiver UI settings registry key remained after uninstall."
+          }
+
+          $runValue = (Get-ItemProperty -Path $runKey -Name "NATSX Controller Receiver" -ErrorAction SilentlyContinue)."NATSX Controller Receiver"
+
+          if (-not [string]::IsNullOrWhiteSpace([string]$runValue)) {
+            throw "Receiver Startup registry entry remained after uninstall."
+          }
+
+          Remove-Item -LiteralPath $trustRoot -Recurse -Force -ErrorAction SilentlyContinue
