@@ -14,8 +14,16 @@ $repoRoot =
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $Version =
-        (Get-Content (Join-Path $repoRoot "VERSION") -Raw)
-            .Trim() -replace '-dev$', ''
+        (
+            Get-Content (Join-Path $repoRoot "VERSION") -Raw
+        ).Trim()
+
+    if ($Version.EndsWith("-dev", [StringComparison]::Ordinal)) {
+        $Version =
+            $Version.Substring(
+                0,
+                $Version.Length - 4)
+    }
 }
 
 if ($Version -notmatch '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$') {
