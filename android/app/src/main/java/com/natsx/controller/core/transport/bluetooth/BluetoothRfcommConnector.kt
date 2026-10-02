@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.content.Context
+import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.PeerId
 import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.protocol.TrustedSessionRegistry
@@ -100,6 +101,7 @@ class BluetoothRfcommConnector(
     private val socketProvider: BluetoothRfcommSocketProvider,
     private val secondaryJoinClient: BluetoothSecondarySessionJoinClient,
     private val rumbleSink: (RumblePayload) -> Unit = {},
+    private val handoverSink: (HandoverPayload) -> Unit = {},
 ) : BluetoothRealtimeLinkFactory {
     override fun create(): BluetoothRfcommRealtimeLink = connect()
 
@@ -122,6 +124,7 @@ class BluetoothRfcommConnector(
                         trustedSession = session,
                         inputStream = socket.inputStream,
                         rumbleSink = rumbleSink,
+                        handoverSink = handoverSink,
                     )
 
                 return BluetoothRfcommRealtimeLink(
@@ -156,6 +159,7 @@ class BluetoothRfcommConnector(
             permissionGate: BluetoothPermissionGate =
                 BluetoothPermissionGate(context),
             rumbleSink: (RumblePayload) -> Unit = {},
+            handoverSink: (HandoverPayload) -> Unit = {},
         ): BluetoothRfcommConnector {
             require(permissionGate.isBluetoothSupported()) {
                 "Bluetooth is not supported on this device."
@@ -206,6 +210,7 @@ class BluetoothRfcommConnector(
                         sessionRegistry = sessionRegistry,
                     ),
                 rumbleSink = rumbleSink,
+                handoverSink = handoverSink,
             )
         }
     }

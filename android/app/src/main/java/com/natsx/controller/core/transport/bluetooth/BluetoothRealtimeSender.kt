@@ -1,6 +1,7 @@
 package com.natsx.controller.core.transport.bluetooth
 
 import android.os.SystemClock
+import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.ProtocolConstants
 import com.natsx.controller.core.protocol.RumblePayload
@@ -22,6 +23,7 @@ class BluetoothRealtimeSender(
     private val nowNanos: () -> Long =
         SystemClock::elapsedRealtimeNanos,
     private val rumbleSink: (RumblePayload) -> Unit = {},
+    private val handoverSink: (HandoverPayload) -> Unit = {},
 ) : RealtimeStateSink, Closeable {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -75,6 +77,10 @@ class BluetoothRealtimeSender(
 
     @Volatile
     var rumblesReceived: Long = 0
+        private set
+
+    @Volatile
+    var handoverCommitsReceived: Long = 0
         private set
 
     @Volatile
@@ -243,6 +249,18 @@ class BluetoothRealtimeSender(
 
                         rumbleSink(rumble)
                         rumblesReceived += 1
+                    }
+
+                    MessageType.HANDOVER_COMMIT -> {
+                        val handover =
+                            BluetoothControlFrameCodec
+                                .decodeHandoverCommit(
+                                    frame,
+                                    trustedSession,
+                                )
+
+                        handoverSink(handover)
+                        handoverCommitsReceived += 1
                     }
 
                     else ->
