@@ -13,6 +13,8 @@ import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.protocol.SessionId
 import com.natsx.controller.core.protocol.SessionReadyPayload
 import com.natsx.controller.core.protocol.TransportCapabilities
+import com.natsx.controller.core.protocol.TransportPreferenceMode
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -108,6 +110,33 @@ class WifiControlDatagramCodecTest {
                     encoded,
                     trusted,
                 ),
+            )
+        }
+    }
+
+    @Test
+    fun transportPreferenceRoundTripPreservesMode() {
+        WifiTrustedSession(sessionId, key).use { trusted ->
+            val expected =
+                TransportPreferencePayload(
+                    TransportPreferenceMode.USB_DIRECT,
+                )
+
+            val encoded =
+                WifiControlDatagramCodec
+                    .encodeTransportPreference(
+                        trustedSession = trusted,
+                        payload = expected,
+                        monotonicTimestampMicros = 778uL,
+                    )
+
+            assertEquals(
+                expected,
+                WifiControlDatagramCodec
+                    .decodeTransportPreference(
+                        encoded,
+                        trusted,
+                    ),
             )
         }
     }

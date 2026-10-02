@@ -11,6 +11,8 @@ import com.natsx.controller.core.protocol.ProtocolFrameCodec
 import com.natsx.controller.core.protocol.ProtocolVersion
 import com.natsx.controller.core.protocol.SessionReadyPayload
 import com.natsx.controller.core.protocol.TransportCapabilities
+import com.natsx.controller.core.protocol.TransportPreferenceMode
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.protocol.TrustedReconnectCrypto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -120,6 +122,44 @@ class UsbTrustedHandshakeTest {
         }
 
         trustSecret.fill(0)
+    }
+
+    @Test
+    fun transportPreferenceRoundTripPreservesMode() {
+        val sessionKey =
+            ByteArray(32) { index ->
+                index.toByte()
+            }
+
+        UsbTrustedSession(
+            com.natsx.controller.core.protocol.SessionId
+                .createRandom(),
+            sessionKey,
+        ).use { trustedSession ->
+            val expected =
+                TransportPreferencePayload(
+                    TransportPreferenceMode.USB_DIRECT,
+                )
+
+            val encoded =
+                UsbControlFrameCodec
+                    .encodeTransportPreference(
+                        trustedSession,
+                        expected,
+                        410uL,
+                    )
+
+            assertEquals(
+                expected,
+                UsbControlFrameCodec
+                    .decodeTransportPreference(
+                        encoded,
+                        trustedSession,
+                    ),
+            )
+        }
+
+        sessionKey.fill(0)
     }
 
     @Test

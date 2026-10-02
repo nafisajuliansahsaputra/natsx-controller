@@ -13,6 +13,8 @@ import com.natsx.controller.core.protocol.ProtocolTransport
 import com.natsx.controller.core.protocol.ProtocolVersion
 import com.natsx.controller.core.protocol.SessionReadyPayload
 import com.natsx.controller.core.protocol.TransportCapabilities
+import com.natsx.controller.core.protocol.TransportPreferenceMode
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.protocol.TrustedReconnectCrypto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -156,6 +158,44 @@ class BluetoothTrustedHandshakeTest {
                 expected,
                 BluetoothControlFrameCodec
                     .decodeHandoverCommit(
+                        encoded,
+                        trustedSession,
+                    ),
+            )
+        }
+
+        sessionKey.fill(0)
+    }
+
+    @Test
+    fun transportPreferenceRoundTripPreservesMode() {
+        val sessionKey =
+            ByteArray(32) { index ->
+                index.toByte()
+            }
+
+        BluetoothTrustedSession(
+            com.natsx.controller.core.protocol.SessionId
+                .createRandom(),
+            sessionKey,
+        ).use { trustedSession ->
+            val expected =
+                TransportPreferencePayload(
+                    TransportPreferenceMode.BLUETOOTH,
+                )
+
+            val encoded =
+                BluetoothControlFrameCodec
+                    .encodeTransportPreference(
+                        trustedSession,
+                        expected,
+                        510uL,
+                    )
+
+            assertEquals(
+                expected,
+                BluetoothControlFrameCodec
+                    .decodeTransportPreference(
                         encoded,
                         trustedSession,
                     ),
