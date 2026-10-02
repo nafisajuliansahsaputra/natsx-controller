@@ -5,6 +5,7 @@ import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.ProtocolConstants
 import com.natsx.controller.core.protocol.RumblePayload
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.RealtimeStateSink
 import java.io.Closeable
@@ -20,6 +21,10 @@ import java.util.concurrent.atomic.AtomicReference
 
 interface WifiRealtimeLink : Closeable, RealtimeStateSink {
     val lastHeartbeatReceivedNanos: Long
+
+    fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean
 }
 
 fun interface WifiRealtimeLinkFactory {
@@ -53,6 +58,8 @@ class WifiRealtimeSender(
     private val pendingEnvelope = AtomicReference<RealtimeStateEnvelope?>(null)
     private val drainScheduled = AtomicBoolean(false)
     private val closed = AtomicBoolean(false)
+    private val lastTransportPreference =
+        AtomicReference<TransportPreferencePayload?>(null)
 
     @Volatile
     var sentDatagrams: Long = 0
@@ -111,6 +118,52 @@ class WifiRealtimeSender(
 
         if (drainScheduled.compareAndSet(false, true)) {
             executor.execute(::drainLatest)
+        }
+    }
+
+    override fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean {
+        if (closed.get()) {
+            return false
+        }
+
+        if (lastTransportPreference.get() == payload) {
+            return true
+        }
+
+        return try {
+            val bytes =
+                WifiControlDatagramCodec
+                    .encodeTransportPreference(
+                        trustedSession = trustedSession,
+                        payload = payload,
+                        monotonicTimestampMicros =
+                            monotonicMicroseconds(),
+                    )
+
+            val activeSocket = ensureSocket()
+            activeSocket.send(
+                DatagramPacket(
+                    bytes,
+                    bytes.size,
+                    remoteEndpoint,
+                ),
+            )
+
+            lastTransportPreference.set(payload)
+            true
+        } catch (_: IOException) {
+            if (!closed.get()) {
+                controlFailures += 1
+                invalidateSocket()
+            }
+            false
+        } catch (_: RuntimeException) {
+            if (!closed.get()) {
+                controlFailures += 1
+            }
+            false
         }
     }
 

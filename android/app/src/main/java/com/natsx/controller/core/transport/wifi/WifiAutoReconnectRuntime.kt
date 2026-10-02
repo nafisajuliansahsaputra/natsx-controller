@@ -1,6 +1,7 @@
 package com.natsx.controller.core.transport.wifi
 
 import android.os.SystemClock
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.session.RealtimeStateBroadcaster
 import java.io.Closeable
 import java.net.InetSocketAddress
@@ -68,6 +69,16 @@ class WifiAutoReconnectRuntime(
         require(heartbeatLostTimeoutMillis in 500..30_000)
         require(pollIntervalMillis in 25..1_000)
     }
+
+    fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean =
+        activeLink
+            .get()
+            ?.trySendTransportPreference(
+                payload,
+            )
+            ?: false
 
     fun start() {
         check(!closed.get()) { "Wi-Fi reconnect runtime is closed." }

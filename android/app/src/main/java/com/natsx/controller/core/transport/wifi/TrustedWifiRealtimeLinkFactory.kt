@@ -3,6 +3,7 @@ package com.natsx.controller.core.transport.wifi
 import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.PeerId
 import com.natsx.controller.core.protocol.RumblePayload
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.trust.TrustedPeerStore
@@ -84,6 +85,19 @@ private class OwnedWifiRealtimeLink(
             "Owned Wi-Fi realtime link is closed."
         }
         delegate.publish(envelope)
+    }
+
+    override fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean {
+        if (closed) {
+            return false
+        }
+
+        return delegate
+            .trySendTransportPreference(
+                payload,
+            )
     }
 
     override fun close() {
