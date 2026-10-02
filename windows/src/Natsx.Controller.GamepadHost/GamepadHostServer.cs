@@ -26,6 +26,10 @@ internal sealed class GamepadHostServer
     public async Task RunAsync(
         CancellationToken cancellationToken)
     {
+        GamepadHostLog.Write(
+            "backend-start",
+            "Starting persistent HIDMaestro backend.");
+
         await using var backend =
             new HidMaestroVirtualGamepadBackend();
 
@@ -37,10 +41,18 @@ internal sealed class GamepadHostServer
         backend.Submit(
             GamepadState.Neutral);
 
+        GamepadHostLog.Write(
+            "backend-ready",
+            "Persistent HIDMaestro backend is ready.");
+
         while (!cancellationToken.IsCancellationRequested)
         {
             await using NamedPipeServerStream pipe =
                 CreateServerPipe();
+
+            GamepadHostLog.Write(
+                "pipe-ready",
+                "Waiting for an authenticated local Receiver.");
 
             try
             {
@@ -51,6 +63,10 @@ internal sealed class GamepadHostServer
 
                 AuthenticateClient(
                     pipe);
+
+                GamepadHostLog.Write(
+                    "client-authenticated",
+                    "Installed Receiver authenticated to the local gamepad-host pipe.");
 
                 await HandleClientAsync(
                         pipe,

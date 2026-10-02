@@ -10,7 +10,14 @@ internal static class GamepadHostLog
 
     public static void Write(
         string category,
-        Exception exception)
+        Exception exception) =>
+        Write(
+            category,
+            exception.ToString());
+
+    public static void Write(
+        string category,
+        string message)
     {
         try
         {
@@ -43,7 +50,7 @@ internal static class GamepadHostLog
 
                 File.AppendAllText(
                     path,
-                    $"[{DateTimeOffset.UtcNow:O}] {category}{Environment.NewLine}{exception}{Environment.NewLine}{Environment.NewLine}");
+                    $"[{DateTimeOffset.UtcNow:O}] {category}{Environment.NewLine}{message}{Environment.NewLine}{Environment.NewLine}");
             }
         }
         catch

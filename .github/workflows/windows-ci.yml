@@ -177,10 +177,15 @@ jobs:
           ) -Wait -PassThru
 
           if ($install.ExitCode -ne 0) {
-            $setupLog = Join-Path $env:ProgramData "NATSX\Controller\setup-driver-error.log"
+            $setupErrorLog = Join-Path $env:ProgramData "NATSX\Controller\setup-driver-error.log"
+            $hostInstallLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host-install.log"
+            $hostLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host.log"
 
-            if (Test-Path -LiteralPath $setupLog) {
-              Get-Content -LiteralPath $setupLog | Write-Host
+            foreach ($log in @($setupLogPath, $setupErrorLog, $hostInstallLog, $hostLog)) {
+              if (Test-Path -LiteralPath $log) {
+                Write-Host "===== $log ====="
+                Get-Content -LiteralPath $log | Write-Host
+              }
             }
 
             throw "CI installer exited with code $($install.ExitCode)."
@@ -215,19 +220,15 @@ jobs:
           $gamepadService = Get-Service -Name "NatsxControllerGamepadHost" -ErrorAction SilentlyContinue
 
           if ($null -eq $gamepadService) {
+            $setupErrorLog = Join-Path $env:ProgramData "NATSX\Controller\setup-driver-error.log"
             $hostInstallLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host-install.log"
             $hostLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host.log"
 
-            if (Test-Path -LiteralPath $setupLogPath) {
-              Get-Content -LiteralPath $setupLogPath | Write-Host
-            }
-
-            if (Test-Path -LiteralPath $hostInstallLog) {
-              Get-Content -LiteralPath $hostInstallLog | Write-Host
-            }
-
-            if (Test-Path -LiteralPath $hostLog) {
-              Get-Content -LiteralPath $hostLog | Write-Host
+            foreach ($log in @($setupLogPath, $setupErrorLog, $hostInstallLog, $hostLog)) {
+              if (Test-Path -LiteralPath $log) {
+                Write-Host "===== $log ====="
+                Get-Content -LiteralPath $log | Write-Host
+              }
             }
 
             & sc.exe query "NatsxControllerGamepadHost" 2>&1 | Write-Host

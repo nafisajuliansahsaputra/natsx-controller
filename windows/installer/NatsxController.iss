@@ -76,6 +76,7 @@ var
   GamepadHostExistedBeforeInstall: Boolean;
   GamepadHostPrepared: Boolean;
   InstallCompleted: Boolean;
+  SetupFailureExitCode: Integer;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
@@ -156,6 +157,18 @@ begin
   end;
 end;
 
+procedure FailPostInstall(const MessageText: String);
+begin
+  SetupFailureExitCode := 9;
+  RollbackPostInstallSideEffects();
+  RaiseException(MessageText);
+end;
+
+function GetCustomSetupExitCode(): Integer;
+begin
+  Result := SetupFailureExitCode;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
@@ -178,13 +191,12 @@ begin
       ResultCode
     ) then
     begin
-      RaiseException('Unable to start NATSX production USB driver installation.');
+      FailPostInstall('Unable to start NATSX production USB driver installation.');
     end;
 
     if ResultCode <> 0 then
     begin
-      RollbackPostInstallSideEffects();
-      RaiseException(
+      FailPostInstall(
         'NATSX production USB driver installation failed with exit code ' +
         IntToStr(ResultCode) + '.'
       );
@@ -200,14 +212,12 @@ begin
       ResultCode
     ) then
     begin
-      RollbackPostInstallSideEffects();
-      RaiseException('Unable to start NATSX Windows Firewall configuration.');
+      FailPostInstall('Unable to start NATSX Windows Firewall configuration.');
     end;
 
     if ResultCode <> 0 then
     begin
-      RollbackPostInstallSideEffects();
-      RaiseException(
+      FailPostInstall(
         'NATSX Windows Firewall configuration failed with exit code ' +
         IntToStr(ResultCode) + '.'
       );
@@ -222,14 +232,12 @@ begin
       ResultCode
     ) then
     begin
-      RollbackPostInstallSideEffects();
-      RaiseException('Unable to start the NATSX virtual-controller driver bootstrap.');
+      FailPostInstall('Unable to start the NATSX virtual-controller driver bootstrap.');
     end;
 
     if ResultCode <> 0 then
     begin
-      RollbackPostInstallSideEffects();
-      RaiseException(
+      FailPostInstall(
         'NATSX virtual-controller driver bootstrap failed with exit code ' +
         IntToStr(ResultCode) +
         '. See %ProgramData%\NATSX\Controller\setup-driver-error.log.'
@@ -245,14 +253,12 @@ begin
       ResultCode
     ) then
     begin
-      RollbackPostInstallSideEffects();
-      RaiseException('Unable to start NATSX privileged gamepad-host service installation.');
+      FailPostInstall('Unable to start NATSX privileged gamepad-host service installation.');
     end;
 
     if ResultCode <> 0 then
     begin
-      RollbackPostInstallSideEffects();
-      RaiseException(
+      FailPostInstall(
         'NATSX privileged gamepad-host service installation failed with exit code ' +
         IntToStr(ResultCode) + '.'
       );
@@ -267,14 +273,12 @@ begin
       ResultCode
     ) then
     begin
-      RollbackPostInstallSideEffects();
-      RaiseException('Unable to run the unelevated NATSX gamepad-host verification.');
+      FailPostInstall('Unable to run the unelevated NATSX gamepad-host verification.');
     end;
 
     if ResultCode <> 0 then
     begin
-      RollbackPostInstallSideEffects();
-      RaiseException(
+      FailPostInstall(
         'The unelevated NATSX Receiver could not use the privileged gamepad host. ' +
         'Verification exit code: ' + IntToStr(ResultCode) +
         '. See %ProgramData%\NATSX\Controller\setup-driver-error.log.'
