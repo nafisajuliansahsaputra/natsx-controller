@@ -44,6 +44,22 @@ public sealed class ControllerSession
         return true;
     }
 
+    public bool TryAdoptEquivalentState(
+        TransportKind transport,
+        uint sequence,
+        GamepadState state)
+    {
+        if (!_hasAcceptedSequence ||
+            sequence != _lastAcceptedSequence ||
+            state != CurrentState)
+        {
+            return false;
+        }
+
+        AuthoritativeTransport = transport;
+        return true;
+    }
+
     public void Neutralize()
     {
         CurrentState = GamepadState.Neutral;

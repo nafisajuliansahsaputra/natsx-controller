@@ -60,6 +60,9 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
                 });
     }
 
+    public event Action<TransportPreferencePayload>?
+        TransportPreferenceReceived;
+
     public ChannelReader<UsbGamepadFrame> States =>
         _latestState.Reader;
 
@@ -95,6 +98,117 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
                 : _timeProvider.GetElapsedTime(
                     acceptedAt,
                     _timeProvider.GetTimestamp());
+        }
+    }
+
+    public async ValueTask<bool> TrySendRumbleAsync(
+        RumbleState rumble,
+        CancellationToken cancellationToken = default)
+    {
+        Stream? outputStream =
+            _outputStream;
+
+        if (outputStream is null ||
+            _receiveLoop is null)
+        {
+            return false;
+        }
+
+        byte[] frame =
+            UsbControlFrameCodec
+                .EncodeRumble(
+                    _trustedSession,
+                    new RumblePayload(
+                        rumble.LowFrequencyMotor,
+                        rumble.HighFrequencyMotor),
+                    GetMonotonicMicroseconds());
+
+        byte[] framed =
+            UsbStreamFrameCodec
+                .Encode(
+                    frame);
+
+        await _outputGate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await outputStream.WriteAsync(
+                    framed,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        finally
+        {
+            _outputGate.Release();
+        }
+    }
+
+    public async ValueTask<bool> TrySendHandoverCommitAsync(
+        ProtocolTransport activeTransport,
+        uint stateSequence,
+        CancellationToken cancellationToken = default)
+    {
+        Stream? outputStream =
+            _outputStream;
+
+        if (outputStream is null ||
+            _receiveLoop is null)
+        {
+            return false;
+        }
+
+        byte[] frame =
+            UsbControlFrameCodec
+                .EncodeHandoverCommit(
+                    _trustedSession,
+                    new HandoverPayload(
+                        activeTransport,
+                        stateSequence),
+                    GetMonotonicMicroseconds());
+
+        byte[] framed =
+            UsbStreamFrameCodec
+                .Encode(
+                    frame);
+
+        await _outputGate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await outputStream.WriteAsync(
+                    framed,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        finally
+        {
+            _outputGate.Release();
         }
     }
 
@@ -203,8 +317,7 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
 
         if (inputStream is not null)
         {
-            await inputStream.DisposeAsync()
-                .ConfigureAwait(false);
+            DisposeStream(inputStream);
         }
 
         if (outputStream is not null &&
@@ -212,8 +325,7 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
                 inputStream,
                 outputStream))
         {
-            await outputStream.DisposeAsync()
-                .ConfigureAwait(false);
+            DisposeStream(outputStream);
         }
 
         var pending =
@@ -240,6 +352,22 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
         cancellation?.Dispose();
     }
 
+    private static void DisposeStream(Stream stream)
+    {
+        try
+        {
+            stream.Dispose();
+        }
+        catch (NotImplementedException)
+        {
+            // WinRT USB output streams may not implement FlushAsync.
+            // The owning UsbDevice tears down the native pipe lifetime.
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
     private async Task ReceiveLoopAsync(
         Stream inputStream,
         CancellationToken cancellationToken)
@@ -260,6 +388,35 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
                         ProtocolConstants.HeaderSize
                         ? (MessageType)frameBytes[6]
                         : 0;
+
+                if (messageType ==
+                    MessageType.TransportPreference)
+                {
+                    try
+                    {
+                        TransportPreferencePayload preference =
+                            UsbControlFrameCodec
+                                .DecodeTransportPreference(
+                                    frameBytes,
+                                    _trustedSession);
+
+                        TransportPreferenceReceived
+                            ?.Invoke(preference);
+
+                        Interlocked.Increment(
+                            ref _acceptedControlFrames);
+                    }
+                    catch (Exception exception) when (
+                        exception is FormatException or
+                        CryptographicException or
+                        ArgumentException)
+                    {
+                        Interlocked.Increment(
+                            ref _rejectedFrames);
+                    }
+
+                    continue;
+                }
 
                 if (messageType ==
                     MessageType.HeartbeatAck)
@@ -427,9 +584,6 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
                 {
                     await outputStream.WriteAsync(
                         framed,
-                        cancellationToken).ConfigureAwait(false);
-
-                    await outputStream.FlushAsync(
                         cancellationToken).ConfigureAwait(false);
                 }
                 finally

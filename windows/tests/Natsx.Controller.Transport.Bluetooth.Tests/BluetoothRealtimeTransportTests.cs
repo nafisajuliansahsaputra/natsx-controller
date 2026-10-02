@@ -50,6 +50,37 @@ public sealed class BluetoothRealtimeTransportTests
     }
 
     [Fact]
+    public void HandoverCommitRoundTrip_PreservesAuthorityAndSequence()
+    {
+        using var session =
+            new BluetoothTrustedSession(
+                CanonicalSessionId,
+                SessionKey);
+
+        var expected =
+            new HandoverPayload(
+                ProtocolTransport.UsbDirect,
+                0xAABBCCDDu);
+
+        byte[] frame =
+            BluetoothControlFrameCodec
+                .EncodeHandoverCommit(
+                    session,
+                    expected,
+                    321_000);
+
+        HandoverPayload actual =
+            BluetoothControlFrameCodec
+                .DecodeHandoverCommit(
+                    frame,
+                    session);
+
+        Assert.Equal(
+            expected,
+            actual);
+    }
+
+    [Fact]
     public async Task ControllerTransport_FirstAuthenticatedStateBecomesReady()
     {
         using var session =

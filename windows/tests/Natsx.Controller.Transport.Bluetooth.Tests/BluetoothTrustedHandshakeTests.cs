@@ -63,11 +63,8 @@ public sealed class BluetoothTrustedHandshakeTests
 
         using var input =
             new MemoryStream(
-                Concat(
-                    BluetoothStreamFrameCodec.Encode(
-                        challengeFrame),
-                    BluetoothStreamFrameCodec.Encode(
-                        remoteReadyFrame)));
+                BluetoothStreamFrameCodec.Encode(
+                    remoteReadyFrame));
 
         using var output =
             new MemoryStream();
@@ -94,7 +91,8 @@ public sealed class BluetoothTrustedHandshakeTests
                 peer =>
                     peer == androidPeer
                         ? trustSecret.ToArray()
-                        : null);
+                        : null,
+                challengeFrame);
 
         Assert.Equal(
             androidPeer,
@@ -183,6 +181,42 @@ public sealed class BluetoothTrustedHandshakeTests
             trustSecret);
         CryptographicOperations.ZeroMemory(
             challengeNonce);
+    }
+
+    [Fact]
+    public void RumbleRoundTrip_PreservesMotorStrengths()
+    {
+        byte[] key =
+            Enumerable.Range(0, 32)
+                .Select(static value => (byte)value)
+                .ToArray();
+
+        using var session =
+            new BluetoothTrustedSession(
+                SessionId.CreateRandom(),
+                key);
+
+        var expected =
+            new RumblePayload(
+                180,
+                75);
+
+        byte[] frame =
+            BluetoothControlFrameCodec
+                .EncodeRumble(
+                    session,
+                    expected,
+                    123);
+
+        RumblePayload actual =
+            BluetoothControlFrameCodec
+                .DecodeRumble(
+                    frame,
+                    session);
+
+        Assert.Equal(
+            expected,
+            actual);
     }
 
     [Fact]

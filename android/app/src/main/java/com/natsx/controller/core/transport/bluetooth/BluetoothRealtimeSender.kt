@@ -1,6 +1,11 @@
 package com.natsx.controller.core.transport.bluetooth
 
 import android.os.SystemClock
+import com.natsx.controller.core.protocol.HandoverPayload
+import com.natsx.controller.core.protocol.MessageType
+import com.natsx.controller.core.protocol.ProtocolConstants
+import com.natsx.controller.core.protocol.RumblePayload
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.RealtimeStateSink
 import java.io.Closeable
@@ -18,6 +23,8 @@ class BluetoothRealtimeSender(
     private val inputStream: InputStream? = null,
     private val nowNanos: () -> Long =
         SystemClock::elapsedRealtimeNanos,
+    private val rumbleSink: (RumblePayload) -> Unit = {},
+    private val handoverSink: (HandoverPayload) -> Unit = {},
 ) : RealtimeStateSink, Closeable {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -53,6 +60,9 @@ class BluetoothRealtimeSender(
     private val closed =
         AtomicBoolean(false)
 
+    private val lastTransportPreference =
+        AtomicReference<TransportPreferencePayload?>(null)
+
     @Volatile
     var sentFrames: Long = 0
         private set
@@ -67,6 +77,14 @@ class BluetoothRealtimeSender(
 
     @Volatile
     var heartbeatAcksSent: Long = 0
+        private set
+
+    @Volatile
+    var rumblesReceived: Long = 0
+        private set
+
+    @Volatile
+    var handoverCommitsReceived: Long = 0
         private set
 
     @Volatile
@@ -98,6 +116,47 @@ class BluetoothRealtimeSender(
             )
         ) {
             executor.execute(::drainLatest)
+        }
+    }
+
+    fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean {
+        if (closed.get()) {
+            return false
+        }
+
+        if (lastTransportPreference.get() == payload) {
+            return true
+        }
+
+        return try {
+            val frame =
+                BluetoothControlFrameCodec
+                    .encodeTransportPreference(
+                        trustedSession = trustedSession,
+                        payload = payload,
+                        monotonicTimestampMicros =
+                            monotonicMicroseconds(),
+                    )
+
+            writePacket(
+                BluetoothStreamFrameCodec
+                    .encode(frame),
+            )
+
+            lastTransportPreference.set(payload)
+            true
+        } catch (_: IOException) {
+            if (!closed.get()) {
+                controlFailures += 1
+            }
+            false
+        } catch (_: RuntimeException) {
+            if (!closed.get()) {
+                controlFailures += 1
+            }
+            false
         }
     }
 
@@ -193,34 +252,65 @@ class BluetoothRealtimeSender(
                     BluetoothStreamFrameCodec
                         .readFrame(activeInput)
 
-                val echoedProbe =
-                    BluetoothControlFrameCodec
-                        .decodeHeartbeat(
-                            frame,
-                            trustedSession,
+                when (readMessageType(frame)) {
+                    MessageType.HEARTBEAT -> {
+                        val echoedProbe =
+                            BluetoothControlFrameCodec
+                                .decodeHeartbeat(
+                                    frame,
+                                    trustedSession,
+                                )
+
+                        heartbeatsReceived += 1
+                        lastHeartbeatReceivedNanos =
+                            nowNanos()
+
+                        val ack =
+                            BluetoothControlFrameCodec
+                                .encodeHeartbeatAck(
+                                    trustedSession =
+                                        trustedSession,
+                                    responderTimestampMicros =
+                                        monotonicMicroseconds(),
+                                    echoedProbeTimestampMicros =
+                                        echoedProbe,
+                                )
+
+                        writePacket(
+                            BluetoothStreamFrameCodec
+                                .encode(ack),
                         )
 
-                heartbeatsReceived += 1
-                lastHeartbeatReceivedNanos =
-                    nowNanos()
+                        heartbeatAcksSent += 1
+                    }
 
-                val ack =
-                    BluetoothControlFrameCodec
-                        .encodeHeartbeatAck(
-                            trustedSession =
-                                trustedSession,
-                            responderTimestampMicros =
-                                monotonicMicroseconds(),
-                            echoedProbeTimestampMicros =
-                                echoedProbe,
-                        )
+                    MessageType.RUMBLE -> {
+                        val rumble =
+                            BluetoothControlFrameCodec
+                                .decodeRumble(
+                                    frame,
+                                    trustedSession,
+                                )
 
-                writePacket(
-                    BluetoothStreamFrameCodec
-                        .encode(ack),
-                )
+                        rumbleSink(rumble)
+                        rumblesReceived += 1
+                    }
 
-                heartbeatAcksSent += 1
+                    MessageType.HANDOVER_COMMIT -> {
+                        val handover =
+                            BluetoothControlFrameCodec
+                                .decodeHandoverCommit(
+                                    frame,
+                                    trustedSession,
+                                )
+
+                        handoverSink(handover)
+                        handoverCommitsReceived += 1
+                    }
+
+                    else ->
+                        controlFailures += 1
+                }
             } catch (_: IOException) {
                 if (!closed.get()) {
                     controlFailures += 1
@@ -235,6 +325,25 @@ class BluetoothRealtimeSender(
                     controlFailures += 1
                 }
             }
+        }
+    }
+
+    private fun readMessageType(
+        frame: ByteArray,
+    ): MessageType {
+        require(
+            frame.size >=
+                ProtocolConstants.HEADER_SIZE,
+        ) {
+            "Bluetooth control frame is shorter than the protocol header."
+        }
+
+        return requireNotNull(
+            MessageType.fromWireValue(
+                frame[6].toInt() and 0xFF,
+            ),
+        ) {
+            "Bluetooth control frame has an unknown message type."
         }
     }
 

@@ -55,7 +55,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Run Windows tests in CI.
 - [x] Build Android project in CI.
 - [x] Run Android unit tests in CI.
-- [ ] Add formatting/lint checks.
+- [x] Add formatting/lint checks.
 
 **Exit criteria:** empty product shells build consistently on clean environments.
 
@@ -101,13 +101,18 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Implement 150 ms default neutralization policy via centralized config.
 - [x] Define `IVirtualGamepadBackend`.
 - [x] Implement HIDMaestro adapter.
-- [ ] Create one virtual Xbox 360-compatible controller.
+- [x] Create one virtual Xbox 360-compatible controller.
 - [x] Submit digital buttons.
 - [x] Submit sticks.
 - [x] Submit triggers.
-- [ ] Verify device remains alive while session transport is absent/recovering.
+- [x] Verify device remains alive while session transport is absent/recovering.
+- [x] Isolate privileged HIDMaestro ownership in the LocalSystem GamepadHost service.
+- [x] Keep the network-facing Receiver explicitly unelevated (`asInvoker`).
+- [x] Add authenticated local Receiver -> GamepadHost IPC with fixed protocol.
+- [x] Add stale-client watchdog neutralization and automatic host reconnect.
+- [x] Keep one persistent virtual controller across Receiver reconnects.
 - [x] Implement output/rumble callback boundary.
-- [ ] Add virtual-backend diagnostics.
+- [x] Add virtual-backend diagnostics.
 
 **Exit criteria:** Windows can drive the virtual controller from deterministic internal test states without any phone connection.
 
@@ -120,7 +125,7 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Build dedicated landscape gameplay surface.
 - [x] Track pointer IDs independently.
 - [x] Implement control ownership.
-- [ ] Implement touch hysteresis.
+- [x] Implement touch hysteresis.
 - [x] Prevent unrelated pointer cancellation.
 - [x] Handle ACTION_CANCEL safely.
 - [x] Handle app focus loss safely.
@@ -173,11 +178,11 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 - [x] Increase right-stick usability.
 - [x] Separate visual size from invisible hitbox size.
 - [x] Add basic layout scale.
-- [ ] Add safe-area handling.
+- [x] Add safe-area handling.
 - [x] Add landscape orientation enforcement.
 - [x] Add keep-screen-awake behavior during gameplay.
-- [ ] Add configurable haptic strength.
-- [ ] Validate common multi-touch combinations used in eFootball.
+- [x] Add configurable haptic strength.
+- [x] Validate common multi-touch combinations used in eFootball.
 
 **Exit criteria:** layout is comfortable enough for extended eFootball play before visual polish begins.
 
@@ -288,21 +293,21 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 ## M9 — USB Direct transport
 
 - [x] Validate final Android USB accessory/direct data approach.
-- [ ] Validate Windows-side USB implementation.
-- [ ] Record ADR for exact USB design.
-- [ ] Implement direct USB transport.
+- [x] Validate Windows-side USB implementation.
+- [x] Record ADR for exact USB design.
+- [x] Implement direct USB transport.
 - [x] No USB tethering.
 - [x] No ADB requirement.
-- [ ] Detect charge-only/non-data cable failure.
+- [x] Detect charge-only/non-data cable failure.
 - [x] Implement handshake.
 - [x] Implement USB health monitoring.
 - [x] Implement 250–500 ms stabilization.
 - [x] Integrate with Smart Connection Manager.
 - [x] Wi-Fi/Bluetooth -> USB preferred takeover.
 - [x] USB disconnect -> immediate best-backup takeover.
-- [ ] Verify Windows Ethernet/LAN route remains unaffected.
+- [x] Verify Windows Ethernet/LAN route remains unaffected.
 
-> Current physical blocker: pre-AOA Windows endpoint-zero bootstrap. Post-AOA AOA data mode already uses scoped Microsoft WinUSB; the bootstrap implementation must be validated separately and must not replace the normal phone driver manually.
+> Current physical blocker: pre-AOA Windows endpoint-zero bootstrap. Post-AOA AOA data mode already uses scoped Microsoft WinUSB. A KMDF pass-through bootstrap prototype plus user-mode driver bridge exists on the USB prototype branch. The OPPO A58 no-ADB state is now confirmed as `USB\\VID_22D9&PID_2764&REV_0404`, class `WPD`, service `WUDFWpdMtp`; the earlier ADB-on `PID_2765` composite layout is not a product dependency. The source-only extension-INF draft has been retargeted to the exact no-ADB PID/revision. The captured stack is `WpdUpFltr -> WUDFRd -> WINUSB -> ACPI -> USBHUB3`, and the device reports the standard MTP `WinUsb` lower filter in both legacy and compound properties. NATSX therefore does not blindly install a second unordered lower filter. The safe user-mode WinUSB probe failed at `WinUsb_Initialize` with `ERROR_INVALID_FUNCTION`, so the inbox MTP WinUSB filter cannot be used directly as the OPPO A58 bootstrap path and the kernel boundary remains required. The KMDF prototype now routes version/START_AOA IOCTLs through a sideband control device instead of relying on WPD/WUDF to forward custom requests. The exact OPPO A58 no-ADB validation package now builds in CI and passes `InfVerif /w /v`; guarded install/rollback harnesses exist but refuse unsigned packages and default to read-only preflight. The physical Windows signing posture is now confirmed: Secure Boot is enabled, VBS/HVCI is running, HVCI registry enforcement is enabled, TESTSIGNING is currently off, and the system drive is BitLocker-protected/encrypted. The ephemeral CI certificate is now trusted on the validation machine and both SYS/CAT signatures verify as Valid with signer thumbprints matching the package manifest. The read-only transition preflight passed with every gate true. BitLocker protection is physically suspended while the system drive remains FullyEncrypted at 100%, and the post-suspend gate also passed. Secure Boot is now physically disabled on the validation machine and the post-UEFI gate passed while TESTSIGNING remained off, HVCI remained running, and BitLocker remained suspended/fully encrypted. TESTSIGNING is now enabled on the validation machine and the post-TESTSIGNING physical-install gate passed with every check true: Secure Boot remains disabled, VBS/HVCI remains running, BitLocker remains suspended/fully encrypted, the OPPO A58 is healthy in the exact no-ADB WPD/MTP state, and the trusted SYS/CAT signatures remain valid. The guarded physical filter attach has now succeeded on the validation OPPO A58: the exact extension package is installed as oem229.inf, the WPD device remains Started on WUDFWpdMtp/wpdmtp.inf, and the live stack is WpdUpFltr -> WUDFRd -> NatsxAoaBootstrap -> WINUSB -> ACPI -> USBHUB3. START_AOA has not been sent. Physical build-3 probing then showed the filter loaded in the expected stack but the \\.\NatsxAoaBootstrap control device was absent. Source audit found a control-plane coupling that can produce exactly that symptom: sideband creation was attempted only after WdfUsbTargetDeviceCreateWithParameters succeeded, so build 3 could not distinguish USB-target creation failure from sideband creation failure. Build 4 now decouples the control plane from USB-target readiness, bumps the validation package to 0.1.0.1, and adds a read-only GET_STATUS readiness contract. Build 4 has now passed both Windows CI and Windows Driver CI, and the newly signed validation artifact has been emitted. A guarded build-4 preparation harness now pins the green artifact ZIP digest, CI certificate identity, exact OPPO hardware target, package version 0.1.0.1, manifest hashes, and SYS/CAT signer binding before extraction is accepted. The signed build-4 artifact has now been prepared locally and passed the pinned ZIP digest, exact hardware target, package version 0.1.0.1, manifest hash, certificate identity, and SYS/CAT signer-binding checks. Its signatures are expectedly untrusted until the new ephemeral build-4 certificate is imported. The build-4 certificate trust preflight has passed: SYS/CAT signer thumbprints match the artifact certificate and both signatures fail only because the new ephemeral root is not yet trusted. The first trust attempt was correctly blocked because PowerShell was not elevated, so no certificate-store changes were made. The exact build-4 ephemeral CI certificate is now trusted successfully from an elevated shell; no Secure Boot or TESTSIGNING state was changed by that trust step. The controlled rollback preflight for the installed build-3 package passed and resolves exactly to oem229.inf with the bootstrap service still present; no package changes were made by the preflight. The explicit build-3 uninstall has now completed successfully without /force and the package was deleted. Post-uninstall verification now confirms the OPPO A58 is back on the clean OEM WPD/MTP stack: Status OK/Started, WUDFWpdMtp, wpdmtp.inf, WinUsb as the only compound lower filter, and no NatsxAoaBootstrap in the live stack. The old bootstrap kernel service is confirmed STOPPED after rollback, and the build-4 install preflight now passes with the exact WPD target healthy, SYS/CAT signatures Valid, signer identities matching the manifest, and the build-4 certificate trusted in both required stores. Manual File Explorer MTP access has now been confirmed normal on the clean OEM stack after build-3 rollback. All pre-install gates are green, and the guarded build-4 package has now been installed physically on the exact OPPO A58 instance. PnPUtil reports the package added and installed successfully, and START_AOA has still not been sent. Post-install stack verification confirms build 4 is physically attached in the expected WPD stack with extension package 0.1.0.1 installed, and manual File Explorer MTP remains normal. The read-only build-4 probe succeeds with ProtocolVersion=1, DriverBuild=4, AttachedTargetCount=1, ReadyUsbTargetCount=0, Compatible=true, proving the control plane works while WdfUsbTargetDeviceCreateWithParameters is still failing. Build 5 diagnostics now expose the exact NTSTATUS and attempt count for that call; both Windows CI and Windows Driver CI are green and the signed 0.1.0.2 artifact has been emitted. The build-5 artifact was prepared and trusted successfully, build 4 was removed through the guarded rollback path without /force, and build 5 was installed physically. Its read-only probe reports ProtocolVersion=1, DriverBuild=5, AttachedTargetCount=1, ReadyUsbTargetCount=0, LastUsbTargetCreateStatus=0xC0000010 (STATUS_INVALID_DEVICE_REQUEST), and UsbTargetCreateAttemptCount=1. This closes the WDFUSBDEVICE specialization as the bootstrap mechanism for this lower-filter stack. Build 6 was installed physically and its read-only raw URB AOA_GET_PROTOCOL probe still returned STATUS_INVALID_DEVICE_REQUEST. Microsoft documentation confirms IOCTL_INTERNAL_USB_SUBMIT_URB targets the USB hub PDO and carries the URB in Parameters.Others.Argument1; build 6 was still sending through the filter's local next-lower I/O target. Build 7 now routes the same read-only raw probe to the physical PDO obtained from WdfDeviceWdmGetPhysicalDevice via a remote WDF I/O target. Physical validation passed completely: raw submit status 0, USB status 0, 2 bytes transferred, Android reported AOA protocol 2, and RawEndpointZeroUsable=true while START_AOA remained unsent. Build 8 moves the bounded full AOA GET_PROTOCOL + six identity strings + START_ACCESSORY sequence onto that same validated physical-PDO raw-URB path and gates START behind a fresh successful raw probe. Physical START_AOA validation has now passed: DriverBuild 8 reported ReadyForStart=true, sent START_ACCESSORY successfully, and the OPPO A58 re-enumerated cleanly as USB\\VID_18D1&PID_2D00 with Status=OK/Class=USBDevice while preserving the device serial. The post-AOA WinUSB package for exact Google AOA identities (18D1:2D00 and 18D1:2D01 MI_00) is staged as a signed validation package; physical post-AOA validation now confirms the re-enumerated CPH2577 is enumerated through the scoped NATSX WinUSB interface and opens successfully with BulkInReadable=true and BulkOutWritable=true. The first probe exposed a teardown-only WinRT limitation where the default buffered .NET adapter called unsupported IOutputStream.FlushAsync during DisposeAsync; the data path itself had already opened successfully. The backend now uses zero-buffer Windows Runtime stream adapters, USB writes no longer depend on FlushAsync, and teardown tolerates that WinRT limitation; Windows CI, Windows Driver CI, and Android CI are green after the fix. Android automatically detects/opens the matching NATSX accessory and registers the USB realtime sender with the shared broadcaster without ADB. Physical validation on the OPPO A58 has now confirmed the production runtime can establish a trusted Wi-Fi session over the normal LAN path and then attach USB Direct as an authenticated low-latency uplink while Windows Ethernet/LAN remains usable. The final runtime deliberately avoids making first-pair or trusted control dependent on the OEM USB downlink path: secure pairing/control uses LAN/Wi-Fi, while USB carries authenticated realtime controller uplink data and can take authority through Smart Auto. M9 remaining work is reliability/release hardening rather than basic feasibility: repeated live plug/unplug handover/rejoin, charge-only/non-data cable diagnostics, normal MTP recovery after repeated transitions, extended realtime-input soak, and final release-signing/installer posture.
 
 **Exit criteria:** USB can be plugged/unplugged during a running controller session and Smart Auto moves transports without manual reconnect.
 
@@ -310,86 +315,96 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M10 — Pairing and trust
 
-- [ ] Define first-pair user flow.
+> First-pair v1 is now implemented over the local LAN/Wi-Fi control path. Android initiates an ephemeral P-256 exchange, both Android and Windows display the same six-digit SAS, both users must explicitly confirm, role-bound HMAC confirmation proofs are exchanged, and only then is the derived 32-byte trust secret persisted using Android Keystore-backed storage and Windows DPAPI. Windows keeps a secure LAN re-pair/recovery listener active even when stale trust exists, so an Android reinstall/new identity can recover by a fresh SAS-confirmed pairing instead of deadlocking. After a trusted Wi-Fi session is established, USB Direct may attach as an authenticated one-way low-latency realtime uplink without depending on OEM USB downlink behavior. M10 is complete: Windows now exposes trusted-controller identity plus an explicit confirmed Forget action that revokes persisted trust and live sessions immediately, with a final trust recheck before late transport attachment to close revoke/attach races.
+
+- [x] Define first-pair user flow.
 - [x] Generate/store peer identity.
 - [x] Protect long-term trust material using platform secure storage.
-- [ ] Implement pairing code/confirmation flow.
-- [ ] Bind trust to the intended device.
-- [ ] Reject untrusted LAN state packets.
-- [ ] Reject stale session packets.
-- [ ] Add “Forget device”.
-- [ ] Add pairing reset/recovery.
+- [x] Implement pairing code/confirmation flow.
+- [x] Bind trust to the intended device.
+- [x] Reject untrusted LAN state packets.
+- [x] Reject stale session packets.
+- [x] Add “Forget device”.
+- [x] Add pairing reset/recovery.
 
 ---
 
 ## M11 — Rumble and haptics
 
-- [ ] Local touch haptics.
-- [ ] Off/Low/Medium/High settings.
-- [ ] Virtual-controller rumble capture.
-- [ ] Output protocol message.
-- [ ] Android rumble handler.
-- [ ] Ensure output cannot block input.
-- [ ] Define behavior during transport handover.
-- [ ] Graceful fallback on devices with limited haptics.
+- [x] Local touch haptics.
+- [x] Off/Low/Medium/High settings.
+- [x] Virtual-controller rumble capture.
+- [x] Output protocol message.
+- [x] Android rumble handler.
+- [x] Ensure output cannot block input.
+- [x] Define behavior during transport handover.
+- [x] Graceful fallback on devices with limited haptics.
+
+> Rumble output is isolated from the realtime input path with a latest-only bounded queue. Android refresh/watchdog behavior prevents stuck vibration, and uplink-only USB automatically falls back to a duplex transport for rumble without changing USB input authority.
 
 ---
 
 ## M12 — Receiver UX
 
-- [ ] Connected device status.
-- [ ] Active transport.
-- [ ] Backup transport status.
-- [ ] Virtual controller status.
-- [ ] RTT.
-- [ ] Jitter.
-- [ ] packet loss/error health.
-- [ ] Input rate.
-- [ ] Reconnect count.
-- [ ] Recent handover reason.
-- [ ] Settings.
-- [ ] Diagnostics view.
-- [ ] Minimize to system tray.
-- [ ] Optional startup with Windows.
-- [ ] Clear error states for missing backend/permissions.
+> M12 is functionally complete. The receiver exposes live, non-blocking Smart Auto diagnostics, trusted-controller identity/Forget management, persistent user settings, system-tray operation, optional per-user Windows startup, and actionable startup error/retry states. Minimize always hides to tray; close-to-tray defaults on so the controller engine keeps running without a visible WPF window. Diagnostics and tray updates remain outside the realtime input path.
+
+- [x] Connected device status.
+- [x] Active transport.
+- [x] Backup transport status.
+- [x] Virtual controller status.
+- [x] RTT.
+- [x] Jitter.
+- [x] packet loss/error health.
+- [x] Input rate.
+- [x] Reconnect count.
+- [x] Recent handover reason.
+- [x] Settings.
+- [x] Diagnostics view.
+- [x] Minimize to system tray.
+- [x] Optional startup with Windows.
+- [x] Clear error states for missing backend/permissions.
 
 ---
 
 ## M13 — Android UX
 
-- [ ] Pairing screen.
-- [ ] Trusted PC list.
-- [ ] Smart Auto connection status.
-- [ ] Gameplay screen.
-- [ ] Connection overlay that does not interrupt controls unnecessarily.
-- [ ] Controller profile chooser.
-- [ ] Sensitivity/deadzone settings.
-- [ ] Haptic settings.
-- [ ] Manual transport override.
-- [ ] Diagnostics.
-- [ ] Calibration flow.
-- [ ] Custom layout editor.
+> Smart Auto status now comes from authenticated Windows HANDOVER_COMMIT authority feedback instead of Android-side transport guessing. Wi-Fi, Bluetooth, and duplex USB control paths feed one sequence-aware coordinator; duplicate/stale commits are rejected, unsigned sequence wraparound is handled, and runtime restart clears old authority before reconnect. Android diagnostics exposes authority, link/reconnect state, controller tuning, haptics, trust count, USB runtime state, calibration, and custom-layout status. Manual transport control is a persisted authenticated preference (Smart Auto / Prefer Wi-Fi / Prefer Bluetooth / Prefer USB): Windows follows the requested healthy transport while preserving emergency failover. The v1 gameplay screen now includes immersive multi-touch controls, profiles/tuning, guided thumb-center/travel calibration, and a persisted drag-to-reposition layout editor; more sophisticated layout editing remains post-v1.
+
+- [x] Pairing screen.
+- [x] Trusted PC list.
+- [x] Smart Auto connection status.
+- [x] Gameplay screen.
+- [x] Connection overlay that does not interrupt controls unnecessarily.
+- [x] Controller profile chooser.
+- [x] Sensitivity/deadzone settings.
+- [x] Haptic settings.
+- [x] Manual transport override.
+- [x] Diagnostics.
+- [x] Calibration flow.
+- [x] Custom layout editor.
 
 ---
 
 ## M14 — Reliability and performance
 
+> Reliability coverage now includes deterministic duplicate/out-of-order rejection, packet-loss/failover harnesses, rapid USB flapping protection, equivalent-state make-before-break handover, safety neutralization without stopping the virtual backend, stale Android trusted-session cleanup, a 10-cycle automated USB attach/takeover/detach/Wi-Fi-fallback soak, repeated five-cycle Wi-Fi and Bluetooth heartbeat-loss recovery, lifecycle neutralization on focus/background loss, immediate rumble stop on background, landscape/config-change contract guards, and sticky-service trusted-peer restart bootstrap coverage. Physical OPPO A58 validation has also confirmed Wi-Fi input, USB preferred takeover, USB unplug fallback back to Wi-Fi without manual reconnect, and Receiver restart recovery. Longer wall-clock soak, Windows sleep/resume, and resource/power profiling remain open.
+
 - [ ] 30-minute soak test.
 - [ ] 2-hour soak test.
-- [ ] repeated Wi-Fi toggle test.
-- [ ] repeated Bluetooth recovery test.
-- [ ] repeated USB reconnect test.
-- [ ] transport flapping test.
-- [ ] packet reordering test.
-- [ ] packet duplication test.
-- [ ] packet loss simulation.
-- [ ] Android background/foreground test.
-- [ ] screen rotation/lock behavior test.
+- [x] repeated Wi-Fi toggle test.
+- [x] repeated Bluetooth recovery test.
+- [x] repeated USB reconnect test.
+- [x] transport flapping test.
+- [x] packet reordering test.
+- [x] packet duplication test.
+- [x] packet loss simulation.
+- [x] Android background/foreground test.
+- [x] screen rotation/lock behavior test.
 - [ ] Windows sleep/resume test.
-- [ ] receiver restart recovery.
-- [ ] phone app restart recovery.
-- [ ] no stuck-input verification.
-- [ ] allocation/profile hot input path.
+- [x] receiver restart recovery.
+- [x] phone app restart recovery.
+- [x] no stuck-input verification.
+- [x] allocation/profile hot input path.
 - [ ] CPU usage review.
 - [ ] battery impact review.
 
@@ -397,18 +412,18 @@ Checkboxes should reflect repository reality. Do not mark items complete because
 
 ## M15 — Release engineering
 
-- [ ] Windows installer strategy.
-- [ ] Driver/backend dependency installation.
-- [ ] elevation flow.
-- [ ] uninstall cleanup.
-- [ ] Android signed release build.
-- [ ] versioning strategy.
-- [ ] changelog.
-- [ ] release checklist.
-- [ ] upgrade/migration behavior.
-- [ ] crash/log collection strategy that remains local-first/private.
-- [ ] security review.
-- [ ] license/dependency review.
+- [x] Windows installer strategy.
+- [ ] Driver/backend dependency installation (HIDMaestro bootstrap, privileged GamepadHost runtime, install/repair/reconnect/uninstall lifecycle, and release gates are complete in CI; Microsoft retail-signed USB AOA driver packages plus clean-machine physical validation are still required for feature-complete production).
+- [x] elevation flow.
+- [x] uninstall cleanup.
+- [x] Android signed release build.
+- [x] versioning strategy.
+- [x] changelog.
+- [x] release checklist.
+- [x] upgrade/migration behavior.
+- [x] crash/log collection strategy that remains local-first/private.
+- [x] security review.
+- [x] license/dependency review.
 
 ---
 

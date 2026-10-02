@@ -119,8 +119,12 @@ Receiver safety deadlines are always based on the receiver's own monotonic clock
 | 10 | HANDOVER_COMMIT |
 | 11 | RUMBLE |
 | 12 | DISCONNECT |
+| 13 | PAIRING_OFFER |
+| 14 | PAIRING_RESPONSE |
+| 15 | PAIRING_CONFIRM |
+| 16 | PAIRING_ABORT |
 
-Values 13..255 are currently unassigned.
+Values 17..255 are currently unassigned.
 
 Unknown message types are rejected by v1 unless a later negotiated minor-version rule explicitly defines otherwise.
 

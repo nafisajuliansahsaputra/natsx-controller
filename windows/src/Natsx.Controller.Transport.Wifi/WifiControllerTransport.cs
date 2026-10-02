@@ -1,10 +1,15 @@
 using System.Net;
 using Natsx.Controller.Connection;
 using Natsx.Controller.Core;
+using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Transport.Wifi;
 
-public sealed class WifiControllerTransport : IControllerTransport
+public sealed class WifiControllerTransport :
+    IControllerTransport,
+    IControllerOutputTransport,
+    IControllerStatusOutputTransport,
+    IControllerPreferenceSource
 {
     private readonly WifiRealtimeReceiver _receiver;
     private readonly IPEndPoint _bindEndPoint;
@@ -22,6 +27,8 @@ public sealed class WifiControllerTransport : IControllerTransport
         TransportLifecycle? lifecycle = null)
     {
         _receiver = receiver ?? throw new ArgumentNullException(nameof(receiver));
+        _receiver.TransportPreferenceReceived +=
+            OnTransportPreferenceReceived;
         _bindEndPoint = bindEndPoint ??
             new IPEndPoint(IPAddress.Any, WifiRealtimeReceiver.DefaultPort);
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -32,6 +39,9 @@ public sealed class WifiControllerTransport : IControllerTransport
     public event EventHandler<TransportGamepadStateEventArgs>? GamepadStateReceived;
 
     public event EventHandler<TransportRuntimeStateChangedEventArgs>? StateChanged;
+
+    public event Action<TransportKind?>?
+        PreferredTransportRequested;
 
     public TransportKind Kind => TransportKind.Wifi;
 
@@ -139,6 +149,41 @@ public sealed class WifiControllerTransport : IControllerTransport
         return _receiver.GetDiagnosticsSnapshot(State);
     }
 
+    public ValueTask<bool> TrySendRumbleAsync(
+        RumbleState rumble,
+        CancellationToken cancellationToken = default)
+    {
+        return _receiver.TrySendRumbleAsync(
+            rumble,
+            cancellationToken);
+    }
+
+    public ValueTask<bool> TrySendHandoverCommitAsync(
+        TransportKind activeTransport,
+        uint stateSequence,
+        CancellationToken cancellationToken = default)
+    {
+        ProtocolTransport protocolTransport =
+            activeTransport switch
+            {
+                TransportKind.Wifi =>
+                    ProtocolTransport.Wifi,
+                TransportKind.Bluetooth =>
+                    ProtocolTransport.Bluetooth,
+                TransportKind.Usb =>
+                    ProtocolTransport.UsbDirect,
+                _ =>
+                    throw new ArgumentOutOfRangeException(
+                        nameof(activeTransport)),
+            };
+
+        return _receiver
+            .TrySendHandoverCommitAsync(
+                protocolTransport,
+                stateSequence,
+                cancellationToken);
+    }
+
     private async Task PumpStatesAsync(CancellationToken cancellationToken)
     {
         try
@@ -170,6 +215,29 @@ public sealed class WifiControllerTransport : IControllerTransport
         }
     }
 
+    private void OnTransportPreferenceReceived(
+        TransportPreferencePayload payload)
+    {
+        TransportKind? preferred =
+            payload.Mode switch
+            {
+                TransportPreferenceMode.Auto =>
+                    null,
+                TransportPreferenceMode.Wifi =>
+                    TransportKind.Wifi,
+                TransportPreferenceMode.Bluetooth =>
+                    TransportKind.Bluetooth,
+                TransportPreferenceMode.UsbDirect =>
+                    TransportKind.Usb,
+                _ =>
+                    throw new ArgumentOutOfRangeException(
+                        nameof(payload)),
+            };
+
+        PreferredTransportRequested
+            ?.Invoke(preferred);
+    }
+
     private void OnLifecycleStateChanged(TransportRuntimeState state)
     {
         StateChanged?.Invoke(
@@ -189,6 +257,8 @@ public sealed class WifiControllerTransport : IControllerTransport
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         await DisconnectAsync(timeout.Token).ConfigureAwait(false);
         await _receiver.DisposeAsync().ConfigureAwait(false);
+        _receiver.TransportPreferenceReceived -=
+            OnTransportPreferenceReceived;
         _lifecycle.StateChanged -= OnLifecycleStateChanged;
 
         _disposed = true;

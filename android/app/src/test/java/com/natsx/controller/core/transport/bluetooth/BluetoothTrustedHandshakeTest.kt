@@ -3,14 +3,18 @@ package com.natsx.controller.core.transport.bluetooth
 import com.natsx.controller.core.protocol.AuthResponsePayload
 import com.natsx.controller.core.protocol.AuthResponsePayloadCodec
 import com.natsx.controller.core.protocol.FrameFlags
+import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.PeerId
 import com.natsx.controller.core.protocol.PeerRole
 import com.natsx.controller.core.protocol.ProtocolFrame
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
+import com.natsx.controller.core.protocol.ProtocolTransport
 import com.natsx.controller.core.protocol.ProtocolVersion
 import com.natsx.controller.core.protocol.SessionReadyPayload
 import com.natsx.controller.core.protocol.TransportCapabilities
+import com.natsx.controller.core.protocol.TransportPreferenceMode
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.protocol.TrustedReconnectCrypto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -120,6 +124,85 @@ class BluetoothTrustedHandshakeTest {
         }
 
         trustSecret.fill(0)
+    }
+
+    @Test
+    fun handoverCommitRoundTripPreservesAuthorityAndSequence() {
+        val sessionKey =
+            ByteArray(32) { index ->
+                index.toByte()
+            }
+
+        BluetoothTrustedSession(
+            com.natsx.controller.core.protocol.SessionId
+                .createRandom(),
+            sessionKey,
+        ).use { trustedSession ->
+            val expected =
+                HandoverPayload(
+                    transport =
+                        ProtocolTransport.USB_DIRECT,
+                    stateSequence =
+                        0xA1B2_C3D4u,
+                )
+
+            val encoded =
+                BluetoothControlFrameCodec
+                    .encodeHandoverCommit(
+                        trustedSession,
+                        expected,
+                        500uL,
+                    )
+
+            assertEquals(
+                expected,
+                BluetoothControlFrameCodec
+                    .decodeHandoverCommit(
+                        encoded,
+                        trustedSession,
+                    ),
+            )
+        }
+
+        sessionKey.fill(0)
+    }
+
+    @Test
+    fun transportPreferenceRoundTripPreservesMode() {
+        val sessionKey =
+            ByteArray(32) { index ->
+                index.toByte()
+            }
+
+        BluetoothTrustedSession(
+            com.natsx.controller.core.protocol.SessionId
+                .createRandom(),
+            sessionKey,
+        ).use { trustedSession ->
+            val expected =
+                TransportPreferencePayload(
+                    TransportPreferenceMode.BLUETOOTH,
+                )
+
+            val encoded =
+                BluetoothControlFrameCodec
+                    .encodeTransportPreference(
+                        trustedSession,
+                        expected,
+                        510uL,
+                    )
+
+            assertEquals(
+                expected,
+                BluetoothControlFrameCodec
+                    .decodeTransportPreference(
+                        encoded,
+                        trustedSession,
+                    ),
+            )
+        }
+
+        sessionKey.fill(0)
     }
 
     @Test

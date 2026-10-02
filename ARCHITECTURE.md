@@ -4,12 +4,13 @@
 
 This document is the technical architecture source of truth for NATSX Controller.
 
-The product has two runtime applications:
+The product has two user-facing applications plus one narrow Windows privileged service:
 
 - Android controller application;
-- Windows receiver application.
+- unelevated Windows Receiver application;
+- LocalSystem Windows GamepadHost service.
 
-Together they expose one stable Xbox 360-compatible virtual controller to Windows games.
+Together they expose one stable Xbox 360-compatible virtual controller to Windows games while keeping network, Bluetooth, USB, pairing, and UI parsing outside the privileged process.
 
 ---
 
@@ -37,23 +38,29 @@ Together they expose one stable Xbox 360-compatible virtual controller to Window
 └───┼──────┼───────────┼──────────────────────────────────┘
     │      │           │
     │      │           │
-┌───┼──────┼───────────┼──────── WINDOWS ────────────────┐
-│   ▼      ▼           ▼                                 │
-│               Transport Host                           │
-│                    │                                   │
-│                    ▼                                   │
-│        Smart Connection Manager                        │
-│                    │                                   │
-│                    ▼                                   │
-│          Controller Session                            │
-│                    │                                   │
-│                    ▼                                   │
-│        Input Safety / Watchdog                         │
-│                    │                                   │
-│                    ▼                                   │
-│        Virtual Controller Backend                      │
-│                    │                                   │
-└────────────────────┼───────────────────────────────────┘
+┌───┼──────┼───────────┼──────── WINDOWS ─────────────────────────┐
+│   ▼      ▼           ▼                                           │
+│            Unelevated Receiver                                   │
+│               Transport Host                                     │
+│                    │                                             │
+│                    ▼                                             │
+│        Smart Connection Manager                                  │
+│                    │                                             │
+│                    ▼                                             │
+│          Controller Session                                      │
+│                    │                                             │
+│                    ▼                                             │
+│        Input Safety / Watchdog                                   │
+│                    │                                             │
+│                    ▼                                             │
+│       PipeVirtualGamepadBackend                                  │
+│                    │ local fixed protocol                        │
+│                    ▼                                             │
+│      LocalSystem GamepadHost service                             │
+│                    │                                             │
+│                    ▼                                             │
+│     HIDMaestro Xbox 360 backend                                  │
+└────────────────────┼─────────────────────────────────────────────┘
                      ▼
               Windows / eFootball
 ```
@@ -78,9 +85,12 @@ Other connections may remain READY/warm as backups.
 
 ### 3.3 Stable virtual-device lifecycle
 
-The virtual controller is not tied to a network socket.
+The virtual controller is not tied to a network socket or Receiver connection.
 
-Transport transitions should not unplug/replug the Xbox 360-compatible controller from the game's perspective.
+The privileged GamepadHost owns one persistent HIDMaestro backend for the lifetime
+of the Windows service. Receiver disconnect/reconnect and USB/Wi-Fi/Bluetooth
+handover neutralize or reattach state without intentionally recreating the
+Xbox 360-compatible device.
 
 ### 3.4 Full-state semantics
 
@@ -120,9 +130,20 @@ USB, Wi-Fi, and Bluetooth serialize the same logical protocol.
 
 ### Virtual controller
 
-Current planned backend: HIDMaestro Xbox 360-compatible profile/integration.
+Current Windows backend: HIDMaestro Xbox 360-compatible profile/integration.
 
-The backend must remain replaceable at the architecture boundary until integration is proven.
+The unelevated Receiver uses `PipeVirtualGamepadBackend`, which speaks a small
+versioned local named-pipe protocol to the privileged GamepadHost. The
+GamepadHost owns the HIDMaestro backend and keeps it independent from
+Wi-Fi/Bluetooth/USB and Receiver process lifetime.
+
+The Receiver manifest is explicitly `asInvoker`. The LocalSystem GamepadHost is
+installed only below Program Files, accepts local pipe clients only, validates
+that the connecting process is the installed Receiver executable, and never
+parses network, Bluetooth, USB, discovery, or pairing traffic.
+
+The backend remains replaceable behind `IVirtualGamepadBackend`; transport
+attach/detach must never recreate the controller device.
 
 ---
 
@@ -156,6 +177,7 @@ The backend must remain replaceable at the architecture boundary until integrati
 │   │   ├── Natsx.Controller.Transport.Bluetooth/
 │   │   ├── Natsx.Controller.Transport.Usb/
 │   │   ├── Natsx.Controller.VirtualGamepad/
+│   │   ├── Natsx.Controller.GamepadHost/
 │   │   └── Natsx.Controller.Receiver/
 │   └── tests/
 │
@@ -212,19 +234,35 @@ Core gamepad logic must not depend on Activities, Fragments, or screen widgets.
 WPF / Tray UI
       │
       ▼
-Receiver application service
+Unelevated Receiver runtime
       │
       ├── SmartConnectionManager
       ├── ControllerSession
       ├── Diagnostics
+      ├── Wi-Fi / Bluetooth / USB
       │
       ▼
-Core interfaces
-      ├── transports
-      └── virtual gamepad
+PipeVirtualGamepadBackend
+      │
+      ▼
+local authenticated named pipe
+      │
+      ▼
+LocalSystem GamepadHost
+      │
+      ▼
+HIDMaestro Xbox 360 backend
 ```
 
-The WPF window is a view/controller surface, not the runtime engine.
+The WPF window is a view/controller surface, not the runtime engine. The
+network-facing Receiver remains unelevated. Privilege is isolated to the
+minimal GamepadHost service, whose protocol accepts only HELLO, full
+`GamepadState`, READY, rumble, and error frames.
+
+The Receiver refreshes the latest authoritative state every 100 ms while
+connected. If the service sees no fresh state for 500 ms, it neutralizes the
+controller and closes the client session. Named-pipe connection attempts retry
+across slow service/HIDMaestro startup and service restart.
 
 ---
 

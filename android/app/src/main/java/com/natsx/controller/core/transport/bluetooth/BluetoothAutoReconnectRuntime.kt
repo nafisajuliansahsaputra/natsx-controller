@@ -1,6 +1,7 @@
 package com.natsx.controller.core.transport.bluetooth
 
 import android.os.SystemClock
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.session.RealtimeStateBroadcaster
 import java.io.Closeable
 import java.util.concurrent.ExecutorService
@@ -66,6 +67,16 @@ class BluetoothAutoReconnectRuntime(
         require(heartbeatLostTimeoutMillis in 500..30_000)
         require(pollIntervalMillis in 25..1_000)
     }
+
+    fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean =
+        activeLink
+            .get()
+            ?.trySendTransportPreference(
+                payload,
+            )
+            ?: false
 
     fun start() {
         check(!closed.get()) {

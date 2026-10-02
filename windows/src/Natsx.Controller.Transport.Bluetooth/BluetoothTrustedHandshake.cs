@@ -226,6 +226,129 @@ public static class BluetoothControlFrameCodec
             .ReadUInt64LittleEndian(frame.Payload);
     }
 
+    public static byte[] EncodeRumble(
+        BluetoothTrustedSession trustedSession,
+        RumblePayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(
+            trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.Rumble,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                RumblePayloadCodec.Encode(
+                    payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static RumblePayload DecodeRumble(
+        ReadOnlySpan<byte> frameBytes,
+        BluetoothTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.Rumble)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.Rumble}, received {frame.MessageType}.");
+        }
+
+        return RumblePayloadCodec.Decode(
+            frame.Payload);
+    }
+
+    public static byte[] EncodeTransportPreference(
+        BluetoothTrustedSession trustedSession,
+        TransportPreferencePayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(
+            trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.TransportPreference,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                TransportPreferencePayloadCodec
+                    .Encode(payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static TransportPreferencePayload DecodeTransportPreference(
+        ReadOnlySpan<byte> frameBytes,
+        BluetoothTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.TransportPreference)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.TransportPreference}, received {frame.MessageType}.");
+        }
+
+        return TransportPreferencePayloadCodec
+            .Decode(frame.Payload);
+    }
+
+    public static byte[] EncodeHandoverCommit(
+        BluetoothTrustedSession trustedSession,
+        HandoverPayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(
+            trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.HandoverCommit,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                HandoverPayloadCodec.Encode(
+                    payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static HandoverPayload DecodeHandoverCommit(
+        ReadOnlySpan<byte> frameBytes,
+        BluetoothTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.HandoverCommit)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.HandoverCommit}, received {frame.MessageType}.");
+        }
+
+        return HandoverPayloadCodec.Decode(
+            frame.Payload);
+    }
+
     public static byte[] EncodeTransportReady(
         BluetoothTrustedSession trustedSession,
         ProtocolTransport transport,
@@ -326,6 +449,34 @@ public sealed class BluetoothTrustedHandshakeServer
         _timeProvider = timeProvider ?? TimeProvider.System;
         _lifecycle = lifecycle;
         _sessionRegistry = sessionRegistry;
+    }
+
+    public async ValueTask<BluetoothTrustedHandshakeCompletion>
+        AuthenticateAsync(
+            Stream inputStream,
+            Stream outputStream,
+            Func<PeerId, byte[]?> trustSecretResolver,
+            byte[] firstFrame,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(inputStream);
+        ArgumentNullException.ThrowIfNull(firstFrame);
+
+        byte[] framed =
+            BluetoothStreamFrameCodec
+                .Encode(firstFrame);
+
+        using var replay =
+            new BluetoothPrefixedReadStream(
+                framed,
+                inputStream);
+
+        return await AuthenticateAsync(
+                replay,
+                outputStream,
+                trustSecretResolver,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async ValueTask<BluetoothTrustedHandshakeCompletion>

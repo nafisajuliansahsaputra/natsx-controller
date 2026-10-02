@@ -1,0 +1,80 @@
+; NATSX AOA bootstrap prototype extension INF
+; TARGET: OPPO A58 normal-mode USB device captured on 2026-10-01 with
+; USB debugging / ADB disabled.
+;
+; The ADB-off configuration is a single MTP/WPD USB device, not the earlier
+; composite ADB-on configuration. NATSX must work from this state because ADB
+; is not a product dependency.
+;
+; This is intentionally device/revision-specific and must never be generalized
+; to a class-wide MTP/WPD/USB filter.
+;
+; Observed ADB-off device:
+;   USB\VID_22D9&PID_2764&REV_0404
+;   class: WPD
+;   base service: WUDFWpdMtp
+;   base INF: wpdmtp.inf
+;   parent: USB root hub
+;
+; Earlier ADB-on observation used PID_2765 with usbccgp + MI_00/MI_01 child
+; interfaces. That PID is not the no-ADB shipping target. This INF therefore
+; matches only the ADB-off PID_2764 revision.
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = Extension
+ClassGuid   = {e2f84ce7-8efa-411c-aa69-97454ca4cb57}
+Provider    = %ProviderName%
+ExtensionId = {6F2E4A6C-3C21-4B18-9D6B-4F7D0F99D9C1}
+DriverVer   = 10/01/2026,0.1.0.5
+CatalogFile = Natsx.AoaBootstrap.OPPOA58.Extension.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+Natsx.AoaBootstrap.Driver.sys = 1
+
+[Manufacturer]
+%ProviderName% = NatsxModels,NTamd64.10.0...22000
+
+[NatsxModels.NTamd64.10.0...22000]
+%DeviceDesc% = NatsxAoaBootstrap_Install, USB\VID_22D9&PID_2764&REV_0404
+
+[NatsxAoaBootstrap_Install.NT]
+CopyFiles = NatsxAoaBootstrap_CopyFiles
+
+[NatsxAoaBootstrap_Install.NT.Services]
+AddService = NatsxAoaBootstrap,,NatsxAoaBootstrap_Service
+
+[NatsxAoaBootstrap_Install.NT.Filters]
+AddFilter = NatsxAoaBootstrap,0,NatsxAoaBootstrap_Filter
+
+[NatsxAoaBootstrap_Filter]
+FilterPosition = Lower
+
+[NatsxAoaBootstrap_Install.NT.Wdf]
+KmdfService = NatsxAoaBootstrap,NatsxAoaBootstrap_Wdf
+
+[NatsxAoaBootstrap_Wdf]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[NatsxAoaBootstrap_CopyFiles]
+Natsx.AoaBootstrap.Driver.sys
+
+[NatsxAoaBootstrap_Service]
+DisplayName   = %ServiceDesc%
+ServiceType   = 1
+StartType     = 3
+ErrorControl  = 1
+ServiceBinary = %13%\Natsx.AoaBootstrap.Driver.sys
+
+[Strings]
+ProviderName = "NATSX"
+DeviceDesc   = "NATSX AOA bootstrap filter for OPPO A58"
+ServiceDesc  = "NATSX AOA bootstrap filter"
+DiskName     = "NATSX AOA bootstrap prototype package"

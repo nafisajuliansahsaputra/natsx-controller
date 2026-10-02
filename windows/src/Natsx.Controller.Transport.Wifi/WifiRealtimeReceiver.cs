@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Threading.Channels;
 using Natsx.Controller.Connection;
+using Natsx.Controller.Core;
 using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Transport.Wifi;
@@ -21,6 +22,7 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
     private readonly WifiHealthTracker _healthTracker;
     private readonly TransportHealthEvaluator _healthEvaluator;
     private readonly object _remoteEndpointLock = new();
+    private readonly SemaphoreSlim _outputGate = new(1, 1);
 
     private UdpClient? _udpClient;
     private CancellationTokenSource? _runCancellation;
@@ -58,6 +60,9 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
 
     public bool IsRunning => _receiveLoop is not null;
 
+    public event Action<TransportPreferencePayload>?
+        TransportPreferenceReceived;
+
     public long AcceptedDatagrams => Interlocked.Read(ref _acceptedDatagrams);
 
     public long AcceptedControlDatagrams =>
@@ -90,6 +95,129 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
         _healthTracker.Snapshot().PacketLossPercent;
 
     public ChannelReader<WifiGamepadDatagram> States => _latestState.Reader;
+
+    public async ValueTask<bool> TrySendRumbleAsync(
+        RumbleState rumble,
+        CancellationToken cancellationToken = default)
+    {
+        UdpClient? udpClient =
+            _udpClient;
+
+        IPEndPoint? remote;
+
+        lock (_remoteEndpointLock)
+        {
+            remote =
+                CloneEndPoint(
+                    _remoteEndpoint);
+        }
+
+        if (udpClient is null ||
+            remote is null ||
+            _receiveLoop is null)
+        {
+            return false;
+        }
+
+        byte[] datagram =
+            WifiControlDatagramCodec
+                .EncodeRumble(
+                    _trustedSession,
+                    new RumblePayload(
+                        rumble.LowFrequencyMotor,
+                        rumble.HighFrequencyMotor),
+                    GetMonotonicMicroseconds());
+
+        await _outputGate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await udpClient.SendAsync(
+                    datagram,
+                    remote,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        finally
+        {
+            _outputGate.Release();
+        }
+    }
+
+    public async ValueTask<bool> TrySendHandoverCommitAsync(
+        ProtocolTransport activeTransport,
+        uint stateSequence,
+        CancellationToken cancellationToken = default)
+    {
+        UdpClient? udpClient =
+            _udpClient;
+
+        IPEndPoint? remote;
+
+        lock (_remoteEndpointLock)
+        {
+            remote =
+                CloneEndPoint(
+                    _remoteEndpoint);
+        }
+
+        if (udpClient is null ||
+            remote is null ||
+            _receiveLoop is null)
+        {
+            return false;
+        }
+
+        byte[] datagram =
+            WifiControlDatagramCodec
+                .EncodeHandoverCommit(
+                    _trustedSession,
+                    new HandoverPayload(
+                        activeTransport,
+                        stateSequence),
+                    GetMonotonicMicroseconds());
+
+        await _outputGate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await udpClient.SendAsync(
+                    datagram,
+                    remote,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        finally
+        {
+            _outputGate.Release();
+        }
+    }
 
     public IPEndPoint? LocalEndPoint
     {
@@ -209,6 +337,7 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
     {
         await StopAsync().ConfigureAwait(false);
         _latestState.Writer.TryComplete();
+        _outputGate.Dispose();
         GC.SuppressFinalize(this);
     }
 
@@ -262,6 +391,22 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
                             _timeProvider.GetTimestamp());
 
                         _latestState.Writer.TryWrite(state);
+                        break;
+                    }
+
+                    case MessageType.TransportPreference:
+                    {
+                        TransportPreferencePayload preference =
+                            WifiControlDatagramCodec
+                                .DecodeTransportPreference(
+                                    result.Buffer,
+                                    _trustedSession);
+
+                        TransportPreferenceReceived
+                            ?.Invoke(preference);
+
+                        Interlocked.Increment(
+                            ref _acceptedControlDatagrams);
                         break;
                     }
 
@@ -335,10 +480,23 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
                         _trustedSession,
                         GetMonotonicMicroseconds());
 
-                await udpClient.SendAsync(
-                    heartbeat,
-                    remote,
-                    cancellationToken).ConfigureAwait(false);
+                await _outputGate
+                    .WaitAsync(
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                try
+                {
+                    await udpClient.SendAsync(
+                            heartbeat,
+                            remote,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                finally
+                {
+                    _outputGate.Release();
+                }
 
                 Interlocked.Increment(ref _heartbeatsSent);
             }

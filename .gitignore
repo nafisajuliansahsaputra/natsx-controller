@@ -38,6 +38,7 @@ TestResults/
 logs/
 diagnostics/
 traces/
+usb-bootstrap-baseline*.json
 
 # Packaging
 dist/

@@ -6,10 +6,10 @@ Trusted reconnect is already defined in `protocol/messages.md` under
 `AUTH_CHALLENGE / AUTH_RESPONSE`. First pairing must not redefine or overload
 that established reconnect payload.
 
-The first-pair wire messages themselves are **not frozen yet**. The
-cryptographic transcript and key derivation below are frozen so Android and
-Windows can build/test the same security foundation before pairing UI and
-message orchestration are added.
+The first-pair wire messages and confirmation choreography are frozen for
+protocol v1. Android initiates first pairing and Windows responds. Pairing
+messages use zero Session ID, sequence zero, and no authenticated flag because
+the long-term trust relationship does not exist yet.
 
 ## 1. Identities
 
@@ -113,7 +113,76 @@ pairing and no trust record is written.
 The SAS is a human verification value. It is **not** an encryption key and is
 never stored as the trust secret.
 
-## 8. Optional first-pair responder proof primitive
+## 8. First-pair wire exchange
+
+Protocol v1 reserves:
+
+- 13 — `PAIRING_OFFER`
+- 14 — `PAIRING_RESPONSE`
+- 15 — `PAIRING_CONFIRM`
+- 16 — `PAIRING_ABORT`
+
+`PAIRING_OFFER` is sent by Android and contains exactly 113 bytes:
+
+```text
+Android Peer ID       16 bytes
+Android nonce         32 bytes
+Android P-256 key     65 bytes
+```
+
+`PAIRING_RESPONSE` is sent by Windows and has the same 113-byte shape using
+the Windows Peer ID, nonce, and P-256 key.
+
+After both peers derive and display the same SAS, each user explicitly confirms
+the code on their own device. A confirmed peer sends `PAIRING_CONFIRM`:
+
+```text
+Peer ID               16 bytes
+Pairing role            1 byte
+Confirmation proof     32 bytes
+```
+
+Pairing role values:
+
+```text
+1 = Android controller
+2 = Windows receiver
+```
+
+The confirmation proof is:
+
+```text
+HMAC-SHA-256(
+    pairingKey,
+    ASCII("NATSX-PAIRING-CONFIRM-V1") ||
+    pairingTranscriptHash ||
+    pairingRole
+)
+```
+
+The role byte prevents one side's confirmation from being reflected back as
+the other side's approval.
+
+`PAIRING_ABORT` is a 4-byte payload. Byte 0 is the reason and bytes 1..3 are
+zero:
+
+```text
+1 = user rejected
+2 = code mismatch
+3 = timeout
+4 = protocol error
+```
+
+A peer persists the long-term trust secret only after:
+
+1. its own user approved the displayed SAS;
+2. the remote `PAIRING_CONFIRM` Peer ID and role match the expected peer;
+3. the remote confirmation proof verifies in constant time.
+
+After trust is persisted, the same transport may immediately continue with the
+normal `AUTH_CHALLENGE / AUTH_RESPONSE / SESSION_READY` trusted reconnect.
+
+## 9. Optional first-pair responder proof primitive
 
 The implementation provides a first-pair response-proof primitive that future
 pairing wire orchestration can use:
@@ -134,7 +203,7 @@ proposed Session ID.
 The exact first-pair message carrying this proof remains intentionally
 unassigned until the first-pair wire exchange is frozen.
 
-## 9. Long-term trust secret
+## 10. Long-term trust secret
 
 After successful human SAS confirmation:
 
@@ -157,7 +226,7 @@ The trust record also stores non-secret metadata such as:
 - capability metadata;
 - pairing version/time.
 
-## 10. Protected local storage
+## 11. Protected local storage
 
 ### Android
 
@@ -173,7 +242,7 @@ The trust secret is protected with Windows DPAPI using
 
 The trust document contains the DPAPI-protected blob and non-secret metadata.
 
-## 11. Trusted reconnect after pairing
+## 12. Trusted reconnect after pairing
 
 After a trust relationship exists, use the existing reconnect contract in
 `protocol/messages.md`:
@@ -194,7 +263,7 @@ That contract uses:
 
 Do **not** create a second reconnect derivation inside the first-pair protocol.
 
-## 12. Secondary transport join
+## 13. Secondary transport join
 
 Wi-Fi, Bluetooth, and USB do not establish independent trust relationships.
 
@@ -205,7 +274,7 @@ trusted Peer identities.
 Transport handover therefore does not reset the global controller-state
 sequence or recreate the virtual controller.
 
-## 13. Secret lifetime
+## 14. Secret lifetime
 
 - P-256 ephemeral private key: memory only.
 - Raw ECDH shared secret: memory only.
@@ -213,7 +282,7 @@ sequence or recreate the virtual controller.
 - Long-term trust secret: protected persistent storage until Forget/Reset.
 - Per-session key: memory only for one logical controller session.
 
-## 14. Forget/reset
+## 15. Forget/reset
 
 Forget device must eventually:
 
@@ -223,7 +292,7 @@ Forget device must eventually:
 4. remove cached transport endpoints;
 5. require first pairing again before accepting controller state.
 
-## 15. Canonical first-pair derivation vector
+## 16. Canonical first-pair derivation vector
 
 This vector verifies cross-language transcript ordering, HKDF, SAS, trust-secret
 derivation, and first-pair response proof.

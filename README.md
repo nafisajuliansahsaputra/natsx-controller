@@ -20,15 +20,14 @@ Already implemented in the current development branch:
 - eFootball-inspired default layout;
 - Android and Windows CI.
 
+The current development branch already includes the stable Xbox 360 virtual backend, trusted Wi-Fi/Bluetooth/USB Direct transports, Smart Auto handover/reconnect, secure local pairing, live diagnostics, trusted-device management, and background system-tray receiver operation.
+
 Still under active development:
 
-- virtual Xbox 360 backend integration;
-- Wi-Fi discovery/pairing/streaming;
-- Bluetooth RFCOMM;
-- USB Direct;
-- full Smart Auto transport orchestration;
-- rumble path;
-- installer and release packaging.
+- rumble/haptics output path;
+- remaining Android production UX/settings;
+- extended soak/performance hardening;
+- installer, release signing, and final packaging.
 
 See `TODO.md` for the full roadmap.
 
@@ -61,7 +60,18 @@ WORKFLOW.md
 Requirements:
 
 - Windows 10/11 for receiver/runtime work;
-- .NET 10 SDK.
+- .NET 10 SDK;
+- internet access on the first clean build so the pinned HIDMaestro v1.9.2 SDK can be bootstrapped.
+
+The HIDMaestro SDK is fetched automatically on the first Windows build when
+`windows/lib/HIDMaestro/HIDMaestro.Core.dll` is absent. The release archive is
+pinned and SHA-256 verified by `windows/eng/fetch-hidmaestro.ps1`; no global
+HIDMaestro SDK installation is required.
+
+HIDMaestro's virtual-device driver is also installed idempotently before the
+first virtual Xbox controller is created. The initial driver installation
+requires Windows elevation; once the matching driver is present, subsequent
+receiver starts do not require reinstalling it.
 
 Build and test:
 
@@ -77,7 +87,37 @@ The WPF receiver project is:
 windows/src/Natsx.Controller.Receiver/
 ```
 
-The virtual Xbox backend is not yet wired into the receiver.
+The WPF receiver now starts one HIDMaestro-backed virtual Xbox controller
+independently from transport lifetime. Trusted Wi-Fi, Bluetooth, and USB
+transports attach to the shared Smart Connection runtime dynamically, so
+transport reconnect/handover does not recreate the virtual controller.
+
+Run the receiver during development with:
+
+```powershell
+dotnet run --project windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release
+```
+
+The receiver can keep running without a visible window. Minimizing sends it to
+the system tray, closing the window keeps it in the tray by default, and the
+tray menu provides Open and Exit actions. The Receiver settings panel can
+enable per-user Windows startup; startup launches with `--background` so the
+runtime can come online directly in the tray.
+
+### First pairing
+
+When neither side has a trust record yet, connect the Android phone over the
+NATSX USB accessory path and open the Android app. Android sends a first-pair
+offer and both devices display the same six-digit SAS.
+
+Pairing completes only after the user confirms that code on **both** screens.
+The derived long-term trust secret is then stored with Android Keystore-backed
+protection on Android and Windows DPAPI on the receiver. The still-open USB
+connection immediately continues into the normal trusted reconnect handshake;
+no cable replug, ADB, manual secret entry, or IP-based trust is required.
+
+If the codes differ, reject pairing. No trust record is written until the
+remote role-bound confirmation proof also verifies.
 
 ## Android development
 
@@ -91,12 +131,16 @@ Current build baseline:
 - targetSdk 36;
 - native Kotlin through AGP built-in Kotlin support.
 
-Build from a machine with Android SDK + Gradle 9.6 available:
+Build from Windows with the repository-pinned Gradle Wrapper:
 
-```bash
-gradle -p android :app:testDebugUnitTest
-gradle -p android :app:assembleDebug
+```powershell
+.\android\gradlew.bat -p android :app:testDebugUnitTest
+.\android\gradlew.bat -p android :app:assembleDebug
 ```
+
+The wrapper downloads the pinned Gradle 9.6.0 distribution on first use and
+verifies its SHA-256 checksum. A globally installed `gradle` command is not
+required.
 
 The repository intentionally does not require ADB as part of the final controller transport design.
 

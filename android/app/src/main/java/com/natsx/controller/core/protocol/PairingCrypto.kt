@@ -16,6 +16,7 @@ object PairingCrypto {
     private val pairingKeyInfo = ascii("NATSX-PAIRING-KEY-V1")
     private val sasContext = ascii("NATSX-SAS-V1")
     private val pairingResponseContext = ascii("NATSX-PAIRING-RESPONSE-V1")
+    private val pairingConfirmContext = ascii("NATSX-PAIRING-CONFIRM-V1")
     private val trustSecretInfo = ascii("NATSX-TRUST-SECRET-V1")
 
     fun computePairingTranscriptHash(
@@ -105,6 +106,56 @@ object PairingCrypto {
             hmacSha256(pairingKey, input)
         } finally {
             input.fill(0)
+        }
+    }
+
+    fun computePairingConfirmationProof(
+        pairingKey: ByteArray,
+        pairingTranscriptHash: ByteArray,
+        role: PairingRole,
+    ): ByteArray {
+        validateKey(pairingKey)
+        validateHash(pairingTranscriptHash)
+
+        val input =
+            pairingConfirmContext +
+                pairingTranscriptHash +
+                byteArrayOf(role.wireValue.toByte())
+
+        return try {
+            hmacSha256(
+                pairingKey,
+                input,
+            )
+        } finally {
+            input.fill(0)
+        }
+    }
+
+    fun verifyPairingConfirmationProof(
+        pairingKey: ByteArray,
+        pairingTranscriptHash: ByteArray,
+        role: PairingRole,
+        suppliedProof: ByteArray,
+    ): Boolean {
+        if (suppliedProof.size != DERIVED_KEY_SIZE) {
+            return false
+        }
+
+        val expected =
+            computePairingConfirmationProof(
+                pairingKey,
+                pairingTranscriptHash,
+                role,
+            )
+
+        return try {
+            MessageDigest.isEqual(
+                expected,
+                suppliedProof,
+            )
+        } finally {
+            expected.fill(0)
         }
     }
 

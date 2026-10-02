@@ -1,6 +1,11 @@
 package com.natsx.controller.core.transport.wifi
 
 import android.os.SystemClock
+import com.natsx.controller.core.protocol.HandoverPayload
+import com.natsx.controller.core.protocol.MessageType
+import com.natsx.controller.core.protocol.ProtocolConstants
+import com.natsx.controller.core.protocol.RumblePayload
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.RealtimeStateSink
 import java.io.Closeable
@@ -16,6 +21,10 @@ import java.util.concurrent.atomic.AtomicReference
 
 interface WifiRealtimeLink : Closeable, RealtimeStateSink {
     val lastHeartbeatReceivedNanos: Long
+
+    fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean
 }
 
 fun interface WifiRealtimeLinkFactory {
@@ -25,6 +34,8 @@ fun interface WifiRealtimeLinkFactory {
 class WifiRealtimeSender(
     private val remoteEndpoint: InetSocketAddress,
     private val trustedSession: WifiTrustedSession,
+    private val rumbleSink: (RumblePayload) -> Unit = {},
+    private val handoverSink: (HandoverPayload) -> Unit = {},
 ) : WifiRealtimeLink {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -47,6 +58,8 @@ class WifiRealtimeSender(
     private val pendingEnvelope = AtomicReference<RealtimeStateEnvelope?>(null)
     private val drainScheduled = AtomicBoolean(false)
     private val closed = AtomicBoolean(false)
+    private val lastTransportPreference =
+        AtomicReference<TransportPreferencePayload?>(null)
 
     @Volatile
     var sentDatagrams: Long = 0
@@ -66,6 +79,14 @@ class WifiRealtimeSender(
 
     @Volatile
     var heartbeatAcksSent: Long = 0
+        private set
+
+    @Volatile
+    var rumblesReceived: Long = 0
+        private set
+
+    @Volatile
+    var handoverCommitsReceived: Long = 0
         private set
 
     @Volatile
@@ -97,6 +118,52 @@ class WifiRealtimeSender(
 
         if (drainScheduled.compareAndSet(false, true)) {
             executor.execute(::drainLatest)
+        }
+    }
+
+    override fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean {
+        if (closed.get()) {
+            return false
+        }
+
+        if (lastTransportPreference.get() == payload) {
+            return true
+        }
+
+        return try {
+            val bytes =
+                WifiControlDatagramCodec
+                    .encodeTransportPreference(
+                        trustedSession = trustedSession,
+                        payload = payload,
+                        monotonicTimestampMicros =
+                            monotonicMicroseconds(),
+                    )
+
+            val activeSocket = ensureSocket()
+            activeSocket.send(
+                DatagramPacket(
+                    bytes,
+                    bytes.size,
+                    remoteEndpoint,
+                ),
+            )
+
+            lastTransportPreference.set(payload)
+            true
+        } catch (_: IOException) {
+            if (!closed.get()) {
+                controlFailures += 1
+                invalidateSocket()
+            }
+            false
+        } catch (_: RuntimeException) {
+            if (!closed.get()) {
+                controlFailures += 1
+            }
+            false
         }
     }
 
@@ -191,31 +258,62 @@ class WifiRealtimeSender(
                     packet.offset + packet.length,
                 )
 
-                val echoedProbeTimestamp =
-                    WifiControlDatagramCodec.decodeHeartbeat(
-                        datagram,
-                        trustedSession,
-                    )
+                when (readMessageType(datagram)) {
+                    MessageType.HEARTBEAT -> {
+                        val echoedProbeTimestamp =
+                            WifiControlDatagramCodec.decodeHeartbeat(
+                                datagram,
+                                trustedSession,
+                            )
 
-                heartbeatsReceived += 1
-                lastHeartbeatReceivedNanos = SystemClock.elapsedRealtimeNanos()
+                        heartbeatsReceived += 1
+                        lastHeartbeatReceivedNanos =
+                            SystemClock.elapsedRealtimeNanos()
 
-                val ack =
-                    WifiControlDatagramCodec.encodeHeartbeatAck(
-                        trustedSession = trustedSession,
-                        responderTimestampMicros = monotonicMicroseconds(),
-                        echoedProbeTimestampMicros = echoedProbeTimestamp,
-                    )
+                        val ack =
+                            WifiControlDatagramCodec.encodeHeartbeatAck(
+                                trustedSession = trustedSession,
+                                responderTimestampMicros = monotonicMicroseconds(),
+                                echoedProbeTimestampMicros = echoedProbeTimestamp,
+                            )
 
-                activeSocket.send(
-                    DatagramPacket(
-                        ack,
-                        ack.size,
-                        remoteEndpoint,
-                    ),
-                )
+                        activeSocket.send(
+                            DatagramPacket(
+                                ack,
+                                ack.size,
+                                remoteEndpoint,
+                            ),
+                        )
 
-                heartbeatAcksSent += 1
+                        heartbeatAcksSent += 1
+                    }
+
+                    MessageType.RUMBLE -> {
+                        val rumble =
+                            WifiControlDatagramCodec.decodeRumble(
+                                datagram,
+                                trustedSession,
+                            )
+
+                        rumbleSink(rumble)
+                        rumblesReceived += 1
+                    }
+
+                    MessageType.HANDOVER_COMMIT -> {
+                        val handover =
+                            WifiControlDatagramCodec
+                                .decodeHandoverCommit(
+                                    datagram,
+                                    trustedSession,
+                                )
+
+                        handoverSink(handover)
+                        handoverCommitsReceived += 1
+                    }
+
+                    else ->
+                        controlFailures += 1
+                }
             } catch (_: SocketTimeoutException) {
                 // Periodically wake so close/recovery can be observed.
             } catch (_: IOException) {
@@ -233,6 +331,25 @@ class WifiRealtimeSender(
                     controlFailures += 1
                 }
             }
+        }
+    }
+
+    private fun readMessageType(
+        frame: ByteArray,
+    ): MessageType {
+        require(
+            frame.size >=
+                ProtocolConstants.HEADER_SIZE,
+        ) {
+            "Wi-Fi control frame is shorter than the protocol header."
+        }
+
+        return requireNotNull(
+            MessageType.fromWireValue(
+                frame[6].toInt() and 0xFF,
+            ),
+        ) {
+            "Wi-Fi control frame has an unknown message type."
         }
     }
 

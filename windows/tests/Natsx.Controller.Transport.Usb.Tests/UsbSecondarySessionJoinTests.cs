@@ -55,11 +55,8 @@ public sealed class UsbSecondarySessionJoinTests
 
         using var input =
             new MemoryStream(
-                Concat(
-                    UsbStreamFrameCodec.Encode(
-                        remoteReady),
-                    UsbStreamFrameCodec.Encode(
-                        remoteTransportReady)));
+                UsbStreamFrameCodec.Encode(
+                    remoteTransportReady));
 
         using var output =
             new MemoryStream();
@@ -79,7 +76,8 @@ public sealed class UsbSecondarySessionJoinTests
         using UsbSecondarySessionJoinCompletion completion =
             await server.JoinAsync(
                 input,
-                output);
+                output,
+                remoteReady);
 
         Assert.Equal(
             androidPeer,

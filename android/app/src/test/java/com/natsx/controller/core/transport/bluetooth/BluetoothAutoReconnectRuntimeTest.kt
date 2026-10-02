@@ -1,6 +1,8 @@
 package com.natsx.controller.core.transport.bluetooth
 
 import com.natsx.controller.core.gamepad.GamepadState
+import com.natsx.controller.core.protocol.TransportPreferenceMode
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.session.RealtimeStateBroadcaster
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.SessionSequence
@@ -58,6 +60,139 @@ class BluetoothAutoReconnectRuntimeTest {
         }
 
         assertTrue(link.closed.get())
+    }
+
+    @Test
+    fun activeLinkReceivesTransportPreference() {
+        val link =
+            FakeLink(
+                initialHeartbeat =
+                    System.nanoTime(),
+            )
+
+        val broadcaster =
+            RealtimeStateBroadcaster(
+                sequence = SessionSequence(),
+                monotonicMicros = { 1uL },
+            )
+
+        val runtime =
+            BluetoothAutoReconnectRuntime(
+                broadcaster = broadcaster,
+                linkFactory =
+                    BluetoothRealtimeLinkFactory {
+                        link
+                    },
+                nowNanos = System::nanoTime,
+                firstHeartbeatTimeoutMillis = 250,
+                heartbeatLostTimeoutMillis = 500,
+                pollIntervalMillis = 25,
+            )
+
+        try {
+            runtime.start()
+
+            waitUntil(1_000) {
+                runtime.state ==
+                    BluetoothReconnectState.ACTIVE
+            }
+
+            val expected =
+                TransportPreferencePayload(
+                    TransportPreferenceMode.BLUETOOTH,
+                )
+
+            assertTrue(
+                runtime.trySendTransportPreference(
+                    expected,
+                ),
+            )
+            assertEquals(
+                expected,
+                link.lastPreference,
+            )
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun repeatedHeartbeatLossRecoversAcrossFiveBluetoothCycles() {
+        val createdLinks =
+            java.util.concurrent
+                .CopyOnWriteArrayList<FakeLink>()
+
+        val broadcaster =
+            RealtimeStateBroadcaster(
+                sequence =
+                    SessionSequence(),
+                monotonicMicros = {
+                    1uL
+                },
+            )
+
+        val runtime =
+            BluetoothAutoReconnectRuntime(
+                broadcaster = broadcaster,
+                linkFactory =
+                    BluetoothRealtimeLinkFactory {
+                        FakeLink(
+                            initialHeartbeat =
+                                System.nanoTime(),
+                        ).also(
+                            createdLinks::add,
+                        )
+                    },
+                nowNanos =
+                    System::nanoTime,
+                firstHeartbeatTimeoutMillis =
+                    250,
+                heartbeatLostTimeoutMillis =
+                    500,
+                pollIntervalMillis =
+                    25,
+            )
+
+        try {
+            runtime.start()
+
+            repeat(5) { cycle ->
+                waitUntil(1_500) {
+                    createdLinks.size >=
+                        cycle + 1 &&
+                        runtime.state ==
+                        BluetoothReconnectState.ACTIVE
+                }
+
+                val active =
+                    createdLinks[cycle]
+
+                active.lastHeartbeatReceivedNanos =
+                    System.nanoTime() -
+                        1_000_000_000L
+
+                waitUntil(1_500) {
+                    createdLinks.size >=
+                        cycle + 2
+                }
+
+                assertTrue(
+                    active.closed.get(),
+                )
+            }
+
+            waitUntil(1_500) {
+                runtime.state ==
+                    BluetoothReconnectState.ACTIVE
+            }
+
+            assertTrue(
+                runtime.reconnectAttempts >=
+                    5,
+            )
+        } finally {
+            runtime.close()
+        }
     }
 
     @Test
@@ -192,8 +327,19 @@ class BluetoothAutoReconnectRuntimeTest {
         val closed =
             AtomicBoolean(false)
 
+        @Volatile
+        var lastPreference:
+            TransportPreferencePayload? = null
+
         val sequences =
             mutableListOf<UInt>()
+
+        override fun trySendTransportPreference(
+            payload: TransportPreferencePayload,
+        ): Boolean {
+            lastPreference = payload
+            return true
+        }
 
         override fun publish(
             envelope: RealtimeStateEnvelope,

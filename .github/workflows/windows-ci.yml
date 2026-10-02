@@ -9,11 +9,13 @@ on:
     paths:
       - "windows/**"
       - "Directory.Build.props"
+      - "VERSION"
       - ".github/workflows/windows-ci.yml"
   pull_request:
     paths:
       - "windows/**"
       - "Directory.Build.props"
+      - "VERSION"
       - ".github/workflows/windows-ci.yml"
 
 permissions:
@@ -26,11 +28,82 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
+
+      - name: Parse Windows PowerShell tooling
+        shell: pwsh
+        run: |
+          $failed = $false
+          @(
+            Get-ChildItem windows/eng -Filter *.ps1 -File
+            Get-ChildItem windows/installer -Filter *.ps1 -File
+            Get-ChildItem windows/driver -Filter *.ps1 -File
+            Get-ChildItem windows/driver/aoa-bootstrap -Filter *.ps1 -File
+            Get-ChildItem windows/driver/aoa-winusb -Filter *.ps1 -File
+          ) | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              $errors | ForEach-Object {
+                Write-Error "$($_.Extent.File):$($_.Extent.StartLineNumber): $($_.Message)"
+              }
+            }
+          }
+
+          if ($failed) {
+            throw "PowerShell syntax validation failed."
+          }
+
+      - name: Enforce Windows privilege boundaries
+        shell: pwsh
+        run: |
+          $manifest = Get-Content windows/src/Natsx.Controller.Receiver/app.manifest -Raw
+          $hostProgram = Get-Content windows/src/Natsx.Controller.GamepadHost/Program.cs -Raw
+
+          if ($manifest -notmatch 'requestedExecutionLevel\s+level="asInvoker"') {
+            throw "The network-facing Receiver must explicitly remain asInvoker."
+          }
+
+          if ($manifest -match 'requireAdministrator|highestAvailable') {
+            throw "The network-facing Receiver must never request elevation."
+          }
+
+          if ($hostProgram -match '(?i)--console') {
+            throw "Production GamepadHost must expose only the SCM service entry point."
+          }
+
+      - name: Enforce installer driver-removal safety
+        shell: pwsh
+        run: |
+          $cleanup = Get-Content windows/installer/remove-production-usb-drivers.ps1 -Raw
+          $installer = Get-Content windows/installer/NatsxController.iss -Raw
+
+          if ($cleanup -match '(?i)/force') {
+            throw "Production USB driver cleanup must never use pnputil /force."
+          }
+
+          if ($installer -match '(?i)RemoveAllVirtualControllers|purge-hidmaestro|uninstall-hidmaestro') {
+            throw "Normal NATSX uninstall must not remove the shared HIDMaestro machine dependency."
+          }
+
+          $serviceInstaller = Get-Content windows/installer/install-gamepad-host.ps1 -Raw
+
+          if ($serviceInstaller -notmatch 'outside Program Files') {
+            throw "LocalSystem service root policy is missing."
+          }
 
       - name: Cache HIDMaestro SDK
         uses: actions/cache@v4
@@ -45,8 +118,288 @@ jobs:
       - name: Restore
         run: dotnet restore windows/Natsx.Controller.slnx
 
+      - name: Reject newly introduced whitespace errors
+        shell: pwsh
+        run: |
+          git diff --check HEAD~1 HEAD
+
       - name: Build
         run: dotnet build windows/Natsx.Controller.slnx --configuration Release --no-restore
 
       - name: Test
         run: dotnet test windows/Natsx.Controller.slnx --configuration Release --no-build --verbosity normal
+
+      - name: Publish Windows runtime for installer smoke test
+        shell: pwsh
+        run: |
+          dotnet publish windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver-ci
+          dotnet publish windows/src/Natsx.Controller.GamepadHost/Natsx.Controller.GamepadHost.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/windows-receiver-ci
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --version 6.7.1 --no-progress -y
+
+      - name: Compile non-shipping Windows installer
+        shell: pwsh
+        run: ./windows/installer/build-installer.ps1 -PublishDir "artifacts/windows-receiver-ci" -OutputDir "artifacts/installer-ci" -AllowMissingProductionUsbDrivers
+
+      - name: Exercise installer lifecycle
+        shell: pwsh
+        run: |
+          $installer = @(
+            Get-ChildItem artifacts/installer-ci -Filter *.exe -File
+          )
+
+          if ($installer.Count -ne 1) {
+            throw "Expected exactly one CI installer, found $($installer.Count)."
+          }
+
+          $installRoot = Join-Path $env:ProgramFiles "NATSX Controller CI"
+
+          $trustRoot = Join-Path $env:LOCALAPPDATA "NATSX\Controller"
+          $trustedPeers = Join-Path $trustRoot "trusted-peers-v1.json"
+          $localPeerIdentity = Join-Path $trustRoot "local-peer-id-v1.txt"
+          New-Item -ItemType Directory -Path $trustRoot -Force | Out-Null
+          Set-Content -LiteralPath $trustedPeers -Value '{"ci":"preserve-trust"}' -Encoding UTF8
+          Set-Content -LiteralPath $localPeerIdentity -Value 'ci-preserve-identity' -Encoding UTF8
+          $trustedPeersHash = (Get-FileHash -LiteralPath $trustedPeers -Algorithm SHA256).Hash
+          $localPeerIdentityHash = (Get-FileHash -LiteralPath $localPeerIdentity -Algorithm SHA256).Hash
+
+          $setupLogPath = Join-Path $env:RUNNER_TEMP "natsx-first-install.log"
+
+          $install = Start-Process -FilePath $installer[0].FullName -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-",
+            "/DIR=`"$installRoot`"",
+            "/LOG=$setupLogPath"
+          ) -Wait -PassThru
+
+          if ($install.ExitCode -ne 0) {
+            $setupErrorLog = Join-Path $env:ProgramData "NATSX\Controller\setup-driver-error.log"
+            $hostInstallLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host-install.log"
+            $hostLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host.log"
+
+            foreach ($log in @($setupLogPath, $setupErrorLog, $hostInstallLog, $hostLog)) {
+              if (Test-Path -LiteralPath $log) {
+                Write-Host "===== $log ====="
+                Get-Content -LiteralPath $log | Write-Host
+              }
+            }
+
+            throw "CI installer exited with code $($install.ExitCode)."
+          }
+
+          $receiver = Join-Path $installRoot "Natsx.Controller.Receiver.exe"
+          $gamepadHost = Join-Path $installRoot "Natsx.Controller.GamepadHost.exe"
+
+          if (-not (Test-Path -LiteralPath $receiver -PathType Leaf)) {
+            if (Test-Path -LiteralPath $setupLogPath) {
+              Get-Content -LiteralPath $setupLogPath | Write-Host
+            }
+
+            $hostInstallLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host-install.log"
+            $hostLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host.log"
+
+            if (Test-Path -LiteralPath $hostInstallLog) {
+              Get-Content -LiteralPath $hostInstallLog | Write-Host
+            }
+
+            if (Test-Path -LiteralPath $hostLog) {
+              Get-Content -LiteralPath $hostLog | Write-Host
+            }
+
+            throw "Receiver executable was not installed."
+          }
+
+          if (-not (Test-Path -LiteralPath $gamepadHost -PathType Leaf)) {
+            throw "Privileged gamepad-host executable was not installed."
+          }
+
+          $gamepadService = Get-Service -Name "NatsxControllerGamepadHost" -ErrorAction SilentlyContinue
+
+          if ($null -eq $gamepadService) {
+            $setupErrorLog = Join-Path $env:ProgramData "NATSX\Controller\setup-driver-error.log"
+            $hostInstallLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host-install.log"
+            $hostLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host.log"
+
+            foreach ($log in @($setupLogPath, $setupErrorLog, $hostInstallLog, $hostLog)) {
+              if (Test-Path -LiteralPath $log) {
+                Write-Host "===== $log ====="
+                Get-Content -LiteralPath $log | Write-Host
+              }
+            }
+
+            & sc.exe query "NatsxControllerGamepadHost" 2>&1 | Write-Host
+
+            throw "Privileged gamepad-host service was not registered after setup."
+          }
+
+          if ($gamepadService.Status -ne "Running") {
+            throw "Privileged gamepad-host service is not running after setup."
+          }
+
+          $gamepadServiceCim = Get-CimInstance Win32_Service -Filter "Name='NatsxControllerGamepadHost'" -ErrorAction Stop
+
+          if ($gamepadServiceCim.StartName -ne "LocalSystem" -or
+              $gamepadServiceCim.StartMode -ne "Auto") {
+            throw "Privileged gamepad-host service identity/start mode is incorrect."
+          }
+
+          if ([string]$gamepadServiceCim.PathName -notlike "*Natsx.Controller.GamepadHost.exe*--service*") {
+            throw "Privileged gamepad-host service command line is incorrect."
+          }
+
+          $reconnectProbe = Start-Process -FilePath $receiver -ArgumentList "--verify-gamepad-host-reconnect" -PassThru
+          Start-Sleep -Seconds 2
+
+          Stop-Service -Name "NatsxControllerGamepadHost" -Force -ErrorAction Stop
+          (Get-Service -Name "NatsxControllerGamepadHost").WaitForStatus(
+            [System.ServiceProcess.ServiceControllerStatus]::Stopped,
+            [TimeSpan]::FromSeconds(15)
+          )
+
+          Start-Sleep -Milliseconds 750
+
+          Start-Service -Name "NatsxControllerGamepadHost" -ErrorAction Stop
+          (Get-Service -Name "NatsxControllerGamepadHost").WaitForStatus(
+            [System.ServiceProcess.ServiceControllerStatus]::Running,
+            [TimeSpan]::FromSeconds(15)
+          )
+
+          $reconnectProbe.WaitForExit(20000) | Out-Null
+
+          if (-not $reconnectProbe.HasExited) {
+            Stop-Process -Id $reconnectProbe.Id -Force -ErrorAction SilentlyContinue
+            throw "Gamepad-host reconnect probe did not exit."
+          }
+
+          if ($reconnectProbe.ExitCode -ne 0) {
+            $setupLog = Join-Path $env:ProgramData "NATSX\Controller\setup-driver-error.log"
+            $hostLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host.log"
+
+            if (Test-Path -LiteralPath $setupLog) {
+              Get-Content -LiteralPath $setupLog | Write-Host
+            }
+
+            if (Test-Path -LiteralPath $hostLog) {
+              Get-Content -LiteralPath $hostLog | Write-Host
+            }
+
+            throw "Receiver failed to reconnect automatically after gamepad-host service restart."
+          }
+
+          $receiverSettingsKey = "HKCU:\Software\NATSX\Controller Receiver"
+          $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+          New-Item -Path $receiverSettingsKey -Force | Out-Null
+          New-ItemProperty -Path $receiverSettingsKey -Name "CloseToTray" -Value 0 -PropertyType DWord -Force | Out-Null
+          New-ItemProperty -Path $runKey -Name "NATSX Controller Receiver" -Value '"C:\ci\Natsx.Controller.Receiver.exe" --background' -PropertyType String -Force | Out-Null
+
+          $repair = Start-Process -FilePath $installer[0].FullName -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-",
+            "/DIR=`"$installRoot`""
+          ) -Wait -PassThru
+
+          if ($repair.ExitCode -ne 0) {
+            throw "CI repair/upgrade installer exited with code $($repair.ExitCode)."
+          }
+
+          $gamepadService = Get-Service -Name "NatsxControllerGamepadHost" -ErrorAction Stop
+
+          if ($gamepadService.Status -ne "Running") {
+            throw "Gamepad-host service is not running after repair/upgrade."
+          }
+
+          if ((Get-FileHash -LiteralPath $trustedPeers -Algorithm SHA256).Hash -ne $trustedPeersHash -or
+              (Get-FileHash -LiteralPath $localPeerIdentity -Algorithm SHA256).Hash -ne $localPeerIdentityHash) {
+            throw "Repair/upgrade modified pairing/trust identity data."
+          }
+
+          if (-not (Test-Path -LiteralPath $receiverSettingsKey)) {
+            throw "Repair/upgrade removed Receiver UI settings."
+          }
+
+          $upgradeRunValue = (Get-ItemProperty -Path $runKey -Name "NATSX Controller Receiver" -ErrorAction SilentlyContinue)."NATSX Controller Receiver"
+
+          if ([string]::IsNullOrWhiteSpace([string]$upgradeRunValue)) {
+            throw "Repair/upgrade removed Receiver Startup registry entry."
+          }
+
+          $firewallRule = Get-NetFirewallRule -Name "NATSX.Controller.LanUdp" -ErrorAction Stop
+          $firewallPort = $firewallRule | Get-NetFirewallPortFilter
+          $firewallAddress = $firewallRule | Get-NetFirewallAddressFilter
+          $firewallApplication = $firewallRule | Get-NetFirewallApplicationFilter
+
+          if ($firewallPort.Protocol -ne "UDP" -or
+              $firewallPort.LocalPort -notcontains "43858-43860") {
+            throw "Installed firewall rule does not expose only NATSX UDP ports."
+          }
+
+          if ($firewallAddress.RemoteAddress -notcontains "LocalSubnet") {
+            throw "Installed firewall rule is not restricted to LocalSubnet."
+          }
+
+          if (-not [string]::Equals(
+                [IO.Path]::GetFullPath([string]$firewallApplication.Program),
+                [IO.Path]::GetFullPath($receiver),
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Installed firewall rule is not scoped to the installed Receiver executable."
+          }
+
+          $uninstaller = @(
+            Get-ChildItem $installRoot -Filter "unins*.exe" -File
+          ) | Select-Object -First 1
+
+          if ($null -eq $uninstaller) {
+            throw "Inno Setup uninstaller was not created."
+          }
+
+          $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART"
+          ) -Wait -PassThru
+
+          if ($uninstall.ExitCode -ne 0) {
+            throw "CI uninstaller exited with code $($uninstall.ExitCode)."
+          }
+
+          Start-Sleep -Milliseconds 500
+
+          if (Test-Path -LiteralPath $receiver) {
+            throw "Receiver executable remained after uninstall."
+          }
+
+          if (-not (Test-Path -LiteralPath $trustedPeers -PathType Leaf) -or
+              -not (Test-Path -LiteralPath $localPeerIdentity -PathType Leaf)) {
+            throw "Normal uninstall removed pairing/trust identity data."
+          }
+
+          if ((Get-FileHash -LiteralPath $trustedPeers -Algorithm SHA256).Hash -ne $trustedPeersHash -or
+              (Get-FileHash -LiteralPath $localPeerIdentity -Algorithm SHA256).Hash -ne $localPeerIdentityHash) {
+            throw "Normal uninstall modified pairing/trust identity data."
+          }
+
+          if (Test-Path -LiteralPath $receiverSettingsKey) {
+            throw "Receiver UI settings registry key remained after uninstall."
+          }
+
+          $runValue = (Get-ItemProperty -Path $runKey -Name "NATSX Controller Receiver" -ErrorAction SilentlyContinue)."NATSX Controller Receiver"
+
+          if (-not [string]::IsNullOrWhiteSpace([string]$runValue)) {
+            throw "Receiver Startup registry entry remained after uninstall."
+          }
+
+          if (Get-NetFirewallRule -Name "NATSX.Controller.LanUdp" -ErrorAction SilentlyContinue) {
+            throw "NATSX firewall rule remained after uninstall."
+          }
+
+          if (Get-Service -Name "NatsxControllerGamepadHost" -ErrorAction SilentlyContinue) {
+            throw "Privileged gamepad-host service remained after uninstall."
+          }
+
+          Remove-Item -LiteralPath $trustRoot -Recurse -Force -ErrorAction SilentlyContinue

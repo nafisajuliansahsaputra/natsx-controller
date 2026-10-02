@@ -2,34 +2,286 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="NATSX Controller Receiver"
-        Width="720"
-        Height="440"
-        MinWidth="560"
-        MinHeight="360"
+        Width="760"
+        Height="860"
+        MinWidth="620"
+        MinHeight="720"
         WindowStartupLocation="CenterScreen">
-    <Grid Margin="32">
-        <StackPanel>
-            <TextBlock FontSize="28"
-                       FontWeight="SemiBold"
-                       Text="NATSX Controller" />
-            <TextBlock Margin="0,6,0,28"
-                       Opacity="0.7"
-                       Text="Windows Receiver" />
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="32">
+            <StackPanel>
+                <TextBlock FontSize="28"
+                           FontWeight="SemiBold"
+                           Text="NATSX Controller" />
+                <TextBlock Margin="0,6,0,28"
+                           Opacity="0.7"
+                           Text="Windows Receiver" />
 
-            <Border Padding="20"
-                    BorderBrush="#33000000"
-                    BorderThickness="1"
-                    CornerRadius="14">
-                <StackPanel>
-                    <TextBlock FontSize="18"
-                               FontWeight="SemiBold"
-                               Text="Foundation ready" />
-                    <TextBlock Margin="0,8,0,0"
-                               TextWrapping="Wrap"
-                               Opacity="0.72"
-                               Text="Transport, pairing, virtual-controller, and Smart Auto services attach behind this UI. The UI does not own the realtime controller engine." />
-                </StackPanel>
-            </Border>
-        </StackPanel>
-    </Grid>
+                <Border Padding="20"
+                        BorderBrush="#33000000"
+                        BorderThickness="1"
+                        CornerRadius="14">
+                    <StackPanel>
+                        <TextBlock FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Text="Receiver runtime" />
+                        <TextBlock x:Name="StatusText"
+                                   Margin="0,8,0,0"
+                                   TextWrapping="Wrap"
+                                   Opacity="0.72"
+                                   Text="Starting receiver…" />
+                    </StackPanel>
+                </Border>
+
+                <Border Margin="0,16,0,0"
+                        Padding="20"
+                        BorderBrush="#33000000"
+                        BorderThickness="1"
+                        CornerRadius="14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0"
+                                    Grid.Column="0"
+                                    Margin="0,0,16,14">
+                            <TextBlock Opacity="0.58"
+                                       Text="Smart Auto" />
+                            <TextBlock x:Name="SmartAutoStateText"
+                                       Margin="0,4,0,0"
+                                       FontWeight="SemiBold"
+                                       Text="Starting" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="0"
+                                    Grid.Column="1"
+                                    Margin="0,0,0,14">
+                            <TextBlock Opacity="0.58"
+                                       Text="Active transport" />
+                            <TextBlock x:Name="ActiveTransportText"
+                                       Margin="0,4,0,0"
+                                       FontWeight="SemiBold"
+                                       Text="None" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1"
+                                    Grid.Column="0"
+                                    Margin="0,0,16,14">
+                            <TextBlock Opacity="0.58"
+                                       Text="Backup transports" />
+                            <TextBlock x:Name="BackupTransportsText"
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Text="None" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1"
+                                    Grid.Column="1"
+                                    Margin="0,0,0,14">
+                            <TextBlock Opacity="0.58"
+                                       Text="Virtual Xbox controller" />
+                            <TextBlock x:Name="VirtualControllerText"
+                                       Margin="0,4,0,0"
+                                       FontWeight="SemiBold"
+                                       Text="Starting" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="2"
+                                    Grid.Column="0"
+                                    Margin="0,0,16,14">
+                            <TextBlock Opacity="0.58"
+                                       Text="RTT" />
+                            <TextBlock x:Name="RoundTripTimeText"
+                                       Margin="0,4,0,0"
+                                       FontWeight="SemiBold"
+                                       Text="—" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="2"
+                                    Grid.Column="1"
+                                    Margin="0,0,0,14">
+                            <TextBlock Opacity="0.58"
+                                       Text="Jitter" />
+                            <TextBlock x:Name="JitterText"
+                                       Margin="0,4,0,0"
+                                       FontWeight="SemiBold"
+                                       Text="—" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="3"
+                                    Grid.Column="0"
+                                    Margin="0,0,16,14">
+                            <TextBlock Opacity="0.58"
+                                       Text="Packet loss" />
+                            <TextBlock x:Name="PacketLossText"
+                                       Margin="0,4,0,0"
+                                       FontWeight="SemiBold"
+                                       Text="—" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="3"
+                                    Grid.Column="1"
+                                    Margin="0,0,0,14">
+                            <TextBlock Opacity="0.58"
+                                       Text="Input rate" />
+                            <TextBlock x:Name="InputRateText"
+                                       Margin="0,4,0,0"
+                                       FontWeight="SemiBold"
+                                       Text="0 Hz" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="4"
+                                    Grid.Column="0"
+                                    Margin="0,0,16,14">
+                            <TextBlock Opacity="0.58"
+                                       Text="Reconnect count" />
+                            <TextBlock x:Name="ReconnectCountText"
+                                       Margin="0,4,0,0"
+                                       Text="0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="4"
+                                    Grid.Column="1"
+                                    Margin="0,0,0,14">
+                            <TextBlock Opacity="0.58"
+                                       Text="Recent handover" />
+                            <TextBlock x:Name="RecentHandoverText"
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Text="None" />
+                        </StackPanel>
+
+                        <Grid Grid.Row="5"
+                              Grid.ColumnSpan="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0"
+                                        Margin="0,0,16,0">
+                                <TextBlock Opacity="0.58"
+                                           Text="Trusted Android controller" />
+                                <TextBlock x:Name="TrustedControllerText"
+                                           Margin="0,4,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="None" />
+                                <TextBlock x:Name="TrustedControllerCountText"
+                                           Margin="0,3,0,0"
+                                           Opacity="0.58"
+                                           Text="0 trusted" />
+                            </StackPanel>
+
+                            <Button x:Name="ForgetControllerButton"
+                                    Grid.Column="1"
+                                    MinWidth="110"
+                                    Padding="12,7"
+                                    VerticalAlignment="Center"
+                                    Click="OnForgetControllerClicked"
+                                    Content="Forget"
+                                    IsEnabled="False" />
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Margin="0,16,0,0"
+                        Padding="20"
+                        BorderBrush="#33000000"
+                        BorderThickness="1"
+                        CornerRadius="14">
+                    <StackPanel>
+                        <TextBlock FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Text="Receiver settings" />
+                        <CheckBox x:Name="StartWithWindowsCheckBox"
+                                  Margin="0,12,0,0"
+                                  Checked="OnStartWithWindowsChanged"
+                                  Unchecked="OnStartWithWindowsChanged"
+                                  Content="Start NATSX Controller with Windows" />
+                        <CheckBox x:Name="CloseToTrayCheckBox"
+                                  Margin="0,10,0,0"
+                                  Checked="OnCloseToTrayChanged"
+                                  Unchecked="OnCloseToTrayChanged"
+                                  Content="Keep receiver running in the system tray when I close the window" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Opacity="0.58"
+                                   TextWrapping="Wrap"
+                                   Text="Minimizing always sends the receiver to the system tray. Use Exit from the tray menu to stop the controller runtime." />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="ErrorPanel"
+                        Margin="0,16,0,0"
+                        Padding="20"
+                        BorderBrush="#66B00020"
+                        BorderThickness="1"
+                        Background="#10B00020"
+                        CornerRadius="14"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Text="Receiver needs attention" />
+                        <TextBlock x:Name="ErrorText"
+                                   Margin="0,8,0,0"
+                                   TextWrapping="Wrap" />
+                        <Button x:Name="RetryReceiverButton"
+                                Margin="0,12,0,0"
+                                Width="120"
+                                HorizontalAlignment="Left"
+                                Padding="12,7"
+                                Click="OnRetryReceiverClicked"
+                                Content="Retry" />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="PairingPanel"
+                        Margin="0,20,0,0"
+                        Padding="20"
+                        BorderBrush="#33000000"
+                        BorderThickness="1"
+                        CornerRadius="14"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Text="Pair Android controller" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Opacity="0.72"
+                                   Text="Confirm only if this 6-digit code matches the code shown on your phone." />
+                        <TextBlock x:Name="PairingCodeText"
+                                   Margin="0,14,0,0"
+                                   FontSize="36"
+                                   FontWeight="Bold"
+                                   Text="" />
+                        <TextBlock x:Name="PairingPeerText"
+                                   Margin="0,6,0,14"
+                                   Opacity="0.58"
+                                   TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal">
+                            <Button Width="120"
+                                    Padding="12,7"
+                                    Click="OnPairingConfirmClicked"
+                                    Content="Confirm" />
+                            <Button Width="120"
+                                    Margin="10,0,0,0"
+                                    Padding="12,7"
+                                    Click="OnPairingRejectClicked"
+                                    Content="Reject" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
 </Window>

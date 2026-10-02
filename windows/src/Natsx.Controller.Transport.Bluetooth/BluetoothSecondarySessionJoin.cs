@@ -54,6 +54,32 @@ public sealed class BluetoothSecondarySessionJoinServer
         JoinAsync(
             Stream inputStream,
             Stream outputStream,
+            byte[] firstFrame,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(inputStream);
+        ArgumentNullException.ThrowIfNull(firstFrame);
+
+        byte[] framed =
+            BluetoothStreamFrameCodec
+                .Encode(firstFrame);
+
+        using var replay =
+            new BluetoothPrefixedReadStream(
+                framed,
+                inputStream);
+
+        return await JoinAsync(
+                replay,
+                outputStream,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async ValueTask<BluetoothSecondarySessionJoinCompletion>
+        JoinAsync(
+            Stream inputStream,
+            Stream outputStream,
             CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(

@@ -1,5 +1,6 @@
 package com.natsx.controller.core.transport.bluetooth
 
+import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.protocol.SessionId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -79,6 +80,64 @@ class BluetoothHeartbeatTest {
             assertTrue(
                 sender.lastHeartbeatReceivedNanos >
                     0L,
+            )
+        }
+
+        sessionKey.fill(0)
+    }
+
+    @Test
+    fun senderDispatchesAuthenticatedRumble() {
+        val sessionKey =
+            ByteArray(32) { index ->
+                index.toByte()
+            }
+
+        BluetoothTrustedSession(
+            sessionId = SessionId.createRandom(),
+            sessionKey = sessionKey,
+        ).use { session ->
+            val expected =
+                RumblePayload(
+                    lowFrequencyMotor = 190,
+                    highFrequencyMotor = 70,
+                )
+
+            val framedRumble =
+                BluetoothStreamFrameCodec.encode(
+                    BluetoothControlFrameCodec
+                        .encodeRumble(
+                            trustedSession = session,
+                            payload = expected,
+                            monotonicTimestampMicros = 123uL,
+                        ),
+                )
+
+            var observed: RumblePayload? = null
+
+            val sender =
+                BluetoothRealtimeSender(
+                    outputStream =
+                        ByteArrayOutputStream(),
+                    trustedSession = session,
+                    inputStream =
+                        ByteArrayInputStream(
+                            framedRumble,
+                        ),
+                    rumbleSink = {
+                        observed = it
+                    },
+                )
+
+            waitUntil {
+                sender.rumblesReceived == 1L
+            }
+
+            sender.close()
+
+            assertEquals(
+                expected,
+                observed,
             )
         }
 

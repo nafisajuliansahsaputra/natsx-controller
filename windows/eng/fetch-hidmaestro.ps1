@@ -16,9 +16,14 @@ if ($Version -ne $ExpectedVersion) {
 $WindowsRoot = Split-Path -Parent $PSScriptRoot
 $OutputDir = [System.IO.Path]::Combine($WindowsRoot, "lib", "HIDMaestro")
 $DestinationDll = Join-Path $OutputDir "HIDMaestro.Core.dll"
+$DestinationLicense = Join-Path $OutputDir "HIDMaestro.LICENSE.txt"
 
-if ((Test-Path $DestinationDll) -and -not $Force) {
-    Write-Host "HIDMaestro SDK already present: $DestinationDll"
+if (
+    (Test-Path $DestinationDll) -and
+    (Test-Path $DestinationLicense) -and
+    -not $Force
+) {
+    Write-Host "HIDMaestro SDK and license already present: $OutputDir"
     exit 0
 }
 
@@ -35,7 +40,22 @@ try {
     Write-Host "Downloading HIDMaestro $Version..."
     Invoke-WebRequest -Uri $Uri -OutFile $ZipPath -UseBasicParsing
 
-    $ActualSha256 = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $Sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $ArchiveStream = [System.IO.File]::OpenRead($ZipPath)
+        try {
+            $HashBytes = $Sha256.ComputeHash($ArchiveStream)
+        }
+        finally {
+            $ArchiveStream.Dispose()
+        }
+    }
+    finally {
+        $Sha256.Dispose()
+    }
+
+    $ActualSha256 =
+        ([System.BitConverter]::ToString($HashBytes) -replace "-", "").ToLowerInvariant()
 
     if ($ActualSha256 -ne $ExpectedSha256) {
         throw "HIDMaestro archive SHA-256 mismatch. Expected $ExpectedSha256, got $ActualSha256."
@@ -51,16 +71,18 @@ try {
         throw "HIDMaestro.Core.dll was not found in the pinned release archive."
     }
 
-    Copy-Item -Path $SdkDll.FullName -Destination $DestinationDll -Force
-
     $LicenseFile = Get-ChildItem -Path $ExtractDir -Filter "LICENSE*" -File -Recurse |
         Select-Object -First 1
 
-    if ($null -ne $LicenseFile) {
-        Copy-Item -Path $LicenseFile.FullName -Destination (Join-Path $OutputDir "HIDMaestro.LICENSE.txt") -Force
+    if ($null -eq $LicenseFile) {
+        throw "Pinned HIDMaestro archive did not contain a LICENSE file."
     }
 
+    Copy-Item -Path $SdkDll.FullName -Destination $DestinationDll -Force
+    Copy-Item -Path $LicenseFile.FullName -Destination $DestinationLicense -Force
+
     Write-Host "HIDMaestro SDK ready: $DestinationDll"
+    Write-Host "HIDMaestro license ready: $DestinationLicense"
 }
 finally {
     if (Test-Path $TempRoot) {

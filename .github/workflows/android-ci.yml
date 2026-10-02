@@ -44,8 +44,28 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
+      - name: Android lint
+        run: gradle -p android :app:lintDebug --stacktrace
+
+      - name: Print Android lint report on failure
+        if: failure()
+        shell: bash
+        run: |
+          report="android/app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt"
+          if [ -f "$report" ]; then
+            cat "$report"
+          fi
+
       - name: Test
         run: gradle -p android :app:testDebugUnitTest --stacktrace
 
       - name: Assemble debug
         run: gradle -p android :app:assembleDebug --stacktrace
+
+      - name: Upload Android debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-controller-android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

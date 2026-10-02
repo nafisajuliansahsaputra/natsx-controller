@@ -1,22 +1,26 @@
-using Windows.Devices.Usb;
-
 namespace Natsx.Controller.Transport.Usb;
 
 public sealed class WinUsbAoaAccessoryConnection : IAsyncDisposable
 {
-    private readonly UsbDevice _device;
+    private readonly IDisposable _owner;
     private bool _disposed;
 
     internal WinUsbAoaAccessoryConnection(
-        UsbDevice device,
+        IDisposable owner,
         WinUsbAoaAccessoryDevice identity,
         Stream input,
-        Stream output)
+        Stream output,
+        byte bulkInPipeId,
+        byte bulkOutPipeId,
+        ushort maximumPacketSize)
     {
-        _device = device ?? throw new ArgumentNullException(nameof(device));
+        _owner = owner ?? throw new ArgumentNullException(nameof(owner));
         Identity = identity ?? throw new ArgumentNullException(nameof(identity));
         Input = input ?? throw new ArgumentNullException(nameof(input));
         Output = output ?? throw new ArgumentNullException(nameof(output));
+        BulkInPipeId = bulkInPipeId;
+        BulkOutPipeId = bulkOutPipeId;
+        MaximumPacketSize = maximumPacketSize;
     }
 
     public WinUsbAoaAccessoryDevice Identity { get; }
@@ -25,34 +29,54 @@ public sealed class WinUsbAoaAccessoryConnection : IAsyncDisposable
 
     public Stream Output { get; }
 
-    public async ValueTask DisposeAsync()
+    public byte BulkInPipeId { get; }
+
+    public byte BulkOutPipeId { get; }
+
+    public ushort MaximumPacketSize { get; }
+
+    public ValueTask DisposeAsync()
     {
         if (_disposed)
         {
-            return;
+            return ValueTask.CompletedTask;
         }
 
         _disposed = true;
 
         try
         {
-            await Input.DisposeAsync().ConfigureAwait(false);
+            DisposeStream(Input);
+
+            if (!ReferenceEquals(Input, Output))
+            {
+                DisposeStream(Output);
+            }
         }
         finally
         {
-            try
-            {
-                if (!ReferenceEquals(Input, Output))
-                {
-                    await Output.DisposeAsync().ConfigureAwait(false);
-                }
-            }
-            finally
-            {
-                _device.Dispose();
-            }
+            _owner.Dispose();
         }
 
         GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
+
+    private static void DisposeStream(Stream stream)
+    {
+        try
+        {
+            stream.Dispose();
+        }
+        catch (NotImplementedException)
+        {
+            // Some WinRT USB output streams do not implement FlushAsync.
+            // The underlying UsbDevice is disposed below and owns the native
+            // pipe lifetime, so unsupported flush-on-close must not turn a
+            // successful USB session into a teardown failure.
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 }

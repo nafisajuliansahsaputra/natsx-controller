@@ -106,6 +106,129 @@ public static class WifiControlDatagramCodec
         return BinaryPrimitives.ReadUInt64LittleEndian(frame.Payload);
     }
 
+    public static byte[] EncodeRumble(
+        WifiTrustedSession trustedSession,
+        RumblePayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(
+            trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.Rumble,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                RumblePayloadCodec.Encode(
+                    payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static RumblePayload DecodeRumble(
+        ReadOnlySpan<byte> datagram,
+        WifiTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                datagram,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.Rumble)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.Rumble}, received {frame.MessageType}.");
+        }
+
+        return RumblePayloadCodec.Decode(
+            frame.Payload);
+    }
+
+    public static byte[] EncodeTransportPreference(
+        WifiTrustedSession trustedSession,
+        TransportPreferencePayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(
+            trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.TransportPreference,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                TransportPreferencePayloadCodec
+                    .Encode(payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static TransportPreferencePayload DecodeTransportPreference(
+        ReadOnlySpan<byte> datagram,
+        WifiTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                datagram,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.TransportPreference)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.TransportPreference}, received {frame.MessageType}.");
+        }
+
+        return TransportPreferencePayloadCodec
+            .Decode(frame.Payload);
+    }
+
+    public static byte[] EncodeHandoverCommit(
+        WifiTrustedSession trustedSession,
+        HandoverPayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(
+            trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.HandoverCommit,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                HandoverPayloadCodec.Encode(
+                    payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static HandoverPayload DecodeHandoverCommit(
+        ReadOnlySpan<byte> datagram,
+        WifiTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                datagram,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.HandoverCommit)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.HandoverCommit}, received {frame.MessageType}.");
+        }
+
+        return HandoverPayloadCodec.Decode(
+            frame.Payload);
+    }
+
     public static ulong DecodeHeartbeat(
         ReadOnlySpan<byte> datagram,
         WifiTrustedSession trustedSession)

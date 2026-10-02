@@ -26,6 +26,59 @@ class UsbSecondarySessionJoinClient(
             .toULong() / 1_000uL
     },
 ) {
+    fun joinUplinkOnly(
+        outputStream: OutputStream,
+    ): UsbTrustedSession {
+        val material =
+            checkNotNull(
+                sessionRegistry.get(
+                    receiverPeerId,
+                ),
+            ) {
+                "No active trusted controller session exists for the receiver."
+            }
+
+        material.use {
+            val sessionKey =
+                material.copySessionKey()
+
+            try {
+                val trustedSession =
+                    UsbTrustedSession(
+                        material.sessionId,
+                        sessionKey,
+                    )
+
+                try {
+                    writeFrame(
+                        outputStream,
+                        UsbControlFrameCodec
+                            .encodeSessionReady(
+                                trustedSession,
+                                SessionReadyPayload(
+                                    role =
+                                        PeerRole.ANDROID_CONTROLLER,
+                                    capabilities =
+                                        TransportCapabilities.WIFI or
+                                            TransportCapabilities.BLUETOOTH or
+                                            TransportCapabilities.USB_DIRECT,
+                                    peerId = localPeerId,
+                                ),
+                                monotonicMicros(),
+                            ),
+                    )
+
+                    return trustedSession
+                } catch (exception: Exception) {
+                    trustedSession.close()
+                    throw exception
+                }
+            } finally {
+                sessionKey.fill(0)
+            }
+        }
+    }
+
     fun join(
         inputStream: InputStream,
         outputStream: OutputStream,

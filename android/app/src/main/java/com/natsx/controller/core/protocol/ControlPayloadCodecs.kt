@@ -14,6 +14,73 @@ enum class ProtocolTransport(val wireValue: Int) {
     }
 }
 
+enum class TransportPreferenceMode(
+    val wireValue: Int,
+) {
+    AUTO(0),
+    WIFI(1),
+    BLUETOOTH(2),
+    USB_DIRECT(3);
+
+    companion object {
+        fun fromWireValue(
+            value: Int,
+        ): TransportPreferenceMode? =
+            entries.firstOrNull {
+                it.wireValue == value
+            }
+    }
+}
+
+data class TransportPreferencePayload(
+    val mode: TransportPreferenceMode,
+)
+
+object TransportPreferencePayloadCodec {
+    const val PAYLOAD_SIZE = 4
+
+    fun encode(
+        payload: TransportPreferencePayload,
+    ): ByteArray =
+        byteArrayOf(
+            payload.mode.wireValue.toByte(),
+            0,
+            0,
+            0,
+        )
+
+    fun decode(
+        bytes: ByteArray,
+    ): TransportPreferencePayload {
+        require(
+            bytes.size == PAYLOAD_SIZE,
+        ) {
+            "TRANSPORT_PREFERENCE payload must be exactly $PAYLOAD_SIZE bytes."
+        }
+        require(
+            bytes.sliceArray(1..3)
+                .all {
+                    it == 0.toByte()
+                },
+        ) {
+            "TRANSPORT_PREFERENCE reserved bytes must be zero."
+        }
+
+        val mode =
+            TransportPreferenceMode
+                .fromWireValue(
+                    bytes[0].toInt() and 0xFF,
+                )
+                ?: throw IllegalArgumentException(
+                    "Unknown transport preference mode.",
+                )
+
+        return TransportPreferencePayload(
+            mode,
+        )
+    }
+}
+
 data class HeartbeatAckPayload(val echoedTimestampMicros: ULong)
 
 object HeartbeatAckPayloadCodec {

@@ -1,5 +1,3 @@
-using System.Buffers.Binary;
-
 namespace Natsx.Controller.Transport.Usb.Tests;
 
 public sealed class UsbAoaBootstrapCoordinatorTests
@@ -45,6 +43,25 @@ public sealed class UsbAoaBootstrapCoordinatorTests
 
         Assert.Equal(
             UsbBootstrapStatus.BootstrapDriverMissing,
+            result.Status);
+        Assert.False(result.IsReady);
+    }
+
+    [Fact]
+    public async Task ProviderAccessDenied_IsReportedAsElevationRequirement()
+    {
+        var coordinator =
+            new UsbAoaBootstrapCoordinator(
+                new FakeAccessoryBackend(),
+                new ThrowingBootstrapProvider(
+                    new UnauthorizedAccessException(
+                        "Driver interface denied access.")));
+
+        UsbBootstrapResult result =
+            await coordinator.EnsureAccessoryModeAsync();
+
+        Assert.Equal(
+            UsbBootstrapStatus.BootstrapRequiresElevation,
             result.Status);
         Assert.False(result.IsReady);
     }
@@ -186,8 +203,9 @@ public sealed class UsbAoaBootstrapCoordinatorTests
             return ValueTask.FromResult(result);
         }
 
-        public ValueTask<WinUsbAoaAccessoryConnection?> OpenFirstAsync(
-            CancellationToken cancellationToken = default)
+        public ValueTask<WinUsbAoaAccessoryConnection?>
+            OpenFirstAsync(
+                CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return ValueTask.FromResult<WinUsbAoaAccessoryConnection?>(null);
@@ -221,6 +239,29 @@ public sealed class UsbAoaBootstrapCoordinatorTests
         }
     }
 
+    private sealed class ThrowingBootstrapProvider :
+        IUsbAoaBootstrapDeviceProvider
+    {
+        private readonly Exception _exception;
+
+        public ThrowingBootstrapProvider(Exception exception)
+        {
+            _exception = exception;
+        }
+
+        public UsbBootstrapProviderState State =>
+            UsbBootstrapProviderState.Ready;
+
+        public ValueTask<IReadOnlyList<IUsbAoaBootstrapDevice>>
+            EnumerateAsync(
+                CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromException<IReadOnlyList<IUsbAoaBootstrapDevice>>(
+                _exception);
+        }
+    }
+
     private sealed class FakeBootstrapDevice :
         IUsbAoaBootstrapDevice
     {
@@ -243,45 +284,21 @@ public sealed class UsbAoaBootstrapCoordinatorTests
 
         public int StartAccessoryCount { get; private set; }
 
-        public ValueTask<int> ControlInAsync(
-            byte requestType,
-            byte request,
-            ushort value,
-            ushort index,
-            Memory<byte> buffer,
+        public ValueTask<ushort> StartAccessoryModeAsync(
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            Assert.Equal(
-                AndroidOpenAccessoryConstants.GetProtocolRequest,
-                request);
-
-            BinaryPrimitives.WriteUInt16LittleEndian(
-                buffer.Span,
-                _protocolVersion);
-
-            return ValueTask.FromResult(2);
-        }
-
-        public ValueTask ControlOutAsync(
-            byte requestType,
-            byte request,
-            ushort value,
-            ushort index,
-            ReadOnlyMemory<byte> data,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (request ==
-                AndroidOpenAccessoryConstants.StartAccessoryRequest)
+            if (_protocolVersion == 0)
             {
-                StartAccessoryCount++;
-                _onStartAccessory?.Invoke();
+                throw new NotSupportedException(
+                    "Connected Android device does not advertise Android Open Accessory support.");
             }
 
-            return ValueTask.CompletedTask;
+            StartAccessoryCount++;
+            _onStartAccessory?.Invoke();
+
+            return ValueTask.FromResult(_protocolVersion);
         }
 
         public ValueTask DisposeAsync() =>

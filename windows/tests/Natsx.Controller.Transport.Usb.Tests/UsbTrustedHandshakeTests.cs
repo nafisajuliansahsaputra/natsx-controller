@@ -63,11 +63,8 @@ public sealed class UsbTrustedHandshakeTests
 
         using var input =
             new MemoryStream(
-                Concat(
-                    UsbStreamFrameCodec.Encode(
-                        challengeFrame),
-                    UsbStreamFrameCodec.Encode(
-                        remoteReadyFrame)));
+                UsbStreamFrameCodec.Encode(
+                    remoteReadyFrame));
 
         using var output =
             new MemoryStream();
@@ -94,7 +91,8 @@ public sealed class UsbTrustedHandshakeTests
                 peer =>
                     peer == androidPeer
                         ? trustSecret.ToArray()
-                        : null);
+                        : null,
+                challengeFrame);
 
         Assert.Equal(
             androidPeer,
@@ -183,6 +181,42 @@ public sealed class UsbTrustedHandshakeTests
             trustSecret);
         CryptographicOperations.ZeroMemory(
             challengeNonce);
+    }
+
+    [Fact]
+    public void RumbleRoundTrip_PreservesMotorStrengths()
+    {
+        byte[] key =
+            Enumerable.Range(0, 32)
+                .Select(static value => (byte)value)
+                .ToArray();
+
+        using var session =
+            new UsbTrustedSession(
+                SessionId.CreateRandom(),
+                key);
+
+        var expected =
+            new RumblePayload(
+                255,
+                33);
+
+        byte[] frame =
+            UsbControlFrameCodec
+                .EncodeRumble(
+                    session,
+                    expected,
+                    123);
+
+        RumblePayload actual =
+            UsbControlFrameCodec
+                .DecodeRumble(
+                    frame,
+                    session);
+
+        Assert.Equal(
+            expected,
+            actual);
     }
 
     [Fact]

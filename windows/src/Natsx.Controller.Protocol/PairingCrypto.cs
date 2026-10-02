@@ -18,6 +18,8 @@ public static class PairingCrypto
         Encoding.ASCII.GetBytes("NATSX-SAS-V1");
     private static readonly byte[] PairingResponseContext =
         Encoding.ASCII.GetBytes("NATSX-PAIRING-RESPONSE-V1");
+    private static readonly byte[] PairingConfirmContext =
+        Encoding.ASCII.GetBytes("NATSX-PAIRING-CONFIRM-V1");
     private static readonly byte[] TrustSecretInfo =
         Encoding.ASCII.GetBytes("NATSX-TRUST-SECRET-V1");
 
@@ -121,6 +123,87 @@ public static class PairingCrypto
         finally
         {
             CryptographicOperations.ZeroMemory(input);
+        }
+    }
+
+    public static byte[] ComputePairingConfirmationProof(
+        ReadOnlySpan<byte> pairingKey,
+        ReadOnlySpan<byte> pairingTranscriptHash,
+        PairingRole role)
+    {
+        ValidateKey(
+            pairingKey,
+            nameof(pairingKey));
+        ValidateHash(
+            pairingTranscriptHash,
+            nameof(pairingTranscriptHash));
+
+        if (!Enum.IsDefined(role))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(role));
+        }
+
+        byte[] input =
+            new byte[
+                PairingConfirmContext.Length +
+                DerivedKeySize +
+                1];
+
+        int offset = 0;
+        Copy(
+            PairingConfirmContext,
+            input,
+            ref offset);
+        Copy(
+            pairingTranscriptHash,
+            input,
+            ref offset);
+        input[offset] =
+            (byte)role;
+
+        try
+        {
+            return HmacSha256(
+                pairingKey,
+                input);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(
+                input);
+        }
+    }
+
+    public static bool VerifyPairingConfirmationProof(
+        ReadOnlySpan<byte> pairingKey,
+        ReadOnlySpan<byte> pairingTranscriptHash,
+        PairingRole role,
+        ReadOnlySpan<byte> suppliedProof)
+    {
+        if (suppliedProof.Length !=
+            DerivedKeySize)
+        {
+            return false;
+        }
+
+        byte[] expected =
+            ComputePairingConfirmationProof(
+                pairingKey,
+                pairingTranscriptHash,
+                role);
+
+        try
+        {
+            return CryptographicOperations
+                .FixedTimeEquals(
+                    expected,
+                    suppliedProof);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(
+                expected);
         }
     }
 

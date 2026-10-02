@@ -7,10 +7,44 @@
     <ProjectReference Include="../Natsx.Controller.Core/Natsx.Controller.Core.csproj" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <HidMaestroSdkPath>$(MSBuildThisFileDirectory)..\..\lib\HIDMaestro\HIDMaestro.Core.dll</HidMaestroSdkPath>
+    <HidMaestroLicensePath>$(MSBuildThisFileDirectory)..\..\lib\HIDMaestro\HIDMaestro.LICENSE.txt</HidMaestroLicensePath>
+    <HidMaestroFetchScript>$(MSBuildThisFileDirectory)..\..\eng\fetch-hidmaestro.ps1</HidMaestroFetchScript>
+  </PropertyGroup>
+
+  <Target
+    Name="EnsureHidMaestroSdk"
+    BeforeTargets="PrepareForBuild"
+    Condition="'$(DesignTimeBuild)' != 'true' and (!Exists('$(HidMaestroSdkPath)') or !Exists('$(HidMaestroLicensePath)'))">
+    <Message
+      Importance="high"
+      Text="HIDMaestro SDK is missing. Bootstrapping pinned SDK v1.9.2..." />
+    <Exec
+      Command="powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(HidMaestroFetchScript)&quot;"
+      WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Error
+      Condition="!Exists('$(HidMaestroSdkPath)')"
+      Text="HIDMaestro.Core.dll is still missing after bootstrap. Run windows\eng\fetch-hidmaestro.ps1 manually and inspect its diagnostic output." />
+    <Error
+      Condition="!Exists('$(HidMaestroLicensePath)')"
+      Text="HIDMaestro license is still missing after bootstrap. Refusing to build a redistributable Windows package without the upstream notice." />
+  </Target>
+
   <ItemGroup>
     <Reference Include="HIDMaestro.Core">
-      <HintPath>$(MSBuildThisFileDirectory)..\..\lib\HIDMaestro\HIDMaestro.Core.dll</HintPath>
+      <HintPath>$(HidMaestroSdkPath)</HintPath>
       <Private>true</Private>
     </Reference>
+    <None
+      Include="$(MSBuildThisFileDirectory)..\..\lib\HIDMaestro\HIDMaestro.LICENSE.txt"
+      Link="licenses\HIDMaestro.LICENSE.txt"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest" />
+    <None
+      Include="$(MSBuildThisFileDirectory)..\..\..\THIRD_PARTY_NOTICES.md"
+      Link="THIRD_PARTY_NOTICES.md"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
