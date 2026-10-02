@@ -83,13 +83,13 @@ class ControllerSurfaceView(
 
     private val dpadBasePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = COLOR_SURFACE_RAISED
+            color = COLOR_DPAD_PLATE
             style = Paint.Style.FILL
         }
 
     private val dpadRingPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = COLOR_CENTER_PANEL_OUTLINE
+            color = COLOR_LAVENDER_EDGE
             style = Paint.Style.STROKE
             strokeWidth = 2f
         }
@@ -512,19 +512,11 @@ class ControllerSurfaceView(
             } ?: return
 
         val contentWidth =
-            (
-                width -
-                    safeInsetLeft -
-                    safeInsetRight
-            ).coerceAtLeast(
+            width.coerceAtLeast(
                 1f,
             )
         val contentHeight =
-            (
-                height -
-                    safeInsetTop -
-                    safeInsetBottom
-            ).coerceAtLeast(
+            height.coerceAtLeast(
                 1f,
             )
 
@@ -871,12 +863,10 @@ class ControllerSurfaceView(
             controls += ControlGeometry.circle(
                 id = id,
                 centerX =
-                    safeInsetLeft +
-                        contentWidth *
+                    contentWidth *
                             position.x,
                 centerY =
-                    safeInsetTop +
-                        contentHeight *
+                    contentHeight *
                             position.y,
                 radius = unit * radius,
                 hitRadius =
@@ -951,30 +941,30 @@ class ControllerSurfaceView(
             )
         }
 
-        rect(ControlId.LT, 0.020f, 0.032f, 0.180f, 0.178f)
-        rect(ControlId.LB, 0.200f, 0.032f, 0.365f, 0.178f)
-        rect(ControlId.RB, 0.635f, 0.032f, 0.800f, 0.178f)
-        rect(ControlId.RT, 0.820f, 0.032f, 0.980f, 0.178f)
+        rect(ControlId.LT, 0.025f, 0.045f, 0.182f, 0.196f)
+        rect(ControlId.LB, 0.205f, 0.051f, 0.366f, 0.197f)
+        rect(ControlId.RB, 0.635f, 0.051f, 0.796f, 0.197f)
+        rect(ControlId.RT, 0.819f, 0.045f, 0.975f, 0.196f)
 
-        rect(ControlId.BACK, 0.307f, 0.225f, 0.373f, 0.314f)
-        rect(ControlId.L3, 0.347f, 0.362f, 0.413f, 0.451f)
-        rect(ControlId.R3, 0.587f, 0.362f, 0.653f, 0.451f)
-        rect(ControlId.START, 0.627f, 0.225f, 0.693f, 0.314f)
-        rect(ControlId.GUIDE, 0.466f, 0.475f, 0.534f, 0.570f)
+        rect(ControlId.BACK, 0.326f, 0.243f, 0.397f, 0.321f)
+        rect(ControlId.L3, 0.358f, 0.364f, 0.429f, 0.442f)
+        rect(ControlId.R3, 0.571f, 0.364f, 0.642f, 0.442f)
+        rect(ControlId.START, 0.603f, 0.243f, 0.674f, 0.321f)
+        rect(ControlId.GUIDE, 0.467f, 0.472f, 0.534f, 0.554f)
 
-        circle(ControlId.LEFT_STICK, 0.120f, 0.480f, 0.132f, 1.28f)
+        circle(ControlId.LEFT_STICK, 0.153f, 0.474f, 0.132f, 1.28f)
 
-        circle(ControlId.DPAD_UP, 0.365f, 0.555f, 0.056f, 1.18f)
-        circle(ControlId.DPAD_LEFT, 0.295f, 0.700f, 0.056f, 1.18f)
-        circle(ControlId.DPAD_RIGHT, 0.435f, 0.700f, 0.056f, 1.18f)
-        circle(ControlId.DPAD_DOWN, 0.365f, 0.845f, 0.056f, 1.18f)
+        circle(ControlId.DPAD_UP, 0.380f, 0.582f, 0.056f, 1.18f)
+        circle(ControlId.DPAD_LEFT, 0.310f, 0.722f, 0.056f, 1.18f)
+        circle(ControlId.DPAD_RIGHT, 0.450f, 0.722f, 0.056f, 1.18f)
+        circle(ControlId.DPAD_DOWN, 0.380f, 0.862f, 0.056f, 1.18f)
 
-        circle(ControlId.RIGHT_STICK, 0.640f, 0.655f, 0.105f, 1.35f)
+        circle(ControlId.RIGHT_STICK, 0.620f, 0.710f, 0.105f, 1.35f)
 
-        circle(ControlId.Y, 0.840f, 0.360f, 0.068f, 1.18f)
-        circle(ControlId.X, 0.770f, 0.502f, 0.068f, 1.18f)
-        circle(ControlId.B, 0.910f, 0.502f, 0.068f, 1.18f)
-        circle(ControlId.A, 0.840f, 0.644f, 0.068f, 1.18f)
+        circle(ControlId.Y, 0.843f, 0.358f, 0.068f, 1.18f)
+        circle(ControlId.X, 0.781f, 0.498f, 0.068f, 1.18f)
+        circle(ControlId.B, 0.907f, 0.498f, 0.068f, 1.18f)
+        circle(ControlId.A, 0.844f, 0.640f, 0.068f, 1.18f)
     }
 
     private fun drawCircleControl(
@@ -999,19 +989,9 @@ class ControllerSurfaceView(
             control.id ==
                 ControlId.RIGHT_STICK
         ) {
-            val visualScale =
-                if (
-                    control.id ==
-                        ControlId.LEFT_STICK
-                ) {
-                    1.78f
-                } else {
-                    2.12f
-                }
-
             val outerRadius =
-                control.radius *
-                    visualScale
+                height *
+                    0.210f
 
             canvas.drawCircle(
                 control.centerX,
@@ -1671,75 +1651,56 @@ class ControllerSurfaceView(
         }
 
         val contentWidth =
-            (
-                width -
-                    safeInsetLeft -
-                    safeInsetRight
+            width.coerceAtLeast(
+                1f,
             )
-                .coerceAtLeast(
-                    1f,
-                )
         val contentHeight =
-            (
-                height -
-                    safeInsetTop -
-                    safeInsetBottom
+            height.coerceAtLeast(
+                1f,
             )
-                .coerceAtLeast(
-                    1f,
-                )
 
         val topY =
-            safeInsetTop
+            0f
         val bottomY =
-            safeInsetTop +
-                contentHeight *
-                    0.455f
+            contentHeight *
+                0.415f
 
         centerPanelPath.reset()
         centerPanelPath.moveTo(
-            safeInsetLeft +
-                contentWidth *
+            contentWidth *
                     0.340f,
             topY,
         )
         centerPanelPath.lineTo(
-            safeInsetLeft +
-                contentWidth *
+            contentWidth *
                     0.660f,
             topY,
         )
         centerPanelPath.lineTo(
-            safeInsetLeft +
-                contentWidth *
+            contentWidth *
                     0.565f,
             bottomY -
                 contentHeight *
                     0.035f,
         )
         centerPanelPath.quadTo(
-            safeInsetLeft +
-                contentWidth *
+            contentWidth *
                     0.550f,
             bottomY,
-            safeInsetLeft +
-                contentWidth *
+            contentWidth *
                     0.525f,
             bottomY,
         )
         centerPanelPath.lineTo(
-            safeInsetLeft +
-                contentWidth *
+            contentWidth *
                     0.475f,
             bottomY,
         )
         centerPanelPath.quadTo(
-            safeInsetLeft +
-                contentWidth *
+            contentWidth *
                     0.450f,
             bottomY,
-            safeInsetLeft +
-                contentWidth *
+            contentWidth *
                     0.435f,
             bottomY -
                 contentHeight *
@@ -1872,18 +1833,8 @@ class ControllerSurfaceView(
         dpadPath.close()
 
         val outerRadius =
-            (
-                (
-                    rightEdge -
-                        leftEdge
-                )
-                    .coerceAtLeast(
-                        bottomEdge -
-                            topEdge,
-                    ) /
-                    2f
-            ) *
-                1.24f
+            height *
+                0.216f
 
         canvas.drawCircle(
             centerX,
@@ -1898,17 +1849,25 @@ class ControllerSurfaceView(
             dpadRingPaint,
         )
 
+        val visualHalfThickness =
+            outerRadius *
+                0.245f
+        val visualReach =
+            outerRadius *
+                0.82f
         val armRadius =
-            halfThickness *
-                0.26f
+            visualHalfThickness *
+                0.28f
 
         tempRect.set(
             centerX -
-                halfThickness,
-            topEdge,
+                visualHalfThickness,
+            centerY -
+                visualReach,
             centerX +
-                halfThickness,
-            bottomEdge,
+                visualHalfThickness,
+            centerY +
+                visualReach,
         )
         canvas.drawRoundRect(
             tempRect,
@@ -1918,12 +1877,14 @@ class ControllerSurfaceView(
         )
 
         tempRect.set(
-            leftEdge,
+            centerX -
+                visualReach,
             centerY -
-                halfThickness,
-            rightEdge,
+                visualHalfThickness,
+            centerX +
+                visualReach,
             centerY +
-                halfThickness,
+                visualHalfThickness,
         )
         canvas.drawRoundRect(
             tempRect,
@@ -1952,9 +1913,9 @@ class ControllerSurfaceView(
                 DpadState.UP != 0
         ) {
             tempRect.set(
-                centerX - halfThickness,
-                topEdge,
-                centerX + halfThickness,
+                centerX - visualHalfThickness,
+                centerY - visualReach,
+                centerX + visualHalfThickness,
                 centerY,
             )
             drawPressed(tempRect)
@@ -1965,10 +1926,10 @@ class ControllerSurfaceView(
                 DpadState.DOWN != 0
         ) {
             tempRect.set(
-                centerX - halfThickness,
+                centerX - visualHalfThickness,
                 centerY,
-                centerX + halfThickness,
-                bottomEdge,
+                centerX + visualHalfThickness,
+                centerY + visualReach,
             )
             drawPressed(tempRect)
         }
@@ -1978,10 +1939,10 @@ class ControllerSurfaceView(
                 DpadState.LEFT != 0
         ) {
             tempRect.set(
-                leftEdge,
-                centerY - halfThickness,
+                centerX - visualReach,
+                centerY - visualHalfThickness,
                 centerX,
-                centerY + halfThickness,
+                centerY + visualHalfThickness,
             )
             drawPressed(tempRect)
         }
@@ -1992,16 +1953,16 @@ class ControllerSurfaceView(
         ) {
             tempRect.set(
                 centerX,
-                centerY - halfThickness,
-                rightEdge,
-                centerY + halfThickness,
+                centerY - visualHalfThickness,
+                centerX + visualReach,
+                centerY + visualHalfThickness,
             )
             drawPressed(tempRect)
         }
 
         dpadMarkPaint.strokeWidth =
             (
-                halfThickness *
+                visualHalfThickness *
                     0.12f
             )
                 .coerceAtLeast(
@@ -2009,7 +1970,7 @@ class ControllerSurfaceView(
                 )
 
         val markLength =
-            halfThickness *
+            visualHalfThickness *
                 0.34f
 
         canvas.drawLine(
@@ -2066,18 +2027,11 @@ class ControllerSurfaceView(
             }
 
         val visualOuterRadius =
-            control.radius *
-                if (
-                    id ==
-                        ControlId.LEFT_STICK
-                ) {
-                    1.78f
-                } else {
-                    2.12f
-                }
+            height *
+                0.210f
         val knobRadius =
             visualOuterRadius *
-                0.58f
+                0.620f
         val travel =
             control.radius *
                 0.50f
@@ -2239,6 +2193,8 @@ class ControllerSurfaceView(
             0xFF9D89CF.toInt()
         const val COLOR_LAVENDER_EDGE =
             0xFF8F7BC4.toInt()
+        const val COLOR_DPAD_PLATE =
+            0xFFA38FD4.toInt()
         const val COLOR_MINT =
             0xFF92DFA0.toInt()
         const val COLOR_MINT_PRESSED =

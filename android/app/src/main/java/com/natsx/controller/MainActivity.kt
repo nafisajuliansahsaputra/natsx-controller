@@ -304,13 +304,13 @@ class MainActivity : Activity() {
         root.addView(
             settingsLogoButton,
             FrameLayout.LayoutParams(
-                dp(34),
-                dp(34),
+                dp(42),
+                dp(42),
                 Gravity.TOP or
                     Gravity.CENTER_HORIZONTAL,
             ).apply {
                 topMargin =
-                    dp(42)
+                    dp(67)
             },
         )
 
@@ -368,29 +368,8 @@ class MainActivity : Activity() {
                 currentConnectionStatus.usb,
             )
 
-        val message =
-            when {
-                currentUsbStatus.isError ->
-                    "USB connection issue"
-
-                activeTransport != null ->
-                    null
-
-                linkStates.any {
-                    it ==
-                        AndroidLinkState.RECONNECTING
-                } ->
-                    "Reconnecting…"
-
-                linkStates.any {
-                    it ==
-                        AndroidLinkState.CONNECTING
-                } ->
-                    "Connecting…"
-
-                else ->
-                    null
-            }
+        val message: String? =
+            null
 
         controllerStatusView.updateState(
             ControllerHudState(
@@ -406,9 +385,6 @@ class MainActivity : Activity() {
                         .isError,
             ),
         )
-
-        controllerStatusView
-            .bringToFront()
 
         if (
             ::pairingOverlay.isInitialized &&

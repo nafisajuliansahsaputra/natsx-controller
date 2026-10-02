@@ -129,19 +129,13 @@ class ControllerStatusView(
         }
 
         val contentWidth =
-            (
-                width -
-                    safeInsetLeft -
-                    safeInsetRight
+            width.coerceAtLeast(
+                1,
             )
-                .coerceAtLeast(
-                    1,
-                )
 
         val contentCenterX =
-            safeInsetLeft +
-                contentWidth /
-                    2f
+            width /
+                2f
 
         val scale =
             min(
@@ -235,8 +229,8 @@ class ControllerStatusView(
         val lampHeight =
             6f * density * scale
         val lampCenterY =
-            logoCenterY +
-                38f *
+            safeInsetTop +
+                118f *
                     density *
                     scale
 
@@ -275,30 +269,6 @@ class ControllerStatusView(
             lampOutlinePaint,
         )
 
-        state.message
-            ?.takeIf {
-                it.isNotBlank()
-            }
-            ?.let { message ->
-                messagePaint.color =
-                    if (state.messageIsError) {
-                        COLOR_ERROR
-                    } else {
-                        COLOR_TEXT
-                    }
-                messagePaint.textSize =
-                    11f * density * scale
-
-                drawCenteredText(
-                    canvas = canvas,
-                    text = message,
-                    x = contentCenterX,
-                    y =
-                        lampCenterY +
-                            21f * density * scale,
-                    paint = messagePaint,
-                )
-            }
     }
 
     private fun transportPaint(
