@@ -101,6 +101,145 @@ public sealed class SmartConnectionManagerTests
     }
 
     [Fact]
+    public void ManualPreference_SelectsRequestedHealthyTransport()
+    {
+        var clock = new ManualTimeProvider();
+        var manager =
+            new SmartConnectionManager(
+                timeProvider: clock);
+
+        manager.Report(
+            Snapshot(
+                TransportKind.Wifi,
+                95));
+        manager.Report(
+            Snapshot(
+                TransportKind.Bluetooth,
+                90));
+
+        HandoverProposal initial =
+            Assert.IsType<HandoverProposal>(
+                manager.Evaluate());
+
+        manager.Commit(initial);
+        Assert.Equal(
+            TransportKind.Wifi,
+            manager.ActiveTransport);
+
+        manager.SetPreferredTransport(
+            TransportKind.Bluetooth);
+
+        HandoverProposal requested =
+            Assert.IsType<HandoverProposal>(
+                manager.Evaluate());
+
+        Assert.Equal(
+            TransportKind.Bluetooth,
+            requested.To);
+        Assert.Equal(
+            HandoverReason.ManualPreference,
+            requested.Reason);
+        Assert.False(
+            requested.FailureInduced);
+    }
+
+    [Fact]
+    public void ManualPreference_DoesNotDisableEmergencyFailover()
+    {
+        var manager =
+            new SmartConnectionManager();
+
+        manager.Report(
+            Snapshot(
+                TransportKind.Wifi,
+                95));
+        manager.Report(
+            Snapshot(
+                TransportKind.Bluetooth,
+                90));
+
+        HandoverProposal initial =
+            Assert.IsType<HandoverProposal>(
+                manager.Evaluate());
+        manager.Commit(initial);
+
+        manager.SetPreferredTransport(
+            TransportKind.Wifi);
+
+        manager.Report(
+            Snapshot(
+                TransportKind.Wifi,
+                0,
+                TransportHealthGrade.Lost,
+                TransportRuntimeState.Failed));
+
+        HandoverProposal emergency =
+            Assert.IsType<HandoverProposal>(
+                manager.Evaluate());
+
+        Assert.Equal(
+            TransportKind.Bluetooth,
+            emergency.To);
+        Assert.Equal(
+            HandoverReason.ActiveLost,
+            emergency.Reason);
+        Assert.True(
+            emergency.FailureInduced);
+    }
+
+    [Fact]
+    public void AutoPreference_RestoresNormalUsbSelection()
+    {
+        var clock =
+            new ManualTimeProvider();
+        var manager =
+            new SmartConnectionManager(
+                timeProvider: clock);
+
+        manager.Report(
+            Snapshot(
+                TransportKind.Wifi,
+                95));
+
+        HandoverProposal initial =
+            Assert.IsType<HandoverProposal>(
+                manager.Evaluate());
+        manager.Commit(initial);
+
+        manager.SetPreferredTransport(
+            TransportKind.Wifi);
+
+        manager.Report(
+            Snapshot(
+                TransportKind.Usb,
+                95));
+        clock.Advance(
+            ConnectionPolicy
+                .Competitive
+                .UsbRecoveryStability);
+        manager.Report(
+            Snapshot(
+                TransportKind.Usb,
+                95));
+
+        Assert.Null(
+            manager.Evaluate());
+
+        manager.SetPreferredTransport(null);
+
+        HandoverProposal automatic =
+            Assert.IsType<HandoverProposal>(
+                manager.Evaluate());
+
+        Assert.Equal(
+            TransportKind.Usb,
+            automatic.To);
+        Assert.Equal(
+            HandoverReason.PreferredUsbReady,
+            automatic.Reason);
+    }
+
+    [Fact]
     public void Usb_TakesOverOnlyAfterStabilization()
     {
         var clock = new ManualTimeProvider();

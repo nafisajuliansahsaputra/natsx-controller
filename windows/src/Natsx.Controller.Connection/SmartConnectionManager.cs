@@ -26,6 +26,8 @@ public sealed class SmartConnectionManager
 
     public TransportKind? ActiveTransport { get; private set; }
 
+    public TransportKind? PreferredTransport { get; private set; }
+
     public ConnectionManagerState State { get; private set; } =
         ConnectionManagerState.Disconnected;
 
@@ -113,6 +115,17 @@ public sealed class SmartConnectionManager
         }
     }
 
+    public void SetPreferredTransport(
+        TransportKind? transport)
+    {
+        PreferredTransport = transport;
+
+        // A user preference change is intentional and should not be delayed
+        // by a cooldown created by a previous automatic handover.
+        _cooldownStartedAt = null;
+        _cooldownDuration = TimeSpan.Zero;
+    }
+
     public HandoverProposal? Evaluate()
     {
         long now = _timeProvider.GetTimestamp();
@@ -120,11 +133,15 @@ public sealed class SmartConnectionManager
 
         if (ActiveTransport is null)
         {
-            TransportKind? initial = SelectBestCandidate(
-                now,
-                minimumScore: _policy.UsableCandidateScore,
-                requireGood: false,
-                exclude: null);
+            TransportKind? initial =
+                SelectPreferredCandidate(
+                    now,
+                    minimumScore: _policy.UsableCandidateScore)
+                ?? SelectBestCandidate(
+                    now,
+                    minimumScore: _policy.UsableCandidateScore,
+                    requireGood: false,
+                    exclude: null);
 
             if (initial is null)
             {
@@ -187,9 +204,36 @@ public sealed class SmartConnectionManager
             }
         }
 
+        HandoverProposal? preferredProposal =
+            EvaluateManualPreference(
+                activeKind,
+                now);
+
+        if (preferredProposal is not null)
+        {
+            return preferredProposal;
+        }
+
         if (IsCooldownActive(now))
         {
             State = ConnectionManagerState.Cooldown;
+            return null;
+        }
+
+        if (PreferredTransport is not null &&
+            PreferredTransport == activeKind)
+        {
+            activeCandidate.HealthWindows =
+                activeCandidate.HealthHistory.Snapshot(
+                    now,
+                    _policy);
+
+            State =
+                activeSnapshot.Value.Grade ==
+                    TransportHealthGrade.Degraded
+                    ? ConnectionManagerState.Degraded
+                    : ConnectionManagerState.Active;
+
             return null;
         }
 
@@ -313,6 +357,71 @@ public sealed class SmartConnectionManager
         candidate.HealthWindows =
             candidate.HealthHistory.Snapshot(now, _policy);
         return candidate.HealthWindows;
+    }
+
+    private HandoverProposal? EvaluateManualPreference(
+        TransportKind activeKind,
+        long now)
+    {
+        if (PreferredTransport is not TransportKind preferred ||
+            preferred == activeKind)
+        {
+            return null;
+        }
+
+        CandidateState candidate =
+            _candidates[preferred];
+        TransportHealthSnapshot? snapshot =
+            candidate.Snapshot;
+
+        if (snapshot is null ||
+            !IsEligibleState(snapshot.Value.State) ||
+            IsCircuitOpen(candidate, now) ||
+            EffectiveScore(
+                preferred,
+                candidate,
+                snapshot.Value,
+                now) < _policy.UsableCandidateScore)
+        {
+            return null;
+        }
+
+        State = ConnectionManagerState.Handover;
+
+        return new HandoverProposal(
+            activeKind,
+            preferred,
+            HandoverReason.ManualPreference,
+            FailureInduced: false);
+    }
+
+    private TransportKind? SelectPreferredCandidate(
+        long now,
+        int minimumScore)
+    {
+        if (PreferredTransport is not TransportKind preferred)
+        {
+            return null;
+        }
+
+        CandidateState candidate =
+            _candidates[preferred];
+        TransportHealthSnapshot? snapshot =
+            candidate.Snapshot;
+
+        if (snapshot is null ||
+            !IsEligibleState(snapshot.Value.State) ||
+            IsCircuitOpen(candidate, now) ||
+            EffectiveScore(
+                preferred,
+                candidate,
+                snapshot.Value,
+                now) < minimumScore)
+        {
+            return null;
+        }
+
+        return preferred;
     }
 
     private HandoverProposal? EvaluateUsbPreference(
