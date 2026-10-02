@@ -172,7 +172,7 @@ jobs:
             "/SUPPRESSMSGBOXES",
             "/NORESTART",
             "/SP-",
-            "/DIR=$installRoot",
+            "/DIR=`"$installRoot`"",
             "/LOG=$setupLogPath"
           ) -Wait -PassThru
 
@@ -190,6 +190,21 @@ jobs:
           $gamepadHost = Join-Path $installRoot "Natsx.Controller.GamepadHost.exe"
 
           if (-not (Test-Path -LiteralPath $receiver -PathType Leaf)) {
+            if (Test-Path -LiteralPath $setupLogPath) {
+              Get-Content -LiteralPath $setupLogPath | Write-Host
+            }
+
+            $hostInstallLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host-install.log"
+            $hostLog = Join-Path $env:ProgramData "NATSX\Controller\gamepad-host.log"
+
+            if (Test-Path -LiteralPath $hostInstallLog) {
+              Get-Content -LiteralPath $hostInstallLog | Write-Host
+            }
+
+            if (Test-Path -LiteralPath $hostLog) {
+              Get-Content -LiteralPath $hostLog | Write-Host
+            }
+
             throw "Receiver executable was not installed."
           }
 
@@ -285,7 +300,7 @@ jobs:
             "/SUPPRESSMSGBOXES",
             "/NORESTART",
             "/SP-",
-            "/DIR=$installRoot"
+            "/DIR=`"$installRoot`""
           ) -Wait -PassThru
 
           if ($repair.ExitCode -ne 0) {
