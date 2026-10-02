@@ -1,12 +1,14 @@
 using System.Net;
 using Natsx.Controller.Connection;
 using Natsx.Controller.Core;
+using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Transport.Wifi;
 
 public sealed class WifiControllerTransport :
     IControllerTransport,
-    IControllerOutputTransport
+    IControllerOutputTransport,
+    IControllerStatusOutputTransport
 {
     private readonly WifiRealtimeReceiver _receiver;
     private readonly IPEndPoint _bindEndPoint;
@@ -148,6 +150,32 @@ public sealed class WifiControllerTransport :
         return _receiver.TrySendRumbleAsync(
             rumble,
             cancellationToken);
+    }
+
+    public ValueTask<bool> TrySendHandoverCommitAsync(
+        TransportKind activeTransport,
+        uint stateSequence,
+        CancellationToken cancellationToken = default)
+    {
+        ProtocolTransport protocolTransport =
+            activeTransport switch
+            {
+                TransportKind.Wifi =>
+                    ProtocolTransport.Wifi,
+                TransportKind.Bluetooth =>
+                    ProtocolTransport.Bluetooth,
+                TransportKind.Usb =>
+                    ProtocolTransport.UsbDirect,
+                _ =>
+                    throw new ArgumentOutOfRangeException(
+                        nameof(activeTransport)),
+            };
+
+        return _receiver
+            .TrySendHandoverCommitAsync(
+                protocolTransport,
+                stateSequence,
+                cancellationToken);
     }
 
     private async Task PumpStatesAsync(CancellationToken cancellationToken)

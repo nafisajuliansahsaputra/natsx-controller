@@ -147,6 +147,47 @@ public static class WifiControlDatagramCodec
             frame.Payload);
     }
 
+    public static byte[] EncodeHandoverCommit(
+        WifiTrustedSession trustedSession,
+        HandoverPayload payload,
+        ulong monotonicTimestampMicros)
+    {
+        ArgumentNullException.ThrowIfNull(
+            trustedSession);
+
+        return ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.HandoverCommit,
+                FrameFlags.Authenticated,
+                trustedSession.SessionId,
+                0,
+                monotonicTimestampMicros,
+                HandoverPayloadCodec.Encode(
+                    payload)),
+            trustedSession.SessionKey);
+    }
+
+    public static HandoverPayload DecodeHandoverCommit(
+        ReadOnlySpan<byte> datagram,
+        WifiTrustedSession trustedSession)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                datagram,
+                trustedSession);
+
+        if (frame.MessageType !=
+            MessageType.HandoverCommit)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.HandoverCommit}, received {frame.MessageType}.");
+        }
+
+        return HandoverPayloadCodec.Decode(
+            frame.Payload);
+    }
+
     public static ulong DecodeHeartbeat(
         ReadOnlySpan<byte> datagram,
         WifiTrustedSession trustedSession)

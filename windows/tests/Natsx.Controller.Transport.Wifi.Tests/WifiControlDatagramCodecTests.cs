@@ -73,6 +73,37 @@ public sealed class WifiControlDatagramCodecTests
     }
 
     [Fact]
+    public void HandoverCommitRoundTripPreservesAuthorityAndSequence()
+    {
+        using var trusted =
+            new WifiTrustedSession(
+                Session,
+                Key);
+
+        var expected =
+            new HandoverPayload(
+                ProtocolTransport.UsbDirect,
+                0xF00DBAAAu);
+
+        byte[] datagram =
+            WifiControlDatagramCodec
+                .EncodeHandoverCommit(
+                    trusted,
+                    expected,
+                    987_654);
+
+        HandoverPayload actual =
+            WifiControlDatagramCodec
+                .DecodeHandoverCommit(
+                    datagram,
+                    trusted);
+
+        Assert.Equal(
+            expected,
+            actual);
+    }
+
+    [Fact]
     public void SessionReadyRoundTripPreservesTrustedIdentity()
     {
         byte[] key = Enumerable.Range(0, WifiTrustedSession.SessionKeySize)

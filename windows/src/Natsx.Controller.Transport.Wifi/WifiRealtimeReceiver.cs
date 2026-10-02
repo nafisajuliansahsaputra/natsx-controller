@@ -154,6 +154,68 @@ public sealed class WifiRealtimeReceiver : IAsyncDisposable
         }
     }
 
+    public async ValueTask<bool> TrySendHandoverCommitAsync(
+        ProtocolTransport activeTransport,
+        uint stateSequence,
+        CancellationToken cancellationToken = default)
+    {
+        UdpClient? udpClient =
+            _udpClient;
+
+        IPEndPoint? remote;
+
+        lock (_remoteEndpointLock)
+        {
+            remote =
+                CloneEndPoint(
+                    _remoteEndpoint);
+        }
+
+        if (udpClient is null ||
+            remote is null ||
+            _receiveLoop is null)
+        {
+            return false;
+        }
+
+        byte[] datagram =
+            WifiControlDatagramCodec
+                .EncodeHandoverCommit(
+                    _trustedSession,
+                    new HandoverPayload(
+                        activeTransport,
+                        stateSequence),
+                    GetMonotonicMicroseconds());
+
+        await _outputGate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await udpClient.SendAsync(
+                    datagram,
+                    remote,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        finally
+        {
+            _outputGate.Release();
+        }
+    }
+
     public IPEndPoint? LocalEndPoint
     {
         get
