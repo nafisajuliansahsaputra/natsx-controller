@@ -272,8 +272,9 @@ class MainActivity : Activity() {
         val settingsButton =
             TextView(this).apply {
                 text = "⚙"
-                textSize = 19f
+                textSize = 16f
                 gravity = Gravity.CENTER
+                alpha = 0.72f
                 contentDescription =
                     "Controller settings"
                 setTextColor(
@@ -288,18 +289,11 @@ class MainActivity : Activity() {
                         shape =
                             GradientDrawable.OVAL
                         setColor(
-                            Color.rgb(
-                                146,
-                                223,
-                                160,
-                            ),
-                        )
-                        setStroke(
-                            dp(1),
-                            Color.rgb(
-                                222,
-                                219,
-                                229,
+                            Color.argb(
+                                0,
+                                255,
+                                255,
+                                255,
                             ),
                         )
                     }
@@ -535,13 +529,8 @@ class MainActivity : Activity() {
                 } ->
                     "Connecting…"
 
-                currentConnectionStatus
-                    .trustedPcCount ==
-                    0 ->
-                    "Pair a Windows receiver"
-
                 else ->
-                    "Waiting for Windows"
+                    null
             }
 
         controllerStatusView.updateState(

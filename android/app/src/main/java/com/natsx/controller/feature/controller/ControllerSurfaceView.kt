@@ -62,6 +62,51 @@ class ControllerSurfaceView(
             style = Paint.Style.FILL
         }
 
+    private val stickWellPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_STICK_WELL
+            style = Paint.Style.FILL
+        }
+
+    private val mintEdgePaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_MINT_EDGE
+            style = Paint.Style.FILL
+        }
+
+    private val lavenderEdgePaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_LAVENDER_EDGE
+            style = Paint.Style.FILL
+        }
+
+    private val dpadBasePaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_LAVENDER_EDGE
+            style = Paint.Style.FILL
+        }
+
+    private val centerPanelPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_CENTER_PANEL
+            style = Paint.Style.FILL
+        }
+
+    private val centerPanelOutlinePaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_CENTER_PANEL_OUTLINE
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+        }
+
+    private val iconPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = COLOR_TEXT_ON_COLOR
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+
     private val dpadMarkPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = COLOR_TEXT_ON_COLOR
@@ -78,6 +123,8 @@ class ControllerSurfaceView(
         }
 
     private val dpadPath = Path()
+    private val controlPath = Path()
+    private val centerPanelPath = Path()
     private val tempRect = RectF()
 
     private var inputTuning =
@@ -130,6 +177,10 @@ class ControllerSurfaceView(
         super.onDraw(canvas)
 
         val state = stateStore.snapshot()
+
+        drawCenterPanel(
+            canvas,
+        )
 
         if (!layoutEditing) {
             drawDpad(
@@ -888,30 +939,30 @@ class ControllerSurfaceView(
             )
         }
 
-        rect(ControlId.LT, 0.025f, 0.035f, 0.175f, 0.170f)
-        rect(ControlId.LB, 0.195f, 0.035f, 0.345f, 0.170f)
-        rect(ControlId.RB, 0.655f, 0.035f, 0.805f, 0.170f)
-        rect(ControlId.RT, 0.825f, 0.035f, 0.975f, 0.170f)
+        rect(ControlId.LT, 0.020f, 0.032f, 0.180f, 0.178f)
+        rect(ControlId.LB, 0.200f, 0.032f, 0.365f, 0.178f)
+        rect(ControlId.RB, 0.635f, 0.032f, 0.800f, 0.178f)
+        rect(ControlId.RT, 0.820f, 0.032f, 0.980f, 0.178f)
 
-        rect(ControlId.BACK, 0.325f, 0.235f, 0.385f, 0.315f)
-        rect(ControlId.L3, 0.350f, 0.355f, 0.410f, 0.435f)
-        rect(ControlId.R3, 0.590f, 0.355f, 0.650f, 0.435f)
-        rect(ControlId.START, 0.615f, 0.235f, 0.675f, 0.315f)
-        rect(ControlId.GUIDE, 0.470f, 0.455f, 0.530f, 0.545f)
+        rect(ControlId.BACK, 0.326f, 0.232f, 0.392f, 0.318f)
+        rect(ControlId.L3, 0.362f, 0.365f, 0.428f, 0.452f)
+        rect(ControlId.R3, 0.572f, 0.365f, 0.638f, 0.452f)
+        rect(ControlId.START, 0.608f, 0.232f, 0.674f, 0.318f)
+        rect(ControlId.GUIDE, 0.466f, 0.475f, 0.534f, 0.570f)
 
-        circle(ControlId.LEFT_STICK, 0.155f, 0.575f, 0.132f, 1.12f)
+        circle(ControlId.LEFT_STICK, 0.140f, 0.505f, 0.132f, 1.24f)
 
-        circle(ControlId.DPAD_UP, 0.380f, 0.555f, 0.047f, 1.16f)
-        circle(ControlId.DPAD_LEFT, 0.325f, 0.655f, 0.047f, 1.16f)
-        circle(ControlId.DPAD_RIGHT, 0.435f, 0.655f, 0.047f, 1.16f)
-        circle(ControlId.DPAD_DOWN, 0.380f, 0.755f, 0.047f, 1.16f)
+        circle(ControlId.DPAD_UP, 0.380f, 0.585f, 0.052f, 1.18f)
+        circle(ControlId.DPAD_LEFT, 0.325f, 0.700f, 0.052f, 1.18f)
+        circle(ControlId.DPAD_RIGHT, 0.435f, 0.700f, 0.052f, 1.18f)
+        circle(ControlId.DPAD_DOWN, 0.380f, 0.815f, 0.052f, 1.18f)
 
-        circle(ControlId.RIGHT_STICK, 0.640f, 0.655f, 0.102f, 1.18f)
+        circle(ControlId.RIGHT_STICK, 0.640f, 0.690f, 0.105f, 1.32f)
 
-        circle(ControlId.Y, 0.840f, 0.445f, 0.058f, 1.18f)
-        circle(ControlId.X, 0.770f, 0.605f, 0.058f, 1.18f)
-        circle(ControlId.B, 0.910f, 0.605f, 0.058f, 1.18f)
-        circle(ControlId.A, 0.840f, 0.765f, 0.058f, 1.18f)
+        circle(ControlId.Y, 0.840f, 0.365f, 0.063f, 1.18f)
+        circle(ControlId.X, 0.770f, 0.505f, 0.063f, 1.18f)
+        circle(ControlId.B, 0.910f, 0.505f, 0.063f, 1.18f)
+        circle(ControlId.A, 0.840f, 0.645f, 0.063f, 1.18f)
     }
 
     private fun drawCircleControl(
@@ -930,44 +981,85 @@ class ControllerSurfaceView(
                         control.id
                 )
 
-        val fill =
-            when {
-                control.id ==
-                    ControlId.LEFT_STICK ||
+        if (
+            control.id ==
+                ControlId.LEFT_STICK ||
+            control.id ==
+                ControlId.RIGHT_STICK
+        ) {
+            val visualScale =
+                if (
                     control.id ==
-                    ControlId.RIGHT_STICK ->
-                    stickBasePaint
+                        ControlId.LEFT_STICK
+                ) {
+                    1.55f
+                } else {
+                    1.82f
+                }
 
-                isUtilityControl(
-                    control.id,
-                ) ->
-                    if (active) {
-                        mintPressedPaint
-                    } else {
-                        mintFillPaint
-                    }
+            val outerRadius =
+                control.radius *
+                    visualScale
 
-                else ->
-                    if (active) {
-                        lavenderPressedPaint
-                    } else {
-                        lavenderFillPaint
-                    }
+            canvas.drawCircle(
+                control.centerX,
+                control.centerY,
+                outerRadius,
+                stickBasePaint,
+            )
+            canvas.drawCircle(
+                control.centerX,
+                control.centerY,
+                outerRadius,
+                outlinePaint,
+            )
+            canvas.drawCircle(
+                control.centerX,
+                control.centerY,
+                outerRadius * 0.73f,
+                stickWellPaint,
+            )
+            return
+        }
+
+        val fill =
+            if (active) {
+                lavenderPressedPaint
+            } else {
+                lavenderFillPaint
             }
 
-        canvas.drawCircle(
-            control.centerX,
-            control.centerY,
-            control.radius,
-            fill,
-        )
-
-        canvas.drawCircle(
-            control.centerX,
-            control.centerY,
-            control.radius,
-            outlinePaint,
-        )
+        if (
+            isFaceButton(
+                control.id,
+            )
+        ) {
+            canvas.drawCircle(
+                control.centerX,
+                control.centerY,
+                control.radius * 1.08f,
+                lavenderEdgePaint,
+            )
+            canvas.drawCircle(
+                control.centerX,
+                control.centerY,
+                control.radius * 0.96f,
+                fill,
+            )
+        } else {
+            canvas.drawCircle(
+                control.centerX,
+                control.centerY,
+                control.radius,
+                fill,
+            )
+            canvas.drawCircle(
+                control.centerX,
+                control.centerY,
+                control.radius,
+                outlinePaint,
+            )
+        }
 
         val label =
             controlLabel(
@@ -1013,74 +1105,643 @@ class ControllerSurfaceView(
             control.rect
                 ?: return
 
-        val radius =
-            min(
-                rect.width(),
-                rect.height(),
-            ) *
-                if (
-                    isUtilityControl(
-                        control.id,
-                    )
-                ) {
-                    0.28f
-                } else {
-                    0.30f
-                }
-
-        val fill =
-            if (
-                isUtilityControl(
+        when {
+            isShoulderControl(
+                control.id,
+            ) ->
+                drawShoulderControl(
+                    canvas,
                     control.id,
+                    rect,
+                    active,
                 )
-            ) {
-                if (active) {
-                    mintPressedPaint
-                } else {
-                    mintFillPaint
-                }
+
+            isUtilityControl(
+                control.id,
+            ) ->
+                drawUtilityControl(
+                    canvas,
+                    control.id,
+                    rect,
+                    active,
+                )
+
+            else -> {
+                val radius =
+                    min(
+                        rect.width(),
+                        rect.height(),
+                    ) *
+                        0.30f
+
+                canvas.drawRoundRect(
+                    rect,
+                    radius,
+                    radius,
+                    if (active) {
+                        lavenderPressedPaint
+                    } else {
+                        lavenderFillPaint
+                    },
+                )
+                canvas.drawRoundRect(
+                    rect,
+                    radius,
+                    radius,
+                    outlinePaint,
+                )
+            }
+        }
+    }
+
+    private fun drawShoulderControl(
+        canvas: Canvas,
+        id: ControlId,
+        rect: RectF,
+        active: Boolean,
+    ) {
+        val fill =
+            if (active) {
+                lavenderPressedPaint
             } else {
-                if (active) {
-                    lavenderPressedPaint
-                } else {
-                    lavenderFillPaint
-                }
+                lavenderFillPaint
             }
 
-        canvas.drawRoundRect(
-            rect,
-            radius,
-            radius,
-            fill,
-        )
-
-        canvas.drawRoundRect(
-            rect,
-            radius,
-            radius,
-            outlinePaint,
-        )
+        if (
+            id == ControlId.LT ||
+            id == ControlId.RT
+        ) {
+            val radius =
+                rect.height() *
+                    0.34f
+            canvas.drawRoundRect(
+                rect,
+                radius,
+                radius,
+                fill,
+            )
+            canvas.drawRoundRect(
+                rect,
+                radius,
+                radius,
+                outlinePaint,
+            )
+        } else {
+            buildShoulderPath(
+                rect,
+                id,
+            )
+            canvas.drawPath(
+                controlPath,
+                fill,
+            )
+            canvas.drawPath(
+                controlPath,
+                outlinePaint,
+            )
+        }
 
         textPaint.textSize =
             rect.height() *
-                if (
-                    isUtilityControl(
-                        control.id,
-                    )
-                ) {
-                    0.38f
-                } else {
-                    0.42f
-                }
+                0.40f
 
         drawCenteredText(
             canvas,
-            controlLabel(
-                control.id,
-            ),
+            controlLabel(id),
             rect.centerX(),
             rect.centerY(),
             textPaint,
+        )
+    }
+
+    private fun buildShoulderPath(
+        rect: RectF,
+        id: ControlId,
+    ) {
+        val radius =
+            rect.height() *
+                0.22f
+        val taper =
+            rect.width() *
+                0.17f
+
+        controlPath.reset()
+
+        if (id == ControlId.LB) {
+            controlPath.moveTo(
+                rect.left + radius,
+                rect.top,
+            )
+            controlPath.quadTo(
+                rect.left,
+                rect.top,
+                rect.left,
+                rect.top + radius,
+            )
+            controlPath.lineTo(
+                rect.left,
+                rect.bottom - radius,
+            )
+            controlPath.quadTo(
+                rect.left,
+                rect.bottom,
+                rect.left + radius,
+                rect.bottom,
+            )
+            controlPath.lineTo(
+                rect.right - radius * 0.35f,
+                rect.bottom,
+            )
+            controlPath.quadTo(
+                rect.right,
+                rect.bottom,
+                rect.right - taper * 0.30f,
+                rect.bottom - radius,
+            )
+            controlPath.lineTo(
+                rect.right - taper,
+                rect.top + radius,
+            )
+            controlPath.quadTo(
+                rect.right - taper * 1.15f,
+                rect.top,
+                rect.right - taper - radius,
+                rect.top,
+            )
+        } else {
+            controlPath.moveTo(
+                rect.left + taper + radius,
+                rect.top,
+            )
+            controlPath.quadTo(
+                rect.left + taper * 1.15f,
+                rect.top,
+                rect.left + taper,
+                rect.top + radius,
+            )
+            controlPath.lineTo(
+                rect.left + taper * 0.30f,
+                rect.bottom - radius,
+            )
+            controlPath.quadTo(
+                rect.left,
+                rect.bottom,
+                rect.left + radius * 0.35f,
+                rect.bottom,
+            )
+            controlPath.lineTo(
+                rect.right - radius,
+                rect.bottom,
+            )
+            controlPath.quadTo(
+                rect.right,
+                rect.bottom,
+                rect.right,
+                rect.bottom - radius,
+            )
+            controlPath.lineTo(
+                rect.right,
+                rect.top + radius,
+            )
+            controlPath.quadTo(
+                rect.right,
+                rect.top,
+                rect.right - radius,
+                rect.top,
+            )
+        }
+
+        controlPath.close()
+    }
+
+    private fun drawUtilityControl(
+        canvas: Canvas,
+        id: ControlId,
+        rect: RectF,
+        active: Boolean,
+    ) {
+        val fill =
+            if (active) {
+                mintPressedPaint
+            } else {
+                mintFillPaint
+            }
+
+        val inset =
+            rect.width() *
+                0.10f
+        val slant =
+            rect.width() *
+                0.11f
+        val radius =
+            rect.height() *
+                0.18f
+
+        controlPath.reset()
+
+        if (id == ControlId.GUIDE) {
+            controlPath.moveTo(
+                rect.left + inset + radius,
+                rect.top,
+            )
+            controlPath.lineTo(
+                rect.right - inset - radius,
+                rect.top,
+            )
+            controlPath.quadTo(
+                rect.right - inset,
+                rect.top,
+                rect.right - inset + slant,
+                rect.top + radius,
+            )
+            controlPath.lineTo(
+                rect.right - slant,
+                rect.bottom - radius,
+            )
+            controlPath.quadTo(
+                rect.right - slant,
+                rect.bottom,
+                rect.right - slant - radius,
+                rect.bottom,
+            )
+            controlPath.lineTo(
+                rect.left + slant + radius,
+                rect.bottom,
+            )
+            controlPath.quadTo(
+                rect.left + slant,
+                rect.bottom,
+                rect.left + slant,
+                rect.bottom - radius,
+            )
+            controlPath.lineTo(
+                rect.left + inset - slant,
+                rect.top + radius,
+            )
+            controlPath.quadTo(
+                rect.left + inset,
+                rect.top,
+                rect.left + inset + radius,
+                rect.top,
+            )
+        } else {
+            val pointsTowardCenter =
+                id == ControlId.BACK ||
+                    id == ControlId.L3
+
+            if (pointsTowardCenter) {
+                controlPath.moveTo(
+                    rect.left + radius,
+                    rect.top,
+                )
+                controlPath.lineTo(
+                    rect.right - slant - radius,
+                    rect.top,
+                )
+                controlPath.quadTo(
+                    rect.right - slant,
+                    rect.top,
+                    rect.right,
+                    rect.top + radius,
+                )
+                controlPath.lineTo(
+                    rect.right - slant * 0.35f,
+                    rect.bottom - radius,
+                )
+                controlPath.quadTo(
+                    rect.right - slant * 0.45f,
+                    rect.bottom,
+                    rect.right - slant - radius,
+                    rect.bottom,
+                )
+                controlPath.lineTo(
+                    rect.left + radius,
+                    rect.bottom,
+                )
+                controlPath.quadTo(
+                    rect.left,
+                    rect.bottom,
+                    rect.left,
+                    rect.bottom - radius,
+                )
+                controlPath.lineTo(
+                    rect.left,
+                    rect.top + radius,
+                )
+                controlPath.quadTo(
+                    rect.left,
+                    rect.top,
+                    rect.left + radius,
+                    rect.top,
+                )
+            } else {
+                controlPath.moveTo(
+                    rect.left + slant + radius,
+                    rect.top,
+                )
+                controlPath.lineTo(
+                    rect.right - radius,
+                    rect.top,
+                )
+                controlPath.quadTo(
+                    rect.right,
+                    rect.top,
+                    rect.right,
+                    rect.top + radius,
+                )
+                controlPath.lineTo(
+                    rect.right,
+                    rect.bottom - radius,
+                )
+                controlPath.quadTo(
+                    rect.right,
+                    rect.bottom,
+                    rect.right - radius,
+                    rect.bottom,
+                )
+                controlPath.lineTo(
+                    rect.left + slant + radius,
+                    rect.bottom,
+                )
+                controlPath.quadTo(
+                    rect.left + slant * 0.45f,
+                    rect.bottom,
+                    rect.left + slant * 0.35f,
+                    rect.bottom - radius,
+                )
+                controlPath.lineTo(
+                    rect.left,
+                    rect.top + radius,
+                )
+                controlPath.quadTo(
+                    rect.left + slant,
+                    rect.top,
+                    rect.left + slant + radius,
+                    rect.top,
+                )
+            }
+        }
+
+        controlPath.close()
+
+        canvas.drawPath(
+            controlPath,
+            fill,
+        )
+        canvas.drawPath(
+            controlPath,
+            outlinePaint,
+        )
+
+        drawUtilityIcon(
+            canvas,
+            id,
+            rect,
+        )
+    }
+
+    private fun drawUtilityIcon(
+        canvas: Canvas,
+        id: ControlId,
+        rect: RectF,
+    ) {
+        when (id) {
+            ControlId.L3,
+            ControlId.R3,
+            -> {
+                textPaint.textSize =
+                    rect.height() *
+                        0.38f
+                drawCenteredText(
+                    canvas,
+                    controlLabel(id),
+                    rect.centerX(),
+                    rect.centerY(),
+                    textPaint,
+                )
+            }
+
+            ControlId.BACK -> {
+                iconPaint.strokeWidth =
+                    (
+                        rect.height() *
+                            0.055f
+                    )
+                        .coerceAtLeast(
+                            1.5f,
+                        )
+                val size =
+                    rect.height() *
+                        0.24f
+                val offset =
+                    size *
+                        0.34f
+                tempRect.set(
+                    rect.centerX() -
+                        size -
+                        offset,
+                    rect.centerY() -
+                        size * 0.55f,
+                    rect.centerX() -
+                        offset,
+                    rect.centerY() +
+                        size * 0.45f,
+                )
+                canvas.drawRect(
+                    tempRect,
+                    iconPaint,
+                )
+                tempRect.offset(
+                    offset * 1.45f,
+                    offset * 0.70f,
+                )
+                canvas.drawRect(
+                    tempRect,
+                    iconPaint,
+                )
+            }
+
+            ControlId.START -> {
+                iconPaint.strokeWidth =
+                    (
+                        rect.height() *
+                            0.055f
+                    )
+                        .coerceAtLeast(
+                            1.5f,
+                        )
+                val half =
+                    rect.width() *
+                        0.16f
+                val gap =
+                    rect.height() *
+                        0.13f
+                for (index in -1..1) {
+                    val y =
+                        rect.centerY() +
+                            index *
+                                gap
+                    canvas.drawLine(
+                        rect.centerX() -
+                            half,
+                        y,
+                        rect.centerX() +
+                            half,
+                        y,
+                        iconPaint,
+                    )
+                }
+            }
+
+            ControlId.GUIDE -> {
+                iconPaint.strokeWidth =
+                    (
+                        rect.height() *
+                            0.050f
+                    )
+                        .coerceAtLeast(
+                            1.5f,
+                        )
+                val cx =
+                    rect.centerX()
+                val cy =
+                    rect.centerY()
+                val size =
+                    rect.height() *
+                        0.22f
+                canvas.drawLine(
+                    cx,
+                    cy + size,
+                    cx,
+                    cy - size,
+                    iconPaint,
+                )
+                canvas.drawLine(
+                    cx,
+                    cy - size,
+                    cx - size * 0.55f,
+                    cy - size * 0.40f,
+                    iconPaint,
+                )
+                canvas.drawLine(
+                    cx,
+                    cy - size,
+                    cx + size * 0.55f,
+                    cy - size * 0.40f,
+                    iconPaint,
+                )
+                tempRect.set(
+                    cx - size * 0.70f,
+                    cy + size * 0.15f,
+                    cx + size * 0.70f,
+                    cy + size * 0.92f,
+                )
+                canvas.drawRoundRect(
+                    tempRect,
+                    size * 0.12f,
+                    size * 0.12f,
+                    iconPaint,
+                )
+            }
+
+            else -> Unit
+        }
+    }
+
+    private fun drawCenterPanel(
+        canvas: Canvas,
+    ) {
+        if (
+            width <= 0 ||
+            height <= 0
+        ) {
+            return
+        }
+
+        val contentWidth =
+            (
+                width -
+                    safeInsetLeft -
+                    safeInsetRight
+            )
+                .coerceAtLeast(
+                    1f,
+                )
+        val contentHeight =
+            (
+                height -
+                    safeInsetTop -
+                    safeInsetBottom
+            )
+                .coerceAtLeast(
+                    1f,
+                )
+
+        val topY =
+            safeInsetTop
+        val bottomY =
+            safeInsetTop +
+                contentHeight *
+                    0.455f
+
+        centerPanelPath.reset()
+        centerPanelPath.moveTo(
+            safeInsetLeft +
+                contentWidth *
+                    0.340f,
+            topY,
+        )
+        centerPanelPath.lineTo(
+            safeInsetLeft +
+                contentWidth *
+                    0.660f,
+            topY,
+        )
+        centerPanelPath.lineTo(
+            safeInsetLeft +
+                contentWidth *
+                    0.565f,
+            bottomY -
+                contentHeight *
+                    0.035f,
+        )
+        centerPanelPath.quadTo(
+            safeInsetLeft +
+                contentWidth *
+                    0.550f,
+            bottomY,
+            safeInsetLeft +
+                contentWidth *
+                    0.525f,
+            bottomY,
+        )
+        centerPanelPath.lineTo(
+            safeInsetLeft +
+                contentWidth *
+                    0.475f,
+            bottomY,
+        )
+        centerPanelPath.quadTo(
+            safeInsetLeft +
+                contentWidth *
+                    0.450f,
+            bottomY,
+            safeInsetLeft +
+                contentWidth *
+                    0.435f,
+            bottomY -
+                contentHeight *
+                    0.035f,
+        )
+        centerPanelPath.close()
+
+        canvas.drawPath(
+            centerPanelPath,
+            centerPanelPaint,
+        )
+        canvas.drawPath(
+            centerPanelPath,
+            centerPanelOutlinePaint,
         )
     }
 
@@ -1198,13 +1859,36 @@ class ControllerSurfaceView(
         )
         dpadPath.close()
 
+        val outerRadius =
+            (
+                (
+                    rightEdge -
+                        leftEdge
+                )
+                    .coerceAtLeast(
+                        bottomEdge -
+                            topEdge,
+                    ) /
+                    2f
+            ) *
+                1.08f
+
+        canvas.drawCircle(
+            centerX,
+            centerY,
+            outerRadius,
+            dpadBasePaint,
+        )
+        canvas.drawCircle(
+            centerX,
+            centerY,
+            outerRadius,
+            outlinePaint,
+        )
+
         canvas.drawPath(
             dpadPath,
             lavenderFillPaint,
-        )
-        canvas.drawPath(
-            dpadPath,
-            outlinePaint,
         )
 
         val corner =
@@ -1345,12 +2029,22 @@ class ControllerSurfaceView(
                     32768f
             }
 
-        val knobRadius =
+        val visualOuterRadius =
             control.radius *
-                0.50f
+                if (
+                    id ==
+                        ControlId.LEFT_STICK
+                ) {
+                    1.55f
+                } else {
+                    1.82f
+                }
+        val knobRadius =
+            visualOuterRadius *
+                0.56f
         val travel =
             control.radius *
-                0.43f
+                0.50f
         val knobX =
             control.centerX +
                 x.coerceIn(
@@ -1377,18 +2071,18 @@ class ControllerSurfaceView(
         canvas.drawCircle(
             knobX,
             knobY,
+            knobRadius * 1.08f,
+            mintEdgePaint,
+        )
+        canvas.drawCircle(
+            knobX,
+            knobY,
             knobRadius,
             if (active) {
                 mintPressedPaint
             } else {
                 mintFillPaint
             },
-        )
-        canvas.drawCircle(
-            knobX,
-            knobY,
-            knobRadius,
-            outlinePaint,
         )
     }
 
@@ -1408,6 +2102,22 @@ class ControllerSurfaceView(
             id == ControlId.L3 ||
             id == ControlId.R3 ||
             id == ControlId.GUIDE
+
+    private fun isShoulderControl(
+        id: ControlId,
+    ): Boolean =
+        id == ControlId.LT ||
+            id == ControlId.LB ||
+            id == ControlId.RB ||
+            id == ControlId.RT
+
+    private fun isFaceButton(
+        id: ControlId,
+    ): Boolean =
+        id == ControlId.A ||
+            id == ControlId.B ||
+            id == ControlId.X ||
+            id == ControlId.Y
 
     private fun isControlActive(
         id: ControlId,
@@ -1452,9 +2162,9 @@ class ControllerSurfaceView(
             ControlId.RT -> "RT"
             ControlId.L3 -> "LS"
             ControlId.R3 -> "RS"
-            ControlId.BACK -> "□"
-            ControlId.START -> "≡"
-            ControlId.GUIDE -> "N"
+            ControlId.BACK -> ""
+            ControlId.START -> ""
+            ControlId.GUIDE -> ""
             ControlId.DPAD_UP -> ""
             ControlId.DPAD_DOWN -> ""
             ControlId.DPAD_LEFT -> ""
@@ -1480,15 +2190,25 @@ class ControllerSurfaceView(
         const val COLOR_SURFACE_RAISED =
             0xFFFAFAFC.toInt()
         const val COLOR_SURFACE_OUTLINE =
-            0xFFDEDBE5.toInt()
+            0xFFD9D5DF.toInt()
+        const val COLOR_STICK_WELL =
+            0xFFEDEAF1.toInt()
+        const val COLOR_CENTER_PANEL =
+            0xFFFAF9FC.toInt()
+        const val COLOR_CENTER_PANEL_OUTLINE =
+            0xFFE7DDF7.toInt()
         const val COLOR_LAVENDER =
             0xFFB7A5E2.toInt()
         const val COLOR_LAVENDER_PRESSED =
             0xFF9D89CF.toInt()
+        const val COLOR_LAVENDER_EDGE =
+            0xFF8F7BC4.toInt()
         const val COLOR_MINT =
             0xFF92DFA0.toInt()
         const val COLOR_MINT_PRESSED =
             0xFF71C982.toInt()
+        const val COLOR_MINT_EDGE =
+            0xFF579764.toInt()
         const val COLOR_TEXT_ON_COLOR =
             0xFFFAFAFC.toInt()
     }

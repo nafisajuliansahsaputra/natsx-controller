@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import android.graphics.Typeface
 import android.view.View
 import kotlin.math.min
 
@@ -40,15 +39,13 @@ class ControllerStatusView(
     private val logoPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = COLOR_LAVENDER
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.DEFAULT_BOLD
+            style = Paint.Style.FILL
         }
 
     private val messagePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = COLOR_TEXT
             textAlign = Paint.Align.CENTER
-            typeface = Typeface.DEFAULT_BOLD
         }
 
     private val lampPaint =
@@ -156,9 +153,9 @@ class ControllerStatusView(
                 )
 
         val iconSize =
-            24f * density * scale
+            20f * density * scale
         val gap =
-            22f * density * scale
+            18f * density * scale
         val groupWidth =
             iconSize * 4f +
                 gap * 3f
@@ -228,16 +225,19 @@ class ControllerStatusView(
                 ),
         )
 
-        logoPaint.textSize =
-            25f * density * scale
-        drawCenteredText(
+        val logoCenterY =
+            iconCenterY +
+                43f *
+                    density *
+                    scale
+        drawLogoMark(
             canvas = canvas,
-            text = "NATSX",
-            x = contentCenterX,
-            y =
-                iconCenterY +
-                    44f * density * scale,
-            paint = logoPaint,
+            centerX = contentCenterX,
+            centerY = logoCenterY,
+            size =
+                38f *
+                    density *
+                    scale,
         )
 
         val lampWidth =
@@ -245,8 +245,10 @@ class ControllerStatusView(
         val lampHeight =
             6f * density * scale
         val lampCenterY =
-            iconCenterY +
-                72f * density * scale
+            logoCenterY +
+                38f *
+                    density *
+                    scale
 
         lampPaint.color =
             when (state.activeTransport) {
@@ -307,6 +309,98 @@ class ControllerStatusView(
                     paint = messagePaint,
                 )
             }
+    }
+
+    private fun drawLogoMark(
+        canvas: Canvas,
+        centerX: Float,
+        centerY: Float,
+        size: Float,
+    ) {
+        val bandWidth =
+            size *
+                0.22f
+
+        iconPath.reset()
+        iconPath.moveTo(
+            centerX -
+                size * 0.34f,
+            centerY -
+                size * 0.28f,
+        )
+        iconPath.lineTo(
+            centerX -
+                size * 0.34f +
+                bandWidth,
+            centerY -
+                size * 0.28f,
+        )
+        iconPath.lineTo(
+            centerX +
+                size * 0.30f,
+            centerY +
+                size * 0.20f,
+        )
+        iconPath.lineTo(
+            centerX +
+                size * 0.30f -
+                bandWidth,
+            centerY +
+                size * 0.20f,
+        )
+        iconPath.close()
+        canvas.drawPath(
+            iconPath,
+            logoPaint,
+        )
+
+        iconPath.reset()
+        iconPath.moveTo(
+            centerX -
+                size * 0.10f,
+            centerY -
+                size * 0.20f,
+        )
+        iconPath.lineTo(
+            centerX +
+                size * 0.10f,
+            centerY -
+                size * 0.20f,
+        )
+        iconPath.lineTo(
+            centerX +
+                size * 0.10f,
+            centerY -
+                size * 0.02f,
+        )
+        iconPath.lineTo(
+            centerX -
+                size * 0.10f,
+            centerY -
+                size * 0.02f,
+        )
+        iconPath.close()
+        canvas.drawPath(
+            iconPath,
+            logoPaint,
+        )
+
+        tempRect.set(
+            centerX -
+                size * 0.30f,
+            centerY +
+                size * 0.05f,
+            centerX -
+                size * 0.12f,
+            centerY +
+                size * 0.23f,
+        )
+        canvas.drawRoundRect(
+            tempRect,
+            size * 0.035f,
+            size * 0.035f,
+            logoPaint,
+        )
     }
 
     private fun transportPaint(
