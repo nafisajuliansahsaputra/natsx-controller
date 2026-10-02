@@ -316,6 +316,14 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
             {
                 break;
             }
+            catch (OperationCanceledException)
+            {
+                // The per-attempt connect timeout is transient. The privileged
+                // service can legitimately need several seconds to initialize
+                // HIDMaestro after boot, install, upgrade, or service restart.
+                // Keep the outer connection loop alive and retry instead of
+                // faulting the entire backend before the service is ready.
+            }
             catch (Exception exception)
                 when (exception is
                     IOException or
