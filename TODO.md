@@ -516,6 +516,6 @@ Do not start these unless the product scope changes:
 - [x] Add complete release variable/secret-presence inventory without logging secrets.
 - [x] Enforce signing on direct Android release builds and reject Android Debug identities.
 - [x] Add regression coverage for unsigned builds, debug subjects, changelog-prefix mismatch and exact-commit approval.
-- [ ] Verify production input audit, Release Policy CI and Android signing guard CI.
+- [x] Verify production input audit, Release Policy CI and Android signing guard CI (runs 37116046139, 37116046138 and 37115890725).
 - [ ] Obtain owner-selected LICENSE, Inno usage confirmation, production Android identity and Windows Authenticode credentials.
 - [ ] Obtain returned Microsoft retail-signed driver packages and physical clean-machine acceptance.

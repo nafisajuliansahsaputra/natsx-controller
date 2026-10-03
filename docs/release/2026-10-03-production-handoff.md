@@ -43,3 +43,13 @@ USB Direct saat ini dibatasi scope bootstrap OPPO A58 / CPH2577 yang sudah dival
 - [Microsoft certificate requirements](https://learn.microsoft.com/windows-hardware/drivers/dashboard/code-signing-reqs)
 - [Runbook repo](windows-retail-driver-runbook.md)
 - [Kontrak readiness](production-readiness.md)
+
+## Bukti CI yang sudah lulus
+
+- Android signing guard, lint, unit tests dan build: run 37115890725.
+- Release Policy CI: run 37116046138.
+- Production input audit: run 37116046139; status inventory belum ready.
+- Windows Driver CI: run 37116046146.
+- Paket input HLK unsigned: artifact 11271705940, `natsx-windows-driver-hlk-payload`.
+
+Semua status CI di atas adalah hasil build/validator, bukan persetujuan physical acceptance atau sertifikasi Microsoft.
