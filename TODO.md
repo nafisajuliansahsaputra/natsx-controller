@@ -538,4 +538,4 @@ Do not start these unless the product scope changes:
 
 - [x] Apply the supplied 600/700/800/900 neutral palette consistently to dark rims and surfaces.
 - [x] Remove duplicate face-edge shadows and soften the outer halo without dropping bevel depth or white lettering/icons.
-- [ ] Verify render snapshots, Android lint/build and full input regressions.
+- [x] Verify render snapshots, Android lint/build and full input regressions (Android CI 37119920104; three-aspect-ratio UI/input verification 37119920069).
