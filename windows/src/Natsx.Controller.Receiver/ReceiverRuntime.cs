@@ -1214,6 +1214,8 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                         lastDiagnostic =
                             exception.Message;
                     }
+
+                    Report($"USB Direct unavailable: {exception.Message}");
                 }
 
                 await Task.Delay(
@@ -1369,11 +1371,10 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 $"USB bootstrap is not ready ({bootstrap.Status}).");
         }
 
-        Report(
-            bootstrap.Status ==
-                UsbBootstrapStatus.AccessoryAlreadyReady
-                ? "Android USB accessory already ready."
-                : "Android USB accessory mode started.");
+        if (bootstrap.Status != UsbBootstrapStatus.AccessoryAlreadyReady)
+        {
+            Report("Android USB accessory mode started.");
+        }
 
         WinUsbAoaAccessoryConnection? connection =
             await accessoryBackend
@@ -1406,13 +1407,20 @@ public sealed class ReceiverRuntime : IAsyncDisposable
             Report(
                 "Waiting for Android USB session…");
 
-            byte[] firstFrame =
-                await ReadUsbFrameWithTimeoutAsync(
-                        connection.Input,
-                        TimeSpan.FromSeconds(15),
-                        cancellationToken,
-                        "Timed out waiting for Android USB session traffic. Open NATSX Controller on the phone.")
-                    .ConfigureAwait(false);
+            byte[] firstFrame;
+            using (var initialTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+            {
+                initialTimeout.CancelAfter(TimeSpan.FromSeconds(15));
+                try
+                {
+                    firstFrame = await UsbInitialSessionReader.ReadAsync(connection.Input, initialTimeout.Token)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    throw new TimeoutException("Timed out waiting for the Android USB session announcement.");
+                }
+            }
 
             MessageType messageType =
                 ReadUsbInitialMessageType(

@@ -389,6 +389,26 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
                         ? (MessageType)frameBytes[6]
                         : 0;
 
+                if (messageType == MessageType.SessionReady)
+                {
+                    try
+                    {
+                        SessionReadyPayload ready = UsbControlFrameCodec.DecodeSessionReady(frameBytes, _trustedSession);
+                        if (ready.Role != PeerRole.AndroidController ||
+                            !ready.Capabilities.HasFlag(TransportCapabilities.UsbDirect))
+                        {
+                            throw new FormatException("Invalid USB session reannouncement.");
+                        }
+                        Interlocked.Increment(ref _acceptedControlFrames);
+                    }
+                    catch (Exception exception) when (
+                        exception is FormatException or CryptographicException or ArgumentException)
+                    {
+                        Interlocked.Increment(ref _rejectedFrames);
+                    }
+                    continue;
+                }
+
                 if (messageType ==
                     MessageType.TransportPreference)
                 {

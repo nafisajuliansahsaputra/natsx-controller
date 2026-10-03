@@ -1,6 +1,10 @@
 package com.natsx.controller.core.transport.usb
 
 import android.os.SystemClock
+import com.natsx.controller.core.protocol.PeerId
+import com.natsx.controller.core.protocol.PeerRole
+import com.natsx.controller.core.protocol.SessionReadyPayload
+import com.natsx.controller.core.protocol.TransportCapabilities
 import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.ProtocolConstants
@@ -25,6 +29,7 @@ class UsbRealtimeSender(
         SystemClock::elapsedRealtimeNanos,
     private val rumbleSink: (RumblePayload) -> Unit = {},
     private val handoverSink: (HandoverPayload) -> Unit = {},
+    private val localPeerId: PeerId? = null,
 ) : RealtimeStateSink, Closeable {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -50,6 +55,7 @@ class UsbRealtimeSender(
         }
 
     private val outputLock = Any()
+    private var lastSessionAnnouncementNanos: Long? = null
 
     private val pendingEnvelope =
         AtomicReference<RealtimeStateEnvelope?>(null)
@@ -214,6 +220,7 @@ class UsbRealtimeSender(
         envelope: RealtimeStateEnvelope,
     ) {
         try {
+            announceSessionIfDue()
             val bytes =
                 UsbRealtimeStreamEncoder
                     .encodeGamepadState(
@@ -235,6 +242,29 @@ class UsbRealtimeSender(
                 sendFailures += 1
             }
         }
+    }
+
+    // Reannounce the existing authenticated session so a restarted Windows
+    // reader can recover without requiring a physical cable reconnect.
+    private fun announceSessionIfDue() {
+        val peerId = localPeerId ?: return
+        val now = nowNanos()
+        val previous = lastSessionAnnouncementNanos
+        if (previous != null && now - previous < 1_000_000_000L) return
+
+        val ready = UsbControlFrameCodec.encodeSessionReady(
+            trustedSession,
+            SessionReadyPayload(
+                role = PeerRole.ANDROID_CONTROLLER,
+                capabilities = TransportCapabilities.WIFI or
+                    TransportCapabilities.BLUETOOTH or
+                    TransportCapabilities.USB_DIRECT,
+                peerId = peerId,
+            ),
+            now.toULong() / 1_000uL,
+        )
+        writePacket(UsbStreamFrameCodec.encode(ready))
+        lastSessionAnnouncementNanos = now
     }
 
     private fun receiveControlLoop() {

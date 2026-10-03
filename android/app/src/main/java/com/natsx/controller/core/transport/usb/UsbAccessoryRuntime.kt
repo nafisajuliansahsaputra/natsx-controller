@@ -53,6 +53,7 @@ class UsbAccessoryRuntime(
     private var trustedSession: UsbTrustedSession? = null
     private var sender: UsbRealtimeSender? = null
     private var activeAccessory: UsbAccessory? = null
+    private var activeReceiverPeerId: com.natsx.controller.core.protocol.PeerId? = null
 
     fun connect(accessory: UsbAccessory) {
         if (closed.get() || !UsbAccessoryIdentity.matches(accessory)) {
@@ -60,7 +61,7 @@ class UsbAccessoryRuntime(
         }
 
         synchronized(gate) {
-            if (activeAccessory == accessory && sender != null) {
+            if (activeAccessory == accessory && isCurrentSession()) {
                 return
             }
         }
@@ -119,8 +120,18 @@ class UsbAccessoryRuntime(
 
     fun isConnected(): Boolean =
         synchronized(gate) {
-            sender != null
+            isCurrentSession()
         }
+
+    // Called under gate. A network reconnect can rotate the shared session
+    // while the USB descriptor stays open; do not keep sending its retired key.
+    private fun isCurrentSession(): Boolean {
+        val activeSender = sender ?: return false
+        val session = trustedSession ?: return false
+        val peerId = activeReceiverPeerId ?: return false
+        if (activeSender.sendFailures > 0) return false
+        return UsbSessionRecovery.isCurrent(sessionRegistry, peerId, session.sessionId)
+    }
 
     fun trySendTransportPreference(
         payload: TransportPreferencePayload,
@@ -139,7 +150,7 @@ class UsbAccessoryRuntime(
 
     private fun connectBlocking(accessory: UsbAccessory) {
         synchronized(gate) {
-            if (activeAccessory == accessory && sender != null) {
+            if (activeAccessory == accessory && isCurrentSession()) {
                 return
             }
         }
@@ -207,6 +218,7 @@ class UsbAccessoryRuntime(
                     inputStream = opened.input,
                     rumbleSink = rumbleSink,
                     handoverSink = handoverSink,
+                    localPeerId = localPeerId,
                 )
 
             broadcaster.addSink(realtimeSender)
@@ -216,10 +228,11 @@ class UsbAccessoryRuntime(
                 trustedSession = session
                 sender = realtimeSender
                 activeAccessory = accessory
+                activeReceiverPeerId = peer.peerId
             }
 
             status.publish(
-                "USB authenticated. Realtime controller active.",
+                "USB session attached. Waiting for receiver transport selection.",
             )
         } catch (exception: Exception) {
             realtimeSender?.let(broadcaster::removeSink)
@@ -688,6 +701,7 @@ class UsbAccessoryRuntime(
             trustedSession = null
             connection = null
             activeAccessory = null
+            activeReceiverPeerId = null
         }
 
         if (oldSender != null) {

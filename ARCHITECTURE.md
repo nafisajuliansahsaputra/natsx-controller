@@ -995,3 +995,17 @@ Resolve them in order of milestone dependency and record the decision.
 ### Authenticated session epochs
 
 Input ordering is scoped to an authenticated logical session, not the receiver process lifetime. A new trusted session ID retires all old transport wrappers, neutralizes input and clears session sequence history before attaching the new link. Same-session Wi-Fi/Bluetooth/USB joins and failover retain the global sequence and anti-replay rules. The virtual backend stays alive across both cases.
+
+### USB recovery on an already-open accessory
+
+Android reannounces authenticated SESSION_READY once per second while publishing
+USB state. A restarted Windows reader discards incoming input/control data until
+a session setup frame arrives, then validates it through the existing trusted
+handshake or secondary-session join. Reannouncements on an attached stream must
+match its authenticated session key and do not reset sequence history or grant
+new authority. If a wireless reconnect rotates the shared logical session while
+the accessory remains open, Android retires its old USB sender and rejoins the
+current session automatically. Losing wireless connectivity alone keeps working
+USB alive. USB open/join errors are shown in the receiver instead of being hidden
+behind accessory-presence status. Health, cooldown and takeover thresholds remain
+unchanged; authenticated fresh state still must stabilize before USB selection.
