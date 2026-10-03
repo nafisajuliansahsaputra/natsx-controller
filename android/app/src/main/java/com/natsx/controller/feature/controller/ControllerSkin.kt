@@ -8,7 +8,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Shader
-import android.graphics.Typeface
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
@@ -28,7 +27,6 @@ internal class ControllerSkin(private val context: Context) {
     private val editorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1f }
     private val assets = mutableMapOf<String, Bitmap>()
-    private val font = Typeface.createFromAsset(context.assets, "controller/jakarta-bold.ttf")
     private var background: Sprite? = null
     private val buttons = mutableMapOf<String, Button>()
     private val nodes = mutableMapOf<String, Node>()
@@ -170,38 +168,44 @@ internal class ControllerSkin(private val context: Context) {
 
 
     private fun drawKey(c: Canvas, id: String, r: RectF, active: Boolean) {
-        val mint = id in listOf("BACK", "START", "L3", "R3", "GUIDE")
-        val circle = id in listOf("A", "B", "X", "Y")
-        val p = Paint(Paint.ANTI_ALIAS_FLAG)
         val key = keyPath(id, r)
+        val circle = id in listOf("A", "B", "X", "Y")
+        val flat = id in listOf("LB", "RB", "BACK", "START", "L3", "R3", "GUIDE")
         if (circle) centered(c, "imgEllipse21", r.centerX(), r.centerY(), 237.820f)
-        else drawWhiteBevel(c, key, (if (mint) 6f else 12f) * px)
-        val depth = (if (mint) 6f else 12f) * px
-        // Add the same drop depth to the originally flat LB/RB and utility keys.
-        p.color = Color.parseColor("#767676")
-        p.style = Paint.Style.FILL_AND_STROKE; p.strokeWidth = depth
-        p.maskFilter = BlurMaskFilter(depth, BlurMaskFilter.Blur.NORMAL)
-        c.drawPath(key, p)
-        p.maskFilter = null; p.style = Paint.Style.FILL
-        p.color = Color.parseColor(if (mint) "#B2EBB2" else "#C3B1E1")
-        c.drawPath(key, p)
-        c.save(); c.clipPath(key)
-        val outside = Path(key).apply { fillType = Path.FillType.INVERSE_WINDING }
-        // Software bitmap canvas reproduces inset shadows once; no blur in onDraw/onTouch.
-        p.color = Color.TRANSPARENT
-        p.setShadowLayer(depth, depth, depth, Color.parseColor("#80FFFFFF")); c.drawPath(outside, p)
-        p.setShadowLayer(depth, -depth, -depth, Color.parseColor("#40000000")); c.drawPath(outside, p)
-        p.clearShadowLayer()
-        if (active) { p.color = 0x224D3A7C; c.drawPath(key, p) }
-        c.restore()
-        p.color = Color.WHITE; p.textAlign = Paint.Align.CENTER; p.typeface = font
-        p.textSize = (if (mint) 24f else 48f) * px
-        val label = when (id) { "L3" -> "LS"; "R3" -> "RS"; "BACK", "START", "GUIDE" -> ""; else -> id }
-        if (label.isNotEmpty()) c.drawText(label, r.centerX(), r.centerY() - (p.ascent() + p.descent()) / 2f, p)
-        else {
-            val icon = when (id) { "BACK" -> "imgFluentTabDesktopMultiple24Regular"; "START" -> "imgCharmMenuHamburger"; else -> "imgFluentShareIos20Filled" }
+        if (flat) {
+            val depth = (if (id == "LB" || id == "RB") 12f else 6f) * px
+            drawWhiteBevel(c, key, depth)
+            val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(118,118,118)
+                style = Paint.Style.FILL_AND_STROKE; strokeWidth = depth
+                strokeJoin = Paint.Join.ROUND
+                maskFilter = BlurMaskFilter(depth, BlurMaskFilter.Blur.NORMAL)
+            }
+            c.drawPath(key, p)
+        }
+        // Original Figma exports retain text, inset highlights, shadows and bevels.
+        val face = asset(id)
+        val x = when {
+            id == "LT" || id == "RT" -> r.left - 36f * px
+            circle -> r.left - 18f * px
+            id == "RB" -> r.left - .25805664f * px
+            else -> r.left
+        }
+        val y = when {
+            id == "LT" || id == "RT" -> r.top - 36f * px
+            circle -> r.top - 18f * px
+            else -> r.top
+        }
+        layer(c, id, x, y, face.width * px, face.height * px)
+        if (id == "BACK" || id == "START" || id == "GUIDE") {
+            val icon = when (id) {
+                "BACK" -> "imgFluentTabDesktopMultiple24Regular"
+                "START" -> "imgCharmMenuHamburger"
+                else -> "imgFluentShareIos20Filled"
+            }
             layer(c, icon, r.centerX() - 15f * px, r.centerY() - 15f * px, 30f * px, 30f * px)
         }
+        if (active) c.drawPath(key, feedbackPaint)
     }
 
     private fun drawDpadBase(c: Canvas) {
