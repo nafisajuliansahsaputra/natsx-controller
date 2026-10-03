@@ -403,3 +403,11 @@ jobs:
           }
 
           Remove-Item -LiteralPath $trustRoot -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Upload complete receiver setup for existing-driver validation
+        if: github.ref == 'refs/heads/fix/receiver-click-update'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NATSX-Receiver-Setup-Existing-Drivers
+          path: artifacts/installer-ci/*.exe
+          if-no-files-found: error
