@@ -16,6 +16,9 @@ import java.io.Closeable
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import com.natsx.controller.core.trust.TrustedPeerStore
 
 fun interface BluetoothRfcommSocketProvider {
     fun open(): BluetoothRfcommSocket
@@ -62,6 +65,7 @@ class BluetoothRfcommRealtimeLink internal constructor(
     private val socket: BluetoothRfcommSocket,
     private val session: BluetoothTrustedSession,
     private val sender: BluetoothRealtimeSender,
+    private val onSessionClosed: () -> Unit = {},
 ) : BluetoothRealtimeLink {
     private var closed = false
 
@@ -102,7 +106,7 @@ class BluetoothRfcommRealtimeLink internal constructor(
             try {
                 session.close()
             } finally {
-                socket.close()
+                try { socket.close() } finally { onSessionClosed() }
             }
         }
     }
@@ -110,7 +114,7 @@ class BluetoothRfcommRealtimeLink internal constructor(
 
 /**
  * Opens the production RFCOMM data path and joins Bluetooth to the currently
- * active trusted controller session.
+ * active trusted controller session, or authenticates directly using saved trust.
  *
  * The socket connection itself is transport establishment only. Controller
  * traffic is not trusted until BluetoothSecondarySessionJoinClient verifies
@@ -121,20 +125,24 @@ class BluetoothRfcommConnector(
     private val secondaryJoinClient: BluetoothSecondarySessionJoinClient,
     private val rumbleSink: (RumblePayload) -> Unit = {},
     private val handoverSink: (HandoverPayload) -> Unit = {},
+    private val sessionOpener: ((InputStream, OutputStream) -> BluetoothTrustedSession)? = null,
+    private val onSessionClosed: () -> Unit = {},
+    private val connectionTimeoutMillis: Long = 15_000,
 ) : BluetoothRealtimeLinkFactory {
     override fun create(): BluetoothRfcommRealtimeLink = connect()
 
     fun connect(): BluetoothRfcommRealtimeLink {
         val socket = socketProvider.open()
+        val deadline = connectionTimeoutExecutor.schedule(
+            { runCatching { socket.close() } }, connectionTimeoutMillis, TimeUnit.MILLISECONDS,
+        )
 
         try {
             socket.connect()
 
             val session =
-                secondaryJoinClient.join(
-                    inputStream = socket.inputStream,
-                    outputStream = socket.outputStream,
-                )
+                sessionOpener?.invoke(socket.inputStream, socket.outputStream)
+                    ?: secondaryJoinClient.join(socket.inputStream, socket.outputStream)
 
             try {
                 val sender =
@@ -150,6 +158,7 @@ class BluetoothRfcommConnector(
                     socket = socket,
                     session = session,
                     sender = sender,
+                    onSessionClosed = onSessionClosed,
                 )
             } catch (exception: Exception) {
                 session.close()
@@ -159,11 +168,18 @@ class BluetoothRfcommConnector(
             runCatching {
                 socket.close()
             }
+            onSessionClosed()
             throw exception
+        } finally {
+            deadline.cancel(false)
         }
     }
 
     companion object {
+        private val connectionTimeoutExecutor = Executors.newSingleThreadScheduledExecutor { runnable ->
+            Thread(runnable, "natsx-bluetooth-connect-timeout").apply { isDaemon = true }
+        }
+
         val SERVICE_UUID: UUID =
             UUID.fromString(
                 "65dbf3c2-1b88-4ac8-9a1d-3b7c9f5f6e11",
@@ -176,6 +192,7 @@ class BluetoothRfcommConnector(
             localPeerId: PeerId,
             receiverPeerId: PeerId,
             sessionRegistry: TrustedSessionRegistry,
+            trustedPeerStore: TrustedPeerStore? = null,
             permissionGate: BluetoothPermissionGate =
                 BluetoothPermissionGate(context),
             rumbleSink: (RumblePayload) -> Unit = {},
@@ -235,8 +252,11 @@ class BluetoothRfcommConnector(
                     }
                 }
 
+            val sessionConnector = BluetoothSessionConnector(localPeerId, receiverPeerId, sessionRegistry, trustedPeerStore)
             return BluetoothRfcommConnector(
                 socketProvider = provider,
+                sessionOpener = sessionConnector::connect,
+                onSessionClosed = sessionConnector::sessionClosed,
                 secondaryJoinClient =
                     BluetoothSecondarySessionJoinClient(
                         localPeerId = localPeerId,

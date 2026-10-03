@@ -572,3 +572,4 @@ Do not start these unless the product scope changes:
 - Forget and successful re-pair reset logical ordering and detach old links without recreating the Xbox device; pending Wi-Fi handshakes are invalidated.
 - Preserve bootstrap driver/probe failure details rather than misreporting them as a charge-only cable.
 - Automated validation pending. Physical Wi-Fi→USB→Wi-Fi and Bluetooth recovery on the user's Windows/phone remain unverified for this build. Existing OEM limitation remains: initial pairing/session establishment uses LAN; USB uplink and Bluetooth join a trusted session.
+- Additional Bluetooth recovery fix: cold reconnect uses saved trust directly when Wi-Fi cannot establish a session, with bounded RFCOMM attempts and session-ID-safe cleanup. Warm Bluetooth joins retain existing behavior. New regressions cover authenticated cold reconnect, rejection of unpaired receivers, and hung socket recovery; CI pending.

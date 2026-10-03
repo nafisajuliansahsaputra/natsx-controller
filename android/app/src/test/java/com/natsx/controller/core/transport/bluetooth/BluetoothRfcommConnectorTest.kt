@@ -24,6 +24,29 @@ import java.io.OutputStream
 
 class BluetoothRfcommConnectorTest {
     @Test
+    fun hungRfcommAttemptClosesSocketAndAllowsNextRetry() {
+        val closed = java.util.concurrent.CountDownLatch(1)
+        val socket = object : BluetoothRfcommSocket {
+            override val inputStream: InputStream = ByteArrayInputStream(byteArrayOf())
+            override val outputStream: OutputStream = ByteArrayOutputStream()
+            override fun connect() {
+                check(closed.await(2, java.util.concurrent.TimeUnit.SECONDS))
+                throw java.io.IOException("Socket was closed by connection deadline")
+            }
+            override fun close() { closed.countDown() }
+        }
+        TrustedSessionRegistry().use { registry ->
+            val connector = BluetoothRfcommConnector(
+                BluetoothRfcommSocketProvider { socket },
+                BluetoothSecondarySessionJoinClient(PeerId.createRandom(), PeerId.createRandom(), registry, { 1uL }),
+                connectionTimeoutMillis = 100,
+            )
+            assertTrue(runCatching { connector.connect() }.exceptionOrNull() is java.io.IOException)
+            assertEquals(0L, closed.count)
+        }
+    }
+
+    @Test
     fun connectJoinsActiveSessionAndPublishesRealtimeState() {
         val androidPeer = PeerId.createRandom()
         val windowsPeer = PeerId.createRandom()

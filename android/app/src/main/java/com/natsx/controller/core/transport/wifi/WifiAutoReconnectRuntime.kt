@@ -141,7 +141,7 @@ class WifiAutoReconnectRuntime(
 
             if (link == null) {
                 authenticationFailures += 1
-                onConnectionFailure(resolved.endpoint, authenticationFailures)
+                runCatching { onConnectionFailure(resolved.endpoint, authenticationFailures) }
                 activeEndpoint = null
                 reconnectAttempts += 1
                 sleepBackoff(retryIndex++)

@@ -482,6 +482,10 @@ class ControllerService : Service() {
     private fun createBondedBluetoothLink(
         receiverPeerId: PeerId,
     ): BluetoothRealtimeLink {
+        if (!app.trustedSessionRegistry.hasAnyActiveSession() && (wifiRuntime?.reconnectAttempts ?: 0) < 3) {
+            throw IllegalStateException("Waiting briefly for preferred Wi-Fi before Bluetooth cold reconnect.")
+        }
+
         val permissionGate =
             BluetoothPermissionGate(this)
 
@@ -537,6 +541,7 @@ class ControllerService : Service() {
                         receiverPeerId = receiverPeerId,
                         sessionRegistry =
                             app.trustedSessionRegistry,
+                        trustedPeerStore = app.trustedPeerStore,
                         permissionGate =
                             permissionGate,
                         rumbleSink =
