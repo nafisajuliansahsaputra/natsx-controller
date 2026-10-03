@@ -1,4 +1,10 @@
-NATSX Receiver input hotfix (existing 0.1.1 installation)
+ARCHIVED: Legacy Receiver-only patch tooling (existing 0.1.1 installation)
+
+Do not use this patch with current NATSX builds. It leaves GamepadHost and its
+input mapping unchanged. Its automatic packaging workflow has been removed.
+Use complete NATSX Receiver Setup to update both components and preserve pairing.
+Current Receiver requires input mapping revision 2 from GamepadHost.
+The instructions below are retained only as historical documentation.
 
 Easy Windows application:
 1. Double-click NATSX-Receiver-Input-Update.exe and approve the Windows prompt.
