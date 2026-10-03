@@ -497,7 +497,7 @@ Do not start these unless the product scope changes:
 
 - [x] Open AOA data and native bulk-OUT handles with WinUSB-required FILE_FLAG_OVERLAPPED; diagnose physical Win32 error 6.
 - [x] Verify the rebuilt Windows receiver and installer in CI.
-- [ ] Confirm WinUsb_Initialize succeeds and USB takes over on the physical phone/PC.
+- [x] Confirm WinUsb_Initialize succeeds and USB takes over on the physical phone/PC (user confirmation and Active USB screenshot, 2026-10-03).
 
 ## USB native reader startup recovery
 
@@ -505,3 +505,8 @@ Do not start these unless the product scope changes:
 - [x] Add native-shaped blocking-stream regression coverage for attachment, USB authority, unplug Wi-Fi fallback and Wi-Fi failure Bluetooth fallback.
 - [x] Verify Windows CI, real Receiver launch and complete installer lifecycle (run 37113201587).
 - [ ] Confirm the complete sequence on the user's physical phone/PC.
+
+## Authoritative transport lamp colors
+
+- [x] Restore USB purple and Bluetooth soft-white lamp colors; Wi-Fi remains green.
+- [x] Verify Android lint, unit tests and APK build (CI run 37114855960).
