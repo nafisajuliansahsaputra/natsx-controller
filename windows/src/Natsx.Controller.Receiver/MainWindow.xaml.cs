@@ -417,15 +417,16 @@ public partial class MainWindow : Window
     private void OnTrayExitRequested()
     {
         Dispatcher.Invoke(
-            () =>
-            {
-                _exitRequested =
-                    true;
-                Close();
-            });
+            ExitReceiver);
     }
 
-    private void ShowAndActivate()
+    public void ExitReceiver()
+    {
+        _exitRequested = true;
+        Close();
+    }
+
+    public void ShowAndActivate()
     {
         Show();
 

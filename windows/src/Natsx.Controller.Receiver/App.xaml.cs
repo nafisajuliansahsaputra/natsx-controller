@@ -6,6 +6,8 @@ namespace Natsx.Controller.Receiver;
 
 public partial class App : System.Windows.Application
 {
+    private ReceiverInstance? _instance;
+
     protected override async void OnStartup(
         StartupEventArgs eventArgs)
     {
@@ -63,11 +65,29 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        bool exitRequested = HasArgument(eventArgs.Args, "--exit");
+        _instance = new ReceiverInstance();
+        if (!_instance.IsPrimary)
+        {
+            _instance.Signal(exitRequested);
+            Shutdown(0);
+            return;
+        }
+        if (exitRequested)
+        {
+            Shutdown(0);
+            return;
+        }
+
         var window =
             new MainWindow();
 
         MainWindow =
             window;
+
+        _instance.Listen(
+            () => Dispatcher.BeginInvoke(new Action(window.ShowAndActivate)),
+            () => Dispatcher.BeginInvoke(new Action(window.ExitReceiver)));
 
         bool background =
             HasArgument(
@@ -81,6 +101,12 @@ public partial class App : System.Windows.Application
         {
             window.Show();
         }
+    }
+
+    protected override void OnExit(ExitEventArgs eventArgs)
+    {
+        _instance?.Dispose();
+        base.OnExit(eventArgs);
     }
 
     private static bool HasArgument(

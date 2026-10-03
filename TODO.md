@@ -479,3 +479,9 @@ Do not start these unless the product scope changes:
 
 - [x] Build and verify a standalone Windows update EXE with receiver selection, assembly validation, backup/rollback and unelevated receiver relaunch (Windows CI includes compiled-EXE installation smoke test).
 - [ ] Verify the graphical update on the user's Windows installation.
+
+## Receiver launch recovery
+
+- [ ] Enforce one gameplay Receiver per user/session and reactivate it on repeated foreground/background launch.
+- [ ] Bound the complete GamepadHost handshake, preserve its failure reason and verify the actual Receiver UI starts after installation.
+- [ ] Recheck USB takeover on the user's physical devices after Receiver startup recovery.

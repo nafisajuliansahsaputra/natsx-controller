@@ -290,6 +290,8 @@ jobs:
             throw "Receiver failed to reconnect automatically after gamepad-host service restart."
           }
 
+          ./windows/eng/Test-ReceiverLaunch.ps1 -Receiver $receiver -TrustRoot $trustRoot
+
           $receiverSettingsKey = "HKCU:\Software\NATSX\Controller Receiver"
           $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
           New-Item -Path $receiverSettingsKey -Force | Out-Null

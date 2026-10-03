@@ -31,6 +31,7 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
     private long _rumblePacketCount;
     private bool _desiredStarted;
     private bool _connected;
+    private string? _lastConnectionError;
 
     public bool IsStarted
     {
@@ -101,6 +102,19 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
                     InitialConnectTimeout,
                     cancellationToken)
                 .ConfigureAwait(false);
+        }
+        catch (TimeoutException exception)
+        {
+            string detail;
+            lock (_gate)
+            {
+                detail = _lastConnectionError ??
+                    "The gamepad-host service is unavailable or another Receiver still owns its connection.";
+            }
+            await StopAsync().ConfigureAwait(false);
+            throw new InvalidOperationException(
+                "Could not connect to NATSX GamepadHost. " + detail,
+                exception);
         }
         catch
         {
@@ -249,12 +263,12 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
 
                 await SendHelloAsync(
                         pipe,
-                        cancellationToken)
+                        connectTimeout.Token)
                     .ConfigureAwait(false);
 
                 await ExpectReadyAsync(
                         pipe,
-                        cancellationToken)
+                        connectTimeout.Token)
                     .ConfigureAwait(false);
 
                 lock (_gate)
@@ -268,6 +282,7 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
                         pipe;
                     _connected =
                         true;
+                    _lastConnectionError = null;
                 }
 
                 if (!TryWriteLatestState(
@@ -332,7 +347,7 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
                     InvalidOperationException or
                     FormatException)
             {
-                _ = exception;
+                lock (_gate) { _lastConnectionError = exception.Message; }
             }
             finally
             {
