@@ -14,7 +14,7 @@ jobs:
         with:
           name: NATSX-Receiver-Setup-Existing-Drivers
           repository: nafisajuliansahsaputra/natsx-controller
-          run-id: 37102179484
+          run-id: 37103720108
           github-token: ${{ github.token }}
           path: setup
       - name: Split verified EXE for workspace transfer
@@ -56,3 +56,4 @@ jobs:
           name: setup-part-4
           path: parts/4/*
           compression-level: 0
+
