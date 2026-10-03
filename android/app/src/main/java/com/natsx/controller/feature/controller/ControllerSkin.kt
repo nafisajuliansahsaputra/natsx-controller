@@ -132,7 +132,7 @@ internal class ControllerSkin(private val context: Context) {
             maskFilter = BlurMaskFilter(6f * px, BlurMaskFilter.Blur.NORMAL)
         }
         c.drawCircle(x, y, 250f * px, p)
-        p.maskFilter = null; p.style = Paint.Style.FILL
+        p.maskFilter = null; p.style = Paint.Style.FILL; p.alpha = 255
         p.shader = LinearGradient(x - 250f * px, y - 250f * px, x + 250f * px, y + 250f * px,
             intArrayOf(Color.parseColor("#575757"), Color.parseColor("#434343"), Color.parseColor("#292929")),
             floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
@@ -188,7 +188,7 @@ internal class ControllerSkin(private val context: Context) {
         p.color = Color.parseColor("#20434343")
         p.strokeWidth = 2f * (rim + 4f * px)
         c.drawPath(key, p)
-        p.maskFilter = null; p.strokeWidth = 2f * rim
+        p.maskFilter = null; p.strokeWidth = 2f * rim; p.alpha = 255
         val bounds = RectF().also { key.computeBounds(it, true) }
         p.shader = LinearGradient(bounds.left, bounds.top, bounds.right, bounds.bottom,
             intArrayOf(Color.parseColor("#575757"), Color.parseColor("#434343"), Color.parseColor("#292929")),
