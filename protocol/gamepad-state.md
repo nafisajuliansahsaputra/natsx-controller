@@ -39,6 +39,18 @@ The exact bit assignments will be frozen before cross-language encoder implement
 | LT | 0..255 | 0 |
 | RT | 0..255 | 0 |
 
+## Axis direction contract
+
+Both sticks use Xbox logical directions: negative X is left, positive X is
+right, positive Y is up, and negative Y is down. Android screen Y increases
+downward, so touch processing reverses it once before serialization. Wi-Fi,
+Bluetooth, USB, and the GamepadHost pipe preserve these signed values.
+
+The HIDMaestro backend converts X to 0=left / 1=right and Y to 0=up / 1=down,
+with 0.5 centered. Both Y axes must be reversed at this output boundary because
+HIDMaestro's XInput companion converts HID Y back to Xbox Y. Do not invert the
+Android state, skin, calibration, or individual transports to compensate.
+
 ## Neutral state
 
 A neutral state is:

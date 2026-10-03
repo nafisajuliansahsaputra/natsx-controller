@@ -3,6 +3,7 @@ package com.natsx.controller
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
+import com.natsx.controller.core.gamepad.DpadState
 import com.natsx.controller.core.gamepad.GamepadButtons
 import com.natsx.controller.core.gamepad.GamepadState
 import com.natsx.controller.core.protocol.GamepadStateCodec
@@ -52,23 +53,58 @@ internal object UsbInputVerification {
         }
         try {
             app.realtimeBroadcaster.addSink(sender)
-            val ax = viewport.x(2074.91f)
-            val ay = viewport.y(539.91f) + 161f * viewport.scale
-            touch(MotionEvent.ACTION_DOWN, ax, ay)
-            receive { it.buttons and GamepadButtons.A != 0 }
-            touch(MotionEvent.ACTION_UP, ax, ay)
-            receive { it == GamepadState.Neutral }
-            states.clear()
-            touch(MotionEvent.ACTION_DOWN, viewport.x(2175f), viewport.y(125f))
-            receive { it.rightTrigger == 255 }
-            touch(MotionEvent.ACTION_UP, viewport.x(2175f), viewport.y(125f))
-            receive { it == GamepadState.Neutral }
-            states.clear()
-            touch(MotionEvent.ACTION_DOWN, viewport.x(325f), viewport.y(540f))
-            touch(MotionEvent.ACTION_MOVE, viewport.x(325f) + 110f * viewport.scale, viewport.y(540f))
-            receive { it.leftX > 0 }
-            touch(MotionEvent.ACTION_CANCEL, viewport.x(325f), viewport.y(540f))
-            receive { it == GamepadState.Neutral }
+            fun press(x: Float, y: Float, expected: GamepadState) {
+                states.clear()
+                touch(MotionEvent.ACTION_DOWN, viewport.x(x), viewport.y(y))
+                receive { it == expected }
+                touch(MotionEvent.ACTION_UP, viewport.x(x), viewport.y(y))
+                receive { it == GamepadState.Neutral }
+            }
+            // Real hitboxes -> complete authenticated state; equality catches crossed controls.
+            for ((x, y, button) in listOf(
+                Triple(2074.91f, 700.91f, GamepadButtons.A),
+                Triple(2235.91f, 539.91f, GamepadButtons.B),
+                Triple(1915.91f, 539.91f, GamepadButtons.X),
+                Triple(2074.91f, 378.91f, GamepadButtons.Y),
+                Triple(625f, 125f, GamepadButtons.LEFT_SHOULDER),
+                Triple(1775f, 125f, GamepadButtons.RIGHT_SHOULDER),
+                Triple(864f, 412f, GamepadButtons.LEFT_STICK),
+                Triple(1534f, 412f, GamepadButtons.RIGHT_STICK),
+                Triple(792f, 287f, GamepadButtons.BACK),
+                Triple(1607f, 287f, GamepadButtons.START),
+                Triple(1200f, 412f, GamepadButtons.GUIDE),
+            )) press(x, y, GamepadState(buttons = button))
+            press(225f, 125f, GamepadState(leftTrigger = 255))
+            press(2175f, 125f, GamepadState(rightTrigger = 255))
+            for ((x, y, direction) in listOf(
+                Triple(900f, 620f, DpadState.UP),
+                Triple(900f, 940f, DpadState.DOWN),
+                Triple(740f, 780f, DpadState.LEFT),
+                Triple(1060f, 780f, DpadState.RIGHT),
+            )) press(x, y, GamepadState(dpad = direction))
+            for ((cx, cy, left) in listOf(Triple(325f, 540f, true), Triple(1500f, 780f, false))) {
+                for ((dx, dy) in listOf(100f to 0f, -100f to 0f, 0f to -100f, 0f to 100f)) {
+                    states.clear()
+                    touch(MotionEvent.ACTION_DOWN, viewport.x(cx), viewport.y(cy))
+                    touch(MotionEvent.ACTION_MOVE, viewport.x(cx + dx), viewport.y(cy + dy))
+                    receive {
+                        val x = if (left) it.leftX else it.rightX
+                        val y = if (left) it.leftY else it.rightY
+                        val otherCentered = if (left) it.rightX == 0 && it.rightY == 0
+                            else it.leftX == 0 && it.leftY == 0
+                        otherCentered && it.buttons == 0 && it.dpad == 0 &&
+                            it.leftTrigger == 0 && it.rightTrigger == 0 &&
+                            when {
+                                dx > 0 -> x > 0 && y == 0
+                                dx < 0 -> x < 0 && y == 0
+                                dy < 0 -> x == 0 && y > 0
+                                else -> x == 0 && y < 0
+                            }
+                    }
+                    touch(MotionEvent.ACTION_CANCEL, viewport.x(cx), viewport.y(cy))
+                    receive { it == GamepadState.Neutral }
+                }
+            }
             check(sender.sentFrames > 0 && sender.sendFailures == 0L)
         } finally {
             onMain { app.gamepadStateStore.neutralize() }

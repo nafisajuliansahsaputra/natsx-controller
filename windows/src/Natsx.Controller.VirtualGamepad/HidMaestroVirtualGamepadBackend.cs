@@ -213,9 +213,9 @@ public sealed class HidMaestroVirtualGamepadBackend : IVirtualGamepadBackend
             ?? throw new InvalidOperationException("HIDMaestro axis buffer is unavailable.");
 
         axes[_leftX] = HidMaestroStateMapper.NormalizeStick(state.LeftX);
-        axes[_leftY] = HidMaestroStateMapper.NormalizeStick(state.LeftY);
+        axes[_leftY] = HidMaestroStateMapper.NormalizeVerticalStick(state.LeftY);
         axes[_rightX] = HidMaestroStateMapper.NormalizeStick(state.RightX);
-        axes[_rightY] = HidMaestroStateMapper.NormalizeStick(state.RightY);
+        axes[_rightY] = HidMaestroStateMapper.NormalizeVerticalStick(state.RightY);
         axes[_leftTrigger] = HidMaestroStateMapper.NormalizeTrigger(state.LeftTrigger);
         axes[_rightTrigger] = HidMaestroStateMapper.NormalizeTrigger(state.RightTrigger);
 

@@ -1,7 +1,7 @@
 name: Controller UI verification
 on:
   push:
-    branches: ["feat/reference-controller-skin"]
+    branches: ["feat/reference-controller-skin", "fix/receiver-click-update"]
     paths: ["android/**", ".github/workflows/controller-ui-verification.yml"]
 permissions:
   contents: read

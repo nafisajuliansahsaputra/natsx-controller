@@ -53,6 +53,13 @@ public static class HidMaestroStateMapper
             : 0.5f + (value / 32768f) * 0.5f;
     }
 
+    // Protocol/XInput: positive Y is up. HIDMaestro HID axes: 0 is up,
+    // 1 is down; its XInput companion reverses Y when exposing the gamepad.
+    public static float NormalizeVerticalStick(short value)
+    {
+        return 1f - NormalizeStick(value);
+    }
+
     public static float NormalizeTrigger(byte value)
     {
         return value / 255f;

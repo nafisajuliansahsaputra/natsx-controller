@@ -519,3 +519,10 @@ Do not start these unless the product scope changes:
 - [x] Verify production input audit, Release Policy CI and Android signing guard CI (runs 37116046139, 37116046138 and 37115890725).
 - [ ] Obtain owner-selected LICENSE, Inno usage confirmation, production Android identity and Windows Authenticode credentials.
 - [ ] Obtain returned Microsoft retail-signed driver packages and physical clean-machine acceptance.
+
+## Gameplay input mapping audit
+
+- [x] Correct both Windows HIDMaestro stick Y axes without changing Android/wire directions.
+- [x] Add individual button, eight-way D-pad, trigger isolation, both-stick direction and native-state neutralization regression coverage.
+- [ ] Verify the rebuilt installer and input regressions in Windows CI.
+- [ ] Confirm up/down and all gameplay controls in joy.cpl/eFootball on the physical PC.
