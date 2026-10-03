@@ -482,6 +482,7 @@ Do not start these unless the product scope changes:
 
 ## Receiver launch recovery
 
-- [ ] Enforce one gameplay Receiver per user/session and reactivate it on repeated foreground/background launch.
-- [ ] Bound the complete GamepadHost handshake, preserve its failure reason and verify the actual Receiver UI starts after installation.
+- [x] Enforce one gameplay Receiver per user/session and reactivate it on repeated foreground/background launch.
+- [x] Bound the complete GamepadHost handshake, preserve its failure reason and verify the actual Receiver UI starts after installation.
 - [ ] Recheck USB takeover on the user's physical devices after Receiver startup recovery.
+
