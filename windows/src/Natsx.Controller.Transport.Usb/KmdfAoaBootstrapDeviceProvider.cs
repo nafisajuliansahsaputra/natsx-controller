@@ -52,33 +52,10 @@ public sealed class KmdfAoaBootstrapDeviceProvider :
             return ValueTask.FromResult(empty);
         }
 
-        try
-        {
-            IUsbAoaBootstrapDevice device =
-                KmdfAoaBootstrapDevice.OpenSidebandControl();
+        IUsbAoaBootstrapDevice device = KmdfAoaBootstrapDevice.OpenSidebandControl();
+        IReadOnlyList<IUsbAoaBootstrapDevice> devices = new[] { device };
+        return ValueTask.FromResult(devices);
 
-            IReadOnlyList<IUsbAoaBootstrapDevice> devices =
-                new[]
-                {
-                    device,
-                };
-
-            return ValueTask.FromResult(devices);
-        }
-        catch (BootstrapControlDeviceMissingException)
-        {
-            IReadOnlyList<IUsbAoaBootstrapDevice> empty =
-                Array.Empty<IUsbAoaBootstrapDevice>();
-
-            return ValueTask.FromResult(empty);
-        }
-        catch (BootstrapTargetNotReadyException)
-        {
-            IReadOnlyList<IUsbAoaBootstrapDevice> empty =
-                Array.Empty<IUsbAoaBootstrapDevice>();
-
-            return ValueTask.FromResult(empty);
-        }
     }
 }
 
@@ -383,7 +360,7 @@ internal sealed class BootstrapControlDeviceMissingException :
 {
     public BootstrapControlDeviceMissingException()
         : base(
-            "The NATSX AOA bootstrap sideband control device is not present.")
+            "The NATSX AOA bootstrap control device is not loaded. Check that the bootstrap driver is installed and allowed to load by Windows; reconnect the Android USB data cable.")
     {
     }
 }

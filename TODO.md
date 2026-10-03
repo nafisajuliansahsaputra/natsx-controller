@@ -563,3 +563,12 @@ Do not start these unless the product scope changes:
 - [x] Verify every enlarged edge, outside edge/corner, multitouch and authenticated USB output at three aspect ratios (UI 37133547872; Android lint/unit/build 37133547877).
 - [x] Compare all four native faces against the current Figma reference and preserve the installed APK signing identity.
 - [ ] Confirm the enlarged controls' comfort on the physical phone during gameplay.
+
+### 2026-10-03 — Forget/re-pair recovery hardening (0.1.3-dev)
+
+- Isolate LAN pairing failures per attempt: timeout, malformed confirmation, and invalid proof cannot terminate the recovery listener.
+- Android retries SAS-confirmed pairing to the same discovered receiver after repeated trusted handshake failures, retaining old trust until both confirmations succeed; one attempt at a time, 60-second cooldown, no prompt while a live session exists.
+- Confirmation uses a human-scale deadline and the selected UDP endpoint. Android rejection sends abort; Windows clears its pending prompt on remote abort.
+- Forget and successful re-pair reset logical ordering and detach old links without recreating the Xbox device; pending Wi-Fi handshakes are invalidated.
+- Preserve bootstrap driver/probe failure details rather than misreporting them as a charge-only cable.
+- Automated validation pending. Physical Wi-Fi→USB→Wi-Fi and Bluetooth recovery on the user's Windows/phone remain unverified for this build. Existing OEM limitation remains: initial pairing/session establishment uses LAN; USB uplink and Bluetooth join a trusted session.

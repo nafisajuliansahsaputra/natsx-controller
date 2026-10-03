@@ -8,6 +8,24 @@ namespace Natsx.Controller.Transport.Wifi.Tests;
 public sealed class WifiTrustedControlProcessorTests
 {
     [Fact]
+    public void ForgottenTrustInvalidatesPendingHandshakeBeforeSessionReady()
+    {
+        var android = PeerId.CreateRandom();
+        var windows = PeerId.CreateRandom();
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 55000);
+        byte[] secret = RandomNumberGenerator.GetBytes(32);
+        using var challenger = WifiTrustedHandshakeChallenge.Create(android, windows, secret);
+        using var processor = new WifiTrustedControlProcessor(windows);
+        var response = processor.HandleChallenge(challenger.EncodeChallenge(100), endpoint, _ => secret.ToArray(), 200);
+        using var session = challenger.AcceptResponse(response);
+        processor.ClearPending();
+        Assert.Equal(0, processor.PendingCount);
+        byte[] ready = WifiControlDatagramCodec.EncodeSessionReady(session,
+            new SessionReadyPayload(PeerRole.AndroidController, TransportCapabilities.Wifi, android), 300);
+        Assert.Throws<CryptographicException>(() => processor.HandleSessionReady(ready, endpoint, 400));
+    }
+
+    [Fact]
     public void ChallengeAndSessionReadyPromoteTrustedSession()
     {
         PeerId androidPeer = PeerId.CreateRandom();

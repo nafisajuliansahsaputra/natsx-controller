@@ -3,6 +3,17 @@ namespace Natsx.Controller.Transport.Usb.Tests;
 public sealed class UsbAoaBootstrapCoordinatorTests
 {
     [Fact]
+    public async Task BootstrapProbeFailurePreservesDriverDiagnostic()
+    {
+        var coordinator = new UsbAoaBootstrapCoordinator(new FakeAccessoryBackend(),
+            new ThrowingBootstrapProvider(new IOException("Raw endpoint-zero probe is not ready: SubmitStatus=0xC0000010")));
+        var result = await coordinator.EnsureAccessoryModeAsync();
+        Assert.Equal(UsbBootstrapStatus.BootstrapFailed, result.Status);
+        Assert.Contains("0xC0000010", result.Diagnostic);
+        Assert.DoesNotContain("charge-only", result.Diagnostic);
+    }
+
+    [Fact]
     public async Task AlreadyAccessoryMode_ReturnsReadyWithoutBootstrap()
     {
         var accessory = new FakeAccessoryBackend

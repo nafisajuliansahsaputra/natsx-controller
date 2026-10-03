@@ -192,6 +192,14 @@ public sealed class WifiTrustedControlProcessor : IDisposable
             return;
         }
 
+        ClearPending();
+
+        _disposed = true;
+        GC.SuppressFinalize(this);
+    }
+
+    public void ClearPending()
+    {
         lock (_gate)
         {
             foreach (PendingSession pending in _pending.Values)
@@ -201,9 +209,6 @@ public sealed class WifiTrustedControlProcessor : IDisposable
 
             _pending.Clear();
         }
-
-        _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     private void AddPending(

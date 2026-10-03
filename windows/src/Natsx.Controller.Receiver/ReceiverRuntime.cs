@@ -108,6 +108,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         _sessionRegistry?.Remove(
             peerId);
+        _wifiControlProcessor?.ClearPending();
 
         ControllerTransportRuntime? runtime =
             _transportRuntime;
@@ -148,6 +149,8 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 _bluetoothSocket?.Dispose();
                 _bluetoothSocket =
                     null;
+                runtime.ResetLogicalSession();
+                _logicalSessionId = null;
             }
             finally
             {
@@ -691,181 +694,11 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                UdpReceiveResult offerDatagram =
-                    await client
-                        .ReceiveAsync(
-                            cancellationToken)
-                        .ConfigureAwait(false);
-
-                ProtocolFrame envelope;
-
-                try
-                {
-                    envelope =
-                        ProtocolFrameCodec.Decode(
-                            offerDatagram.Buffer);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                if (envelope.MessageType !=
-                    MessageType.PairingOffer)
-                {
-                    continue;
-                }
-
-                PairingOfferPayload offer;
-
-                try
-                {
-                    offer =
-                        PairingFrameCodec
-                            .DecodeOffer(
-                                offerDatagram.Buffer);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                using var responder =
-                    new PairingResponderSession(
-                        trust.LocalPeerId,
-                        offer);
-
-                byte[] response =
-                    PairingFrameCodec
-                        .EncodeResponse(
-                            responder.Response);
-
-                await client
-                    .SendAsync(
-                        response,
-                        offerDatagram.RemoteEndPoint,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-
-                Report(
-                    $"LAN pairing request from {offer.AndroidPeerId}. Waiting for matching code confirmation…");
-
-                bool approved =
-                    await RequestPairingConfirmationAsync(
-                            responder.ComparisonCode,
-                            responder.RemotePeerId,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-
-                if (!approved)
-                {
-                    byte[] abort =
-                        PairingFrameCodec
-                            .EncodeAbort(
-                                new PairingAbortPayload(
-                                    PairingAbortReason.UserRejected));
-
-                    await client
-                        .SendAsync(
-                            abort,
-                            offerDatagram.RemoteEndPoint,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-
-                    continue;
-                }
-
-                UdpReceiveResult remoteConfirmationDatagram =
-                    await ReceiveFromEndpointAsync(
-                            client,
-                            offerDatagram.RemoteEndPoint,
-                            TimeSpan.FromMinutes(2),
-                            cancellationToken)
-                        .ConfigureAwait(false);
-
-                ProtocolFrame remoteEnvelope =
-                    ProtocolFrameCodec.Decode(
-                        remoteConfirmationDatagram.Buffer);
-
-                if (remoteEnvelope.MessageType ==
-                    MessageType.PairingAbort)
-                {
-                    continue;
-                }
-
-                if (remoteEnvelope.MessageType !=
-                    MessageType.PairingConfirm)
-                {
-                    continue;
-                }
-
-                PairingConfirmPayload remoteConfirmation =
-                    PairingFrameCodec
-                        .DecodeConfirm(
-                            remoteConfirmationDatagram.Buffer);
-
-                PairingConfirmPayload localConfirmation =
-                    responder.ApproveDisplayedCode();
-
-                byte[] localConfirmationBytes =
-                    PairingFrameCodec
-                        .EncodeConfirm(
-                            localConfirmation);
-
-                await client
-                    .SendAsync(
-                        localConfirmationBytes,
-                        offerDatagram.RemoteEndPoint,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-
-                using PairingEstablishedMaterial established =
-                    responder.AcceptRemoteConfirmation(
-                        remoteConfirmation);
-
-                byte[] secret =
-                    established.CopyTrustSecret();
-
-                try
-                {
-                    IReadOnlyList<TrustedPeerRecord> existingPeers =
-                        trust.TrustedPeers.List();
-
-                    foreach (TrustedPeerRecord existingPeer in existingPeers)
-                    {
-                        if (existingPeer.PeerId !=
-                            established.RemotePeerId)
-                        {
-                            trust.TrustedPeers.Remove(
-                                existingPeer.PeerId);
-                        }
-                    }
-
-                    _sessionRegistry?.Clear();
-
-                    trust.TrustedPeers.Put(
-                        new TrustedPeerRecord(
-                            established.RemotePeerId,
-                            "NATSX Android Controller",
-                            (byte)(
-                                TransportCapabilities.Wifi |
-                                TransportCapabilities.Bluetooth |
-                                TransportCapabilities.UsbDirect),
-                            DateTimeOffset.UtcNow,
-                            TrustedPeerRecord.CurrentPairingVersion),
-                        secret);
-                }
-                finally
-                {
-                    CryptographicOperations.ZeroMemory(
-                        secret);
-                }
-
-                Report(
-                    $"LAN pairing complete. Trusted Android peer: {established.RemotePeerId}. Recovery listener remains active.");
-            }
+            await WifiPairingListener.RunAsync(
+                client,
+                (datagram, token) => HandleWifiPairingOfferAsync(client, datagram, trust, token),
+                exception => Report($"LAN pairing attempt failed; ready to retry: {exception.Message}"),
+                cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
@@ -892,6 +725,169 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
             client.Dispose();
         }
+    }
+
+    private async Task HandleWifiPairingOfferAsync(
+        UdpClient client, UdpReceiveResult offerDatagram, WindowsTrustServices trust,
+        CancellationToken cancellationToken)
+    {
+        ProtocolFrame envelope;
+
+        try
+        {
+            envelope =
+                ProtocolFrameCodec.Decode(
+                    offerDatagram.Buffer);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (envelope.MessageType !=
+            MessageType.PairingOffer)
+        {
+            return;
+        }
+
+        PairingOfferPayload offer;
+
+        try
+        {
+            offer =
+                PairingFrameCodec
+                    .DecodeOffer(
+                        offerDatagram.Buffer);
+        }
+        catch
+        {
+            return;
+        }
+
+        using var responder =
+            new PairingResponderSession(
+                trust.LocalPeerId,
+                offer);
+
+        byte[] response =
+            PairingFrameCodec
+                .EncodeResponse(
+                    responder.Response);
+
+        await client
+            .SendAsync(
+                response,
+                offerDatagram.RemoteEndPoint,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        Report(
+            $"LAN pairing request from {offer.AndroidPeerId}. Waiting for matching code confirmation…");
+
+        using var attemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task<bool> approvalTask = RequestPairingConfirmationAsync(
+            responder.ComparisonCode, responder.RemotePeerId, attemptCancellation.Token).AsTask();
+        Task<UdpReceiveResult> confirmationTask = ReceiveFromEndpointAsync(
+            client, offerDatagram.RemoteEndPoint, TimeSpan.FromMinutes(2), attemptCancellation.Token);
+        UdpReceiveResult remoteConfirmationDatagram;
+        try
+        {
+            Task first = await Task.WhenAny(approvalTask, confirmationTask).ConfigureAwait(false);
+            if (first == confirmationTask)
+            {
+                // Remote rejection clears the local prompt immediately, even before local approval.
+                var early = await confirmationTask.ConfigureAwait(false);
+                if (ProtocolFrameCodec.Decode(early.Buffer).MessageType == MessageType.PairingAbort) return;
+            }
+            if (!await approvalTask.ConfigureAwait(false))
+            {
+                byte[] abort = PairingFrameCodec.EncodeAbort(new PairingAbortPayload(PairingAbortReason.UserRejected));
+                await client.SendAsync(abort, offerDatagram.RemoteEndPoint, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+            remoteConfirmationDatagram = await confirmationTask.ConfigureAwait(false);
+            if (ProtocolFrameCodec.Decode(remoteConfirmationDatagram.Buffer).MessageType != MessageType.PairingConfirm) return;
+        }
+        finally
+        {
+            attemptCancellation.Cancel();
+            // Observe both tasks and release the prompt before the next pairing attempt.
+            try { await Task.WhenAll(approvalTask, confirmationTask).ConfigureAwait(false); }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested) { }
+        }
+
+        PairingConfirmPayload remoteConfirmation =
+            PairingFrameCodec
+                .DecodeConfirm(
+                    remoteConfirmationDatagram.Buffer);
+
+        PairingConfirmPayload localConfirmation =
+            responder.ApproveDisplayedCode();
+
+        byte[] localConfirmationBytes =
+            PairingFrameCodec
+                .EncodeConfirm(
+                    localConfirmation);
+
+        using PairingEstablishedMaterial established =
+            responder.AcceptRemoteConfirmation(
+                remoteConfirmation);
+
+        byte[] secret =
+            established.CopyTrustSecret();
+
+        try
+        {
+            await ResetPairedTransportsAsync(cancellationToken, () =>
+            {
+                trust.TrustedPeers.Put(
+                    new TrustedPeerRecord(established.RemotePeerId, "NATSX Android Controller",
+                        (byte)(TransportCapabilities.Wifi | TransportCapabilities.Bluetooth | TransportCapabilities.UsbDirect),
+                        DateTimeOffset.UtcNow, TrustedPeerRecord.CurrentPairingVersion), secret);
+                foreach (var existingPeer in trust.TrustedPeers.List())
+                {
+                    if (existingPeer.PeerId != established.RemotePeerId)
+                        trust.TrustedPeers.Remove(existingPeer.PeerId);
+                }
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(
+                secret);
+        }
+
+        await client.SendAsync(localConfirmationBytes, offerDatagram.RemoteEndPoint, cancellationToken)
+            .ConfigureAwait(false);
+
+        Report(
+            $"LAN pairing complete. Trusted Android peer: {established.RemotePeerId}. Recovery listener remains active.");
+    }
+
+    private async Task ResetPairedTransportsAsync(CancellationToken cancellationToken, Action updateTrust)
+    {
+        await _transportMutationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_transportRuntime is { } runtime)
+            {
+                await DeactivateUsbCandidateAsync(runtime).ConfigureAwait(false);
+                await runtime.DetachTransportAsync(TransportKind.Wifi, cancellationToken).ConfigureAwait(false);
+                await runtime.DetachTransportAsync(TransportKind.Bluetooth, cancellationToken).ConfigureAwait(false);
+                runtime.ResetLogicalSession();
+            }
+            _wifiSession?.Dispose();
+            _wifiSession = null;
+            _bluetoothSessionOwner?.Dispose();
+            _bluetoothSessionOwner = null;
+            _bluetoothSocket?.Dispose();
+            _bluetoothSocket = null;
+            _logicalSessionId = null;
+            _sessionRegistry?.Clear();
+            updateTrust();
+            _wifiControlProcessor?.ClearPending();
+        }
+        finally { _transportMutationGate.Release(); }
     }
 
     private static async Task<UdpReceiveResult> ReceiveFromEndpointAsync(

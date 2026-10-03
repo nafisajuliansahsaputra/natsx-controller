@@ -1035,3 +1035,7 @@ monitoring also starts off the Receiver startup caller. Stop cancels the worker
 and disposes the stream; the connection owner aborts native pipes on teardown.
 No task is created per packet. Smart Auto still requires fresh authenticated
 state and the configured recovery stability before USB takes authority.
+
+#### Recovery after one-sided Forget (0.1.3-dev)
+
+A saved Android peer is not evidence that Windows still holds the same trust secret. After three failed trusted handshakes to a resolved expected receiver, Android may offer a fresh SAS exchange to that receiver. Existing trust is preserved on timeout/rejection; neither an unauthenticated discovery response nor handshake failure authorizes input or erases keys. Both devices must approve the matching code before replacement. Recovery is serialized with a 60-second cooldown and suppressed while any trusted session exists. Windows isolates each pairing attempt, keeps its listener alive after failed attempts, cancels the prompt on remote abort, invalidates pending challenges and resets old live sessions after Forget/re-pair. Virtual controller identity is retained.

@@ -3,6 +3,7 @@ package com.natsx.controller.core.transport.wifi
 import com.natsx.controller.core.pairing.PairingConfirmationCoordinator
 import com.natsx.controller.core.pairing.PairingPrompt
 import com.natsx.controller.core.protocol.MessageType
+import com.natsx.controller.core.protocol.PairingAbortPayload
 import com.natsx.controller.core.protocol.PairingAbortReason
 import com.natsx.controller.core.protocol.PairingFrameCodec
 import com.natsx.controller.core.protocol.PairingInitiatorSession
@@ -28,7 +29,10 @@ class WifiFirstPairingClient(
         require(timeoutMillis in 500..10_000)
     }
 
-    fun pair(): TrustedPeerRecord {
+    fun pair(
+        receiverEndpoint: InetSocketAddress? = null,
+        expectedReceiverPeerId: PeerId? = null,
+    ): TrustedPeerRecord {
         PairingInitiatorSession(localPeerId).use { pairing ->
             DatagramSocket().use { socket ->
                 socket.broadcast = true
@@ -41,7 +45,7 @@ class WifiFirstPairingClient(
 
                 val broadcast =
                     InetSocketAddress(
-                        InetAddress.getByName(
+                        receiverEndpoint?.address ?: InetAddress.getByName(
                             BROADCAST_ADDRESS,
                         ),
                         PAIRING_PORT,
@@ -100,6 +104,13 @@ class WifiFirstPairingClient(
                             responseBytes,
                         )
 
+                require(expectedReceiverPeerId == null || response.windowsPeerId == expectedReceiverPeerId) {
+                    "Pairing recovery response belongs to a different receiver."
+                }
+                val windowsEndpoint = InetSocketAddress(responsePacket.address, responsePacket.port)
+                // Bind the entire confirmation exchange to the selected response endpoint.
+                socket.connect(windowsEndpoint)
+
                 val code =
                     pairing.acceptResponse(
                         response,
@@ -116,16 +127,12 @@ class WifiFirstPairingClient(
                         )
 
                 if (!approved) {
+                    val abort = PairingFrameCodec.encodeAbort(PairingAbortPayload(PairingAbortReason.USER_REJECTED))
+                    socket.send(DatagramPacket(abort, abort.size, windowsEndpoint))
                     error(
                         "LAN pairing was rejected or timed out on Android.",
                     )
                 }
-
-                val windowsEndpoint =
-                    InetSocketAddress(
-                        responsePacket.address,
-                        responsePacket.port,
-                    )
 
                 val localConfirm =
                     PairingFrameCodec
@@ -142,6 +149,8 @@ class WifiFirstPairingClient(
                     ),
                 )
 
+                // Receiver code approval is a human operation, not a 5-second discovery probe.
+                socket.soTimeout = CONFIRMATION_TIMEOUT_MILLIS
                 val remotePacket =
                     receive(
                         socket,
@@ -261,6 +270,7 @@ class WifiFirstPairingClient(
     companion object {
         const val PAIRING_PORT = 43858
         const val DEFAULT_TIMEOUT_MILLIS = 5_000
+        const val CONFIRMATION_TIMEOUT_MILLIS = 120_000
         const val MAXIMUM_DATAGRAM_SIZE = 512
         const val BROADCAST_ADDRESS = "255.255.255.255"
     }

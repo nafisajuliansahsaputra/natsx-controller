@@ -17,6 +17,30 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class WifiAutoReconnectRuntimeTest {
     @Test
+    fun repeatedTrustedHandshakeFailuresNotifyRecoveryAndKeepRetrying() {
+        val endpoint = InetSocketAddress("127.0.0.1", 43860)
+        val failures = AtomicInteger()
+        val broadcaster = RealtimeStateBroadcaster(SessionSequence(), { 1uL })
+        WifiAutoReconnectRuntime(
+            broadcaster = broadcaster,
+            endpointProvider = WifiEndpointProvider {
+                WifiResolvedEndpoint(endpoint, WifiEndpointResolutionSource.CACHED_DIRECT)
+            },
+            linkFactory = WifiRealtimeLinkFactory { throw java.io.IOException("Receiver forgot this peer") },
+            onConnectionFailure = { actual, count ->
+                assertEquals(endpoint, actual)
+                failures.set(count)
+            },
+            nowNanos = System::nanoTime,
+        ).use { runtime ->
+            runtime.start()
+            waitUntil(3_000) { failures.get() >= 3 }
+            assertTrue(failures.get() >= 3)
+            assertTrue(runtime.reconnectAttempts >= 2)
+        }
+    }
+
+    @Test
     fun reachesActiveUsingResolvedTrustedEndpoint() {
         val endpoint =
             InetSocketAddress(

@@ -16,6 +16,7 @@ import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import com.natsx.controller.NatsxControllerApplication
 import com.natsx.controller.core.connection.AndroidConnectionStatus
 import com.natsx.controller.core.connection.AndroidLinkState
@@ -38,6 +39,8 @@ import com.natsx.controller.core.transport.wifi.WifiDiscoveryClient
 import com.natsx.controller.core.transport.wifi.WifiEndpointResolver
 import com.natsx.controller.core.transport.wifi.WifiFirstPairingClient
 import com.natsx.controller.core.transport.wifi.WifiReconnectState
+import com.natsx.controller.core.transport.wifi.WifiTrustRecoveryGate
+import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -56,6 +59,7 @@ class ControllerService : Service() {
         }
     private val connectionBootstrapStarted = AtomicBoolean(false)
     private val usbPermissionRequestInFlight = AtomicBoolean(false)
+    private val trustRecoveryGate = WifiTrustRecoveryGate(SystemClock::elapsedRealtime)
     private val wifiRuntimeGate = Any()
     private val bluetoothRuntimeGate = Any()
     private val usbAttachWatcher: ScheduledExecutorService =
@@ -390,10 +394,43 @@ class ControllerService : Service() {
                 broadcaster = app.realtimeBroadcaster,
                 endpointProvider = resolver,
                 linkFactory = linkFactory,
+                onConnectionFailure = { endpoint, failures ->
+                    recoverReceiverTrust(receiverPeerId, endpoint, failures)
+                },
             )
 
             wifiRuntime = runtime
             runtime.start()
+        }
+    }
+
+    private fun recoverReceiverTrust(receiverPeerId: PeerId, endpoint: InetSocketAddress, failures: Int) {
+        if (!trustRecoveryGate.tryBegin(failures, app.trustedSessionRegistry.hasAnyActiveSession())) return
+        connectionExecutor.execute {
+            try {
+                if (app.trustedSessionRegistry.hasAnyActiveSession()) return@execute
+                app.usbRuntimeStatus.publish("Receiver is reachable but trusted reconnect failed. Confirm matching pairing codes on both devices to recover.")
+                WifiFirstPairingClient(app.localPeerId, app.trustedPeerStore, app.pairingConfirmation)
+                    .pair(endpoint, receiverPeerId)
+                synchronized(wifiRuntimeGate) {
+                    wifiRuntime?.close()
+                    wifiRuntime = null
+                }
+                synchronized(bluetoothRuntimeGate) {
+                    bluetoothRuntime?.close()
+                    bluetoothRuntime = null
+                }
+                usbRuntime.disconnect()
+                app.trustedSessionRegistry.remove(receiverPeerId)
+                app.connectionStatus.resetSmartAutoAuthority()
+                startTrustedWifi(receiverPeerId)
+                startTrustedBluetooth(receiverPeerId)
+                app.usbRuntimeStatus.publish("Pairing recovered. Reconnecting Wi-Fi and available USB/Bluetooth links…")
+            } catch (exception: Exception) {
+                app.usbRuntimeStatus.publish("Pairing recovery: ${exception.message}. Existing trust retained; reconnect will retry.", isError = true)
+            } finally {
+                trustRecoveryGate.finish()
+            }
         }
     }
 

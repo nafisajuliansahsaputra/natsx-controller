@@ -34,6 +34,7 @@ class WifiAutoReconnectRuntime(
     private val broadcaster: RealtimeStateBroadcaster,
     private val endpointProvider: WifiEndpointProvider,
     private val linkFactory: WifiRealtimeLinkFactory,
+    private val onConnectionFailure: (InetSocketAddress, Int) -> Unit = { _, _ -> },
     private val nowNanos: () -> Long = SystemClock::elapsedRealtimeNanos,
     private val firstHeartbeatTimeoutMillis: Long =
         DEFAULT_FIRST_HEARTBEAT_TIMEOUT_MILLIS,
@@ -112,6 +113,7 @@ class WifiAutoReconnectRuntime(
 
     private fun runLoop() {
         var retryIndex = 0
+        var authenticationFailures = 0
 
         while (running.get() && !closed.get()) {
             state = if (retryIndex == 0) {
@@ -138,12 +140,15 @@ class WifiAutoReconnectRuntime(
                     .getOrNull()
 
             if (link == null) {
+                authenticationFailures += 1
+                onConnectionFailure(resolved.endpoint, authenticationFailures)
                 activeEndpoint = null
                 reconnectAttempts += 1
                 sleepBackoff(retryIndex++)
                 continue
             }
 
+            authenticationFailures = 0
             activeLink.set(link)
             broadcaster.addSink(link)
             state = WifiReconnectState.AWAITING_HEARTBEAT
