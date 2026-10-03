@@ -533,3 +533,9 @@ Do not start these unless the product scope changes:
 - [x] Shrink the movable cap to 310px, increase radial visual travel to 110px and widen full-scale/capture travel without moving controls.
 - [x] Verify lint/unit tests, native rendering and complete input mapping in Android CI (37119260532) and three-aspect-ratio UI verification (37119260528).
 - [ ] Confirm comfort and contrast on the physical phone.
+
+## Dark bevel refinement
+
+- [x] Apply the supplied 600/700/800/900 neutral palette consistently to dark rims and surfaces.
+- [x] Remove duplicate face-edge shadows and soften the outer halo without dropping bevel depth or white lettering/icons.
+- [ ] Verify render snapshots, Android lint/build and full input regressions.

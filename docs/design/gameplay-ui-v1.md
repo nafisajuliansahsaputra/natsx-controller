@@ -143,8 +143,10 @@ keeps circles round and the control groups coherent on other aspect ratios.
 Saved custom positions remain normalized to the window. Android hides both
 system bars and draws through display cutouts; insets do not shrink the canvas.
 
-Gameplay uses a soft-dark #292929 background, #1A1A1A shadow surfaces and
-subtle charcoal highlights. White button lettering and glyphs remain white;
+Gameplay uses the owner-supplied neutral scale: #292929 (800) background,
+#434343 (700) bevel body, #575757 (600) upper-left highlight and #1A1A1A (900)
+soft shadow. One continuous silhouette defines each rim; short 6px blurred
+shadows replace the heavy black halo and duplicate face-edge shadow. White button lettering and glyphs remain white;
 colored green/lavender faces remain intact. Neutral surfaces in exported PNGs
 are retinted once during asset loading, preserving alpha and colored layers.
 

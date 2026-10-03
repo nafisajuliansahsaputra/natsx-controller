@@ -52,7 +52,7 @@ internal class ControllerSkin(private val context: Context) {
             val red = Color.red(color); val green = Color.green(color); val blue = Color.blue(color)
             if (Color.alpha(color) == 0 || max(red, max(green, blue)) - min(red, min(green, blue)) > 18) continue
             val light = (red + green + blue) / 3
-            val dark = if (light <= 245) light * 41 / 245 else 41 + (light - 245) * 21 / 10
+            val dark = if (light <= 245) light * 41 / 245 else 41 + (light - 245) * 26 / 10
             pixels[i] = Color.argb(Color.alpha(color), dark, dark, dark)
         }
         Bitmap.createBitmap(pixels, source.width, source.height, Bitmap.Config.ARGB_8888)
@@ -126,15 +126,16 @@ internal class ControllerSkin(private val context: Context) {
 
     private fun drawStickBase(c: Canvas, x: Float, y: Float) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#1A1A1A")
+            color = Color.parseColor("#601A1A1A")
             style = Paint.Style.FILL_AND_STROKE
-            strokeWidth = 24f * px
-            maskFilter = BlurMaskFilter(12f * px, BlurMaskFilter.Blur.NORMAL)
+            strokeWidth = 12f * px
+            maskFilter = BlurMaskFilter(6f * px, BlurMaskFilter.Blur.NORMAL)
         }
         c.drawCircle(x, y, 250f * px, p)
         p.maskFilter = null; p.style = Paint.Style.FILL
         p.shader = LinearGradient(x - 250f * px, y - 250f * px, x + 250f * px, y + 250f * px,
-            Color.parseColor("#484848"), Color.parseColor("#1A1A1A"), Shader.TileMode.CLAMP)
+            intArrayOf(Color.parseColor("#575757"), Color.parseColor("#434343"), Color.parseColor("#292929")),
+            floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(x, y, 250f * px, p)
         p.shader = null
         p.color = Color.parseColor("#801C4B1E")
@@ -176,17 +177,22 @@ internal class ControllerSkin(private val context: Context) {
 
     private fun drawDarkBevel(c: Canvas, key: Path, rim: Float) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#B0000000")
+            color = Color.parseColor("#601A1A1A")
             style = Paint.Style.FILL_AND_STROKE
             strokeJoin = Paint.Join.ROUND
-            strokeWidth = 2f * (rim + 12f * px)
-            maskFilter = BlurMaskFilter(12f * px, BlurMaskFilter.Blur.NORMAL)
+            strokeWidth = 2f * rim
+            maskFilter = BlurMaskFilter(6f * px, BlurMaskFilter.Blur.NORMAL)
         }
+        // Short soft shadow under one continuous silhouette, not a thick black halo.
+        c.save(); c.translate(2f * px, 3f * px); c.drawPath(key, p); c.restore()
+        p.color = Color.parseColor("#20434343")
+        p.strokeWidth = 2f * (rim + 4f * px)
         c.drawPath(key, p)
         p.maskFilter = null; p.strokeWidth = 2f * rim
         val bounds = RectF().also { key.computeBounds(it, true) }
         p.shader = LinearGradient(bounds.left, bounds.top, bounds.right, bounds.bottom,
-            Color.parseColor("#505050"), Color.parseColor("#1A1A1A"), Shader.TileMode.CLAMP)
+            intArrayOf(Color.parseColor("#575757"), Color.parseColor("#434343"), Color.parseColor("#292929")),
+            floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
         c.drawPath(key, p)
         p.shader = null
     }
@@ -229,12 +235,9 @@ internal class ControllerSkin(private val context: Context) {
         val key = keyPath(id, r)
         drawDarkBevel(c, key, (if (circle || mint) 6f else 12f) * px)
         val depth = (if (mint) 6f else 12f) * px
-        // Add the same drop depth to the originally flat LB/RB and utility keys.
-        p.color = Color.parseColor("#803A264F")
-        p.style = Paint.Style.FILL_AND_STROKE; p.strokeWidth = depth
-        p.maskFilter = BlurMaskFilter(depth, BlurMaskFilter.Blur.NORMAL)
-        c.drawPath(key, p)
-        p.maskFilter = null; p.style = Paint.Style.FILL
+        // The backplate already owns the soft drop shadow. Keep the face inset
+        // independent so a second dark stroke cannot muddy the bevel.
+        p.style = Paint.Style.FILL
         p.color = Color.parseColor(if (mint) "#B2EBB2" else "#C3B1E1")
         c.drawPath(key, p)
         c.save(); c.clipPath(key)
