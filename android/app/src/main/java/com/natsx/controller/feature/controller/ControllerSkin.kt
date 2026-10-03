@@ -172,7 +172,6 @@ internal class ControllerSkin(private val context: Context) {
         val key = keyPath(id, r)
         val circle = id in listOf("A", "B", "X", "Y")
         val flat = id in listOf("LB", "RB", "BACK", "START", "L3", "R3", "GUIDE")
-        if (circle) centered(c, "imgEllipse21", r.centerX(), r.centerY(), 237.820f)
         if (flat) {
             val depth = (if (id == "LB" || id == "RB") 12f else 6f) * px
             drawWhiteBevel(c, key, depth)
@@ -188,13 +187,13 @@ internal class ControllerSkin(private val context: Context) {
         val face = asset(id)
         val x = when {
             id == "LT" || id == "RT" -> r.left - 36f * px
-            circle -> r.left - 18f * px
+            circle -> r.left - 24f * px
             id == "RB" -> r.left - .25805664f * px
             else -> r.left
         }
         val y = when {
             id == "LT" || id == "RT" -> r.top - 36f * px
-            circle -> r.top - 18f * px
+            circle -> r.top - 24f * px
             else -> r.top
         }
         layer(c, id, x, y, face.width * px, face.height * px)

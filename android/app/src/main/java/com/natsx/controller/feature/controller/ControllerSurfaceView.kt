@@ -684,7 +684,7 @@ class ControllerSurfaceView(
             val saved = controllerLayout.positions[id.name]
             val group = when (id) {
                 ControlId.DPAD_UP, ControlId.DPAD_DOWN, ControlId.DPAD_LEFT, ControlId.DPAD_RIGHT -> 900f to 780f
-                ControlId.A, ControlId.B, ControlId.X, ControlId.Y -> 2074.91f to 539.91f
+                ControlId.A, ControlId.B, ControlId.X, ControlId.Y -> 2074.62f to 539.62f
                 else -> x to y
             }
             // Stretch anchors to the screen; keep each circle/cross/face-button group uniform.
@@ -723,10 +723,11 @@ class ControllerSurfaceView(
         circle(ControlId.DPAD_LEFT, 740f, 780f, 80f, 1.10f)
         circle(ControlId.DPAD_RIGHT, 1060f, 780f, 80f, 1.10f)
         circle(ControlId.DPAD_DOWN, 900f, 940f, 80f, 1.10f)
-        circle(ControlId.Y, 2074.91f, 378.91f, 88.91f, 1.14f)
-        circle(ControlId.X, 1915.91f, 539.91f, 88.91f, 1.14f)
-        circle(ControlId.B, 2235.91f, 539.91f, 88.91f, 1.14f)
-        circle(ControlId.A, 2074.91f, 700.91f, 88.91f, 1.14f)
+        // Updated Figma wrappers: 231.24px circles, with identical acquisition hitboxes.
+        circle(ControlId.Y, 2074.62f, 349.62f, 115.62f, 1f)
+        circle(ControlId.X, 1884.62f, 539.62f, 115.62f, 1f)
+        circle(ControlId.B, 2265.62f, 539.62f, 115.62f, 1f)
+        circle(ControlId.A, 2074.62f, 730.62f, 115.62f, 1f)
 
         skin.rebuild(width, height, viewport.left, viewport.top, viewport.width, viewport.height,
             controls.map { control ->

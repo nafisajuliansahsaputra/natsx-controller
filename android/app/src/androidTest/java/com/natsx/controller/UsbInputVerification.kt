@@ -62,10 +62,10 @@ internal object UsbInputVerification {
             }
             // Real hitboxes -> complete authenticated state; equality catches crossed controls.
             for ((x, y, button) in listOf(
-                Triple(2074.91f, 700.91f, GamepadButtons.A),
-                Triple(2235.91f, 539.91f, GamepadButtons.B),
-                Triple(1915.91f, 539.91f, GamepadButtons.X),
-                Triple(2074.91f, 378.91f, GamepadButtons.Y),
+                Triple(2074.62f, 730.62f, GamepadButtons.A),
+                Triple(2265.62f, 539.62f, GamepadButtons.B),
+                Triple(1884.62f, 539.62f, GamepadButtons.X),
+                Triple(2074.62f, 349.62f, GamepadButtons.Y),
                 Triple(625f, 125f, GamepadButtons.LEFT_SHOULDER),
                 Triple(1775f, 125f, GamepadButtons.RIGHT_SHOULDER),
                 Triple(864f, 412f, GamepadButtons.LEFT_STICK),

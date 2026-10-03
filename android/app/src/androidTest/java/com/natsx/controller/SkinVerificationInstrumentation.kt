@@ -79,6 +79,32 @@ class SkinVerificationInstrumentation : Instrumentation() {
         val stickX = logoViewport.x(325f)
         val stickY = logoViewport.y(540f)
         val scale = logoViewport.scale
+        // Every newly enlarged face-button edge acquires exactly that button;
+        // the decorative glow and empty corner outside its circle do not.
+        for ((cx, cy, button) in listOf(
+            Triple(2074.62f, 349.62f, GamepadButtons.Y),
+            Triple(1884.62f, 539.62f, GamepadButtons.X),
+            Triple(2265.62f, 539.62f, GamepadButtons.B),
+            Triple(2074.62f, 730.62f, GamepadButtons.A),
+        )) {
+            val x = logoViewport.x(2074.62f) + (cx - 2074.62f) * scale
+            val y = logoViewport.y(539.62f) + (cy - 539.62f) * scale
+            for ((dx, dy) in listOf(1f to 0f, -1f to 0f, 0f to 1f, 0f to -1f)) {
+                val edge = listOf((x + dx * 114.62f * scale) to (y + dy * 114.62f * scale))
+                touch(view, MotionEvent.ACTION_DOWN, edge)
+                check(store.snapshot() == GamepadState(buttons = button)) { "Enlarged button edge must acquire $button" }
+                touch(view, MotionEvent.ACTION_UP, edge)
+                check(store.snapshot() == GamepadState.Neutral)
+                val outside = listOf((x + dx * 116.62f * scale) to (y + dy * 116.62f * scale))
+                touch(view, MotionEvent.ACTION_DOWN, outside)
+                check(store.snapshot() == GamepadState.Neutral) { "Glow must not acquire $button" }
+                touch(view, MotionEvent.ACTION_CANCEL, outside)
+            }
+            val corner = listOf((x + 100f * scale) to (y + 100f * scale))
+            touch(view, MotionEvent.ACTION_DOWN, corner)
+            check(store.snapshot() == GamepadState.Neutral) { "Face-button hitbox must remain circular" }
+            touch(view, MotionEvent.ACTION_CANCEL, corner)
+        }
         // Matching outer bevels at the same radial position on both sticks.
         for ((dx, dy) in listOf(248f to 0f, -248f to 0f, 0f to -248f, 0f to 248f)) {
             val left = bitmap.getPixel((stickX + dx * scale).toInt(), (stickY + dy * scale).toInt())
@@ -174,7 +200,7 @@ class SkinVerificationInstrumentation : Instrumentation() {
         view.applySafeInsets(32, 8, 0, 16)
         val viewport = com.natsx.controller.feature.controller.ControllerDesignViewport.fit(w.toFloat(), h.toFloat(), 32f, 8f, 0f, 16f)
         fun point(x: Float, y: Float) = viewport.x(x) to viewport.y(y)
-        val points = arrayListOf(point(325f, 540f), point(2175f, 125f), point(2074.91f, 700.91f), point(1500f, 780f))
+        val points = arrayListOf(point(325f, 540f), point(2175f, 125f), point(2074.62f, 730.62f), point(1500f, 780f))
         touch(view, MotionEvent.ACTION_DOWN, points.take(1))
         for (count in 2..4) touch(view, MotionEvent.ACTION_POINTER_DOWN or ((count - 1) shl 8), points.take(count))
         check(store.snapshot().rightTrigger == 255)

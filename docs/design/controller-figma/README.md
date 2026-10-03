@@ -1,5 +1,15 @@
 # White controller design
 
+The owner's 2026-10-03 ABXY update uses 231.24px outer circles with 219.24px
+colored faces. All four acquisition hitboxes match the outer circle exactly
+(115.62px radius), excluding the shadow/glow; existing release hysteresis remains.
+Centers follow the updated Figma wrappers: Y (2074.62,349.62), X (1884.62,539.62),
+B (2265.62,539.62), A (2074.62,730.62). The complete wrapper PNGs retain the
+original white rim, effects and 48px lettering; no extra old rim is drawn.
+All other controls retain their geometry and assets. Native checks exercise
+each enlarged edge, outside edges, circular corners, release and multitouch
+at three aspect ratios.
+
 The right analog now uses the same `imgEllipse5` white plate/glow as the left, per the owner's bevel correction. Separate cap images and the common socket remain intact. Native render checks compare their outer bevels at matching radial positions across all three aspect ratios.
 
 Source: https://www.figma.com/design/3XXaIyhGotYr3ktNj5sjUo/Untitled?node-id=1-2
