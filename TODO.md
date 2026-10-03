@@ -503,5 +503,5 @@ Do not start these unless the product scope changes:
 
 - [x] Isolate synchronous native USB reads from attachment and Receiver startup.
 - [x] Add native-shaped blocking-stream regression coverage for attachment, USB authority, unplug Wi-Fi fallback and Wi-Fi failure Bluetooth fallback.
-- [ ] Verify Windows CI, real Receiver launch and complete installer lifecycle.
+- [x] Verify Windows CI, real Receiver launch and complete installer lifecycle (run 37113201587).
 - [ ] Confirm the complete sequence on the user's physical phone/PC.
