@@ -1,5 +1,7 @@
 # White controller design
 
+The right analog now uses the same `imgEllipse5` white plate/glow as the left, per the owner's bevel correction. Separate cap images and the common socket remain intact. Native render checks compare their outer bevels at matching radial positions across all three aspect ratios.
+
 Source: https://www.figma.com/design/3XXaIyhGotYr3ktNj5sjUo/Untitled?node-id=1-2
 
 Frame 1:2 is 2400 × 1080, background #FAFAFA. Implementation follows its high-fidelity design context. The 25 original static layers and 13 key faces are exported directly through the Figma Plugin API as PNG at scale 1, retaining effects and the node transforms. `white-assets.json` records each node, layout bounds and rendered bounds. These exports are bundled under `android/app/src/main/assets/controller/figma-white`; no network request or SVG renderer is used during gameplay.

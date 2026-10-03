@@ -79,6 +79,17 @@ class SkinVerificationInstrumentation : Instrumentation() {
         val stickX = logoViewport.x(325f)
         val stickY = logoViewport.y(540f)
         val scale = logoViewport.scale
+        // Matching outer bevels at the same radial position on both sticks.
+        for ((dx, dy) in listOf(248f to 0f, -248f to 0f, 0f to -248f, 0f to 248f)) {
+            val left = bitmap.getPixel((stickX + dx * scale).toInt(), (stickY + dy * scale).toInt())
+            val right = bitmap.getPixel((logoViewport.x(1500f) + dx * scale).toInt(),
+                (logoViewport.y(780f) + dy * scale).toInt())
+            check(kotlin.math.abs(Color.red(left) - Color.red(right)) <= 2 &&
+                kotlin.math.abs(Color.green(left) - Color.green(right)) <= 2 &&
+                kotlin.math.abs(Color.blue(left) - Color.blue(right)) <= 2) {
+                "Right analog bevel must match left at $dx,$dy: $left vs $right"
+            }
+        }
         fun pixel(dx: Float, dy: Float = 0f) = bitmap.getPixel((stickX + dx * scale).toInt(), (stickY + dy * scale).toInt())
         val idleThird = pixel(-145f)
         val idleSocket = pixel(205f)

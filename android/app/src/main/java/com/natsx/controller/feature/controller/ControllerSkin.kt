@@ -70,7 +70,8 @@ internal class ControllerSkin(private val context: Context) {
             layer(c, "imgVector2", 0f, 844f, 658f, 236f)
             c.restore()
             for (node in geometry) if (node.id.endsWith("_STICK")) {
-                centered(c, if (node.id == "LEFT_STICK") "imgEllipse5" else "imgEllipse4", node.x, node.y, 548f)
+                // Both analogs share the left plate's white bevel and soft glow.
+                centered(c, "imgEllipse5", node.x, node.y, 548f)
                 centered(c, "imgEllipse15", node.x - .5f * px, node.y - .5f * px, 481f)
             }
             drawDpadBase(c)
