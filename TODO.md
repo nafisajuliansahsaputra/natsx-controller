@@ -496,5 +496,5 @@ Do not start these unless the product scope changes:
 ## Native WinUSB initialization hotfix
 
 - [x] Open AOA data and native bulk-OUT handles with WinUSB-required FILE_FLAG_OVERLAPPED; diagnose physical Win32 error 6.
-- [ ] Verify the rebuilt Windows receiver and installer in CI.
+- [x] Verify the rebuilt Windows receiver and installer in CI.
 - [ ] Confirm WinUsb_Initialize succeeds and USB takes over on the physical phone/PC.
