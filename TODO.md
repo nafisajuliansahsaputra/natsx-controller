@@ -554,4 +554,12 @@ Do not start these unless the product scope changes:
 - [x] Add matching missing LB/RB and utility bevel/depth; retain analog travel, input mapping and committed transport contours/light.
 - [x] Verify lint/build, native screenshots at three aspect ratios, pairing and Activity touch-to-authenticated-USB output (Android CI 37126678741; UI/input 37126678689).
 - [x] Compare native rendering with the full-resolution Figma reference and prepare an in-place update APK with the preserved signing identity.
-- [ ] Confirm the updated skin on the user's physical phone and eFootball setup.
+- [x] Confirm the white skin on the user's physical phone and eFootball setup (owner reports two successful gameplay sessions, 2026-10-03).
+
+## Larger Figma ABXY controls
+
+- [x] Match the updated 231.24px ABXY wrapper sizes/positions and full original bevel exports.
+- [x] Match circular acquisition hitboxes to the visible outer circle; retain release hysteresis.
+- [x] Verify every enlarged edge, outside edge/corner, multitouch and authenticated USB output at three aspect ratios (UI 37133547872; Android lint/unit/build 37133547877).
+- [x] Compare all four native faces against the current Figma reference and preserve the installed APK signing identity.
+- [ ] Confirm the enlarged controls' comfort on the physical phone during gameplay.
