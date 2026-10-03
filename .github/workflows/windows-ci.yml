@@ -295,6 +295,7 @@ jobs:
           $receiverSettingsKey = "HKCU:\Software\NATSX\Controller Receiver"
           $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
           New-Item -Path $receiverSettingsKey -Force | Out-Null
+          New-Item -Path $runKey -Force | Out-Null
           New-ItemProperty -Path $receiverSettingsKey -Name "CloseToTray" -Value 0 -PropertyType DWord -Force | Out-Null
           New-ItemProperty -Path $runKey -Name "NATSX Controller Receiver" -Value '"C:\ci\Natsx.Controller.Receiver.exe" --background' -PropertyType String -Force | Out-Null
 
