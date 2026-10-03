@@ -68,7 +68,7 @@ jobs:
           )
 
           for token in "${required[@]}"; do
-            if ! grep -Fq "$token" "$workflow"; then
+            if ! grep -Fq -- "$token" "$workflow"; then
               echo "Release workflow is missing required production gate/token: $token" >&2
               exit 1
             fi

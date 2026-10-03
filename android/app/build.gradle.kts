@@ -1,3 +1,8 @@
+import java.security.KeyStore
+import java.security.PrivateKey
+import java.security.cert.X509Certificate
+import javax.naming.ldap.LdapName
+
 plugins {
     id("com.android.application")
 }
@@ -147,16 +152,16 @@ tasks.register("verifyReleaseSigning") {
         val password = checkNotNull(releaseStorePassword).toCharArray()
         val keyPassword = checkNotNull(releaseKeyPassword).toCharArray()
         try {
-            val store = java.security.KeyStore.getInstance(storePath, password)
+            val store = KeyStore.getInstance(storePath, password)
             val alias = checkNotNull(releaseKeyAlias)
             check(store.isKeyEntry(alias)) { "Android release alias must contain a private key." }
-            check(store.getKey(alias, keyPassword) is java.security.PrivateKey) {
+            check(store.getKey(alias, keyPassword) is PrivateKey) {
                 "Android release signing key is unavailable."
             }
-            val certificate = store.getCertificate(alias) as? java.security.cert.X509Certificate
+            val certificate = store.getCertificate(alias) as? X509Certificate
                 ?: error("Android release signing certificate is unavailable.")
             certificate.checkValidity()
-            val debugSubject = javax.naming.ldap.LdapName(certificate.subjectX500Principal.name)
+            val debugSubject = LdapName(certificate.subjectX500Principal.name)
                 .rdns.any { it.type.equals("CN", ignoreCase = true) &&
                     it.value.toString().equals("Android Debug", ignoreCase = true) }
             check(!alias.equals("androiddebugkey", ignoreCase = true) && !debugSubject) {
