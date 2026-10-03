@@ -163,9 +163,8 @@ internal sealed class GamepadHostServer
         backend.RumbleReceived +=
             ForwardRumble;
 
-        await WriteEmptyFrameAsync(
+        await WriteReadyFrameAsync(
                 pipe,
-                GamepadHostMessageType.Ready,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -439,19 +438,20 @@ internal sealed class GamepadHostServer
             payloadLength);
     }
 
-    private static async Task WriteEmptyFrameAsync(
+    private static async Task WriteReadyFrameAsync(
         Stream pipe,
-        GamepadHostMessageType messageType,
         CancellationToken cancellationToken)
     {
         byte[] frame =
             new byte[
-                GamepadHostProtocol.HeaderSize];
+                GamepadHostProtocol.HeaderSize + 1];
 
         GamepadHostProtocol.EncodeHeader(
             frame,
-            messageType,
-            0);
+            GamepadHostMessageType.Ready,
+            1);
+
+        frame[GamepadHostProtocol.HeaderSize] = GamepadHostProtocol.InputMappingRevision;
 
         await pipe
             .WriteAsync(

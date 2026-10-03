@@ -259,6 +259,12 @@ network-facing Receiver remains unelevated. Privilege is isolated to the
 minimal GamepadHost service, whose protocol accepts only HELLO, full
 `GamepadState`, READY, rumble, and error frames.
 
+READY carries one byte identifying input mapping revision 2. The Receiver
+rejects empty legacy READY frames and incompatible revisions, so an old
+installed GamepadHost cannot silently supply outdated stick-Y mapping.
+Receiver Setup must update both components together; this local attestation
+does not change the Android/wire controller protocol.
+
 The Receiver refreshes the latest authoritative state every 100 ms while
 connected. If the service sees no fresh state for 500 ms, it neutralizes the
 controller and closes the client session. Named-pipe connection attempts retry

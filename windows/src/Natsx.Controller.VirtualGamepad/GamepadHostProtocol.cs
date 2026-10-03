@@ -18,12 +18,25 @@ public static class GamepadHostProtocol
         "NATSX.Controller.GamepadHost.v1";
 
     public const byte Version = 1;
+    // READY must attest the Y-axis mapping implemented by the installed host.
+    // Old hosts emitted an empty READY and could silently run old input code.
+    public const byte InputMappingRevision = 2;
     public const int HeaderSize = 8;
     public const int GamepadStatePayloadSize = 13;
     public const int RumblePayloadSize = 2;
     public const int MaximumPayloadSize = 256;
 
     private const uint Magic = 0x3158544E;
+
+    public static void ValidateReady(ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length != 1 || payload[0] != InputMappingRevision)
+        {
+            throw new InvalidOperationException(
+                "NATSX GamepadHost input mapping is outdated or incompatible. " +
+                "Run the latest NATSX Receiver Setup to update both Receiver and GamepadHost.");
+        }
+    }
 
     public static void EncodeHeader(
         Span<byte> destination,

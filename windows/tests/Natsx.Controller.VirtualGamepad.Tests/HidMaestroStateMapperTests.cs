@@ -6,6 +6,38 @@ namespace Natsx.Controller.VirtualGamepad.Tests;
 
 public sealed class HidMaestroStateMapperTests
 {
+    [Theory]
+    [InlineData(short.MaxValue, 0, 32767)]
+    [InlineData(short.MinValue, 65535, -32768)]
+    public void BothVerticalAxesEncodeToCorrectHidAndXInputDirections(short logicalY, int hidY, int xinputY)
+    {
+        // Actual pinned SDK report encoder, Xbox 360 wired descriptor from
+        // HIDMaestro v1.9.2 profiles/microsoft/xbox-360-wired.json.
+        // Driver companion.c ReadGamepadState uses 32767 - rawY for XInput.
+        byte[] descriptor = Convert.FromHexString(
+            "05010905a101a10009300931150026ffff350046ffff950275108102c0" +
+            "a10009330934150026ffff350046ffff950275108102c0" +
+            "a1000932150026ffff350046ffff950175108102c0" +
+            "a10009400941150026ffff350046ffff950275108102c0" +
+            "05091901290a950a7501810205010939150125083500463b10660e00750495018142750295018103750895028103c0");
+        var builderType = typeof(HMGamepadState).Assembly.GetType("HIDMaestro.Internal.HidReportBuilder")!;
+        var builder = builderType.GetMethod("Parse")!.Invoke(null, new object?[] { descriptor, null, (byte)0 })!;
+        var axes = new Dictionary<HMAxis, float>
+        {
+            [HMAxis.X] = 0.5f, [HMAxis.Rx] = 0.5f,
+            [HMAxis.Y] = HidMaestroStateMapper.NormalizeVerticalStick(logicalY),
+            [HMAxis.Ry] = HidMaestroStateMapper.NormalizeVerticalStick(logicalY),
+        };
+        byte[] report = (byte[])builderType.GetMethod("BuildReport")!
+            .Invoke(builder, new object?[] { axes, 0, (uint)0, null, null, null })!;
+        foreach (int offset in new[] { 2, 6 })
+        {
+            int rawY = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(report.AsSpan(offset));
+            Assert.Equal(hidY, rawY);
+            Assert.Equal(xinputY, 32767 - rawY);
+        }
+    }
+
     [Fact]
     public void NormalizeStick_MapsXboxEndpointsAndCenter()
     {

@@ -22,6 +22,12 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        string version = typeof(MainWindow).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .Single().InformationalVersion.Split('+')[0];
+        Title = $"NATSX Controller Receiver {version}";
+
         _trayIcon =
             new ReceiverTrayIcon();
 

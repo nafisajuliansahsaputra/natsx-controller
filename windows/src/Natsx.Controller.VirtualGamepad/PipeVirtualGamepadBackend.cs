@@ -440,12 +440,13 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
         }
 
         if (messageType !=
-                GamepadHostMessageType.Ready ||
-            payloadLength != 0)
+                GamepadHostMessageType.Ready)
         {
             throw new FormatException(
                 "The privileged virtual-gamepad host returned an invalid READY frame.");
         }
+
+        GamepadHostProtocol.ValidateReady(payload.AsSpan(0, payloadLength));
     }
 
     private async Task StateRefreshLoopAsync(

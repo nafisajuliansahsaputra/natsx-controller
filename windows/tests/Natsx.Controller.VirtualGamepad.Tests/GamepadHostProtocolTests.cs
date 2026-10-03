@@ -5,6 +5,22 @@ namespace Natsx.Controller.VirtualGamepad.Tests;
 
 public sealed class GamepadHostProtocolTests
 {
+    [Theory]
+    [InlineData(new byte[0])]
+    [InlineData(new byte[] { 1 })]
+    [InlineData(new byte[] { 2, 0 })]
+    [InlineData(new byte[] { 3 })]
+    public void ReadyRejectsLegacyOrIncompatibleHost(byte[] payload)
+    {
+        Assert.Throws<InvalidOperationException>(() => GamepadHostProtocol.ValidateReady(payload));
+    }
+
+    [Fact]
+    public void ReadyAcceptsCurrentInputMapping()
+    {
+        GamepadHostProtocol.ValidateReady(new byte[] { GamepadHostProtocol.InputMappingRevision });
+    }
+
     [Fact]
     public void GamepadState_RoundTrips()
     {
