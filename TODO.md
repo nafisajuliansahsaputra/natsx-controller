@@ -477,5 +477,5 @@ Do not start these unless the product scope changes:
 
 ## Receiver click-to-install update
 
-- [ ] Build and verify a standalone Windows update EXE with receiver selection, assembly validation, backup/rollback and unelevated receiver relaunch.
+- [x] Build and verify a standalone Windows update EXE with receiver selection, assembly validation, backup/rollback and unelevated receiver relaunch (Windows CI includes compiled-EXE installation smoke test).
 - [ ] Verify the graphical update on the user's Windows installation.
