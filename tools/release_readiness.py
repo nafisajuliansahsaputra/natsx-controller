@@ -14,12 +14,13 @@ def assess(root, env):
 
     version = (root / "VERSION").read_text().strip()
     code = (root / "VERSION_CODE").read_text().strip()
-    add("stable_version", bool(re.fullmatch(r"\d+\.\d+\.\d+", version)), "Stable VERSION x.y.z after release acceptance")
+    stable = bool(re.fullmatch(r"\d+\.\d+\.\d+", version))
+    add("stable_version", stable, "Stable VERSION x.y.z after release acceptance")
     add("android_version_code", bool(re.fullmatch(r"[1-9]\d*", code)), "Positive monotonic VERSION_CODE")
     license_file = root / "LICENSE"
     add("product_license", license_file.is_file() and bool(license_file.read_text().strip()), "Product owner selects and records LICENSE")
     changelog = (root / "CHANGELOG.md").read_text()
-    add("final_changelog", bool(re.search(r"^## " + re.escape(version) + r"\s*$", changelog, re.MULTILINE)), "Exact final CHANGELOG section matching VERSION")
+    add("final_changelog", stable and bool(re.search(r"^## " + re.escape(version) + r"\s*$", changelog, re.MULTILINE)), "Exact final CHANGELOG section matching VERSION")
     add("installer_license", env.get("NATSX_INNO_LICENSE_CONFIRMED", "").lower() == "true", "Owner confirms permitted Inno Setup use")
     sha = env.get("RELEASE_SHA", "")
     add("physical_acceptance", bool(re.fullmatch(r"[0-9a-f]{40}", sha)) and env.get("NATSX_PHYSICAL_RELEASE_APPROVED_SHA") == sha,

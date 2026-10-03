@@ -81,3 +81,11 @@ preflight runs the same inventory with `--require-ready` before any signing work
 Android `preReleaseBuild` always depends on `verifyReleaseSigning`. Missing
 credentials, invalid/expired certificates and Android Debug keys/subjects are
 rejected, even for a direct local `assembleRelease` invocation.
+
+## USB hardware scope
+
+Physical USB Direct validation covers OPPO A58 / CPH2577 with the exact
+22D9:2764 revision 0404 bootstrap identity and expected Google AOA identities.
+The current bootstrap extension is intentionally hardware-specific. A final
+release must list that scope and must not promise USB support on arbitrary
+Android phones without validating an additional safe bootstrap binding.
