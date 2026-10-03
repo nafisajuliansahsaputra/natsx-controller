@@ -98,7 +98,8 @@ class SkinVerificationInstrumentation : Instrumentation() {
         // Missing bevels follow the dark translucent backplates in the supplied SVG.
         for ((x, y) in listOf(625f to 44f, 1775f to 44f, 792.65f to 247f, 1607.65f to 247f,
             864.65f to 372f, 1534.65f to 372f, 1199.65f to 372f)) {
-            val at = bitmap.getPixel(logoViewport.x(x).toInt(), logoViewport.y(y).toInt())
+            val cy = if (y < 200f) 125f else if (y < 300f) 287.5f else 412.5f
+            val at = bitmap.getPixel(logoViewport.x(x).toInt(), (logoViewport.y(cy) + (y-cy)*scale).toInt())
             check(Color.red(at) > 26 && Color.red(at) < 90 &&
                 kotlin.math.abs(Color.red(at) - Color.green(at)) <= 3) { "Matching bevel missing at $x,$y" }
         }

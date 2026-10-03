@@ -37,7 +37,8 @@ internal class ControllerSkin(private val context: Context) {
     private val px get() = unit / 1080f
     private var insetX = 0f
     private var insetY = 0f
-    private var viewportScale = 1f
+    private var viewportScaleX = 1f
+    private var viewportScaleY = 1f
     private val connectionStrokes = ConnectionStrokePaths.create()
 
     private fun asset(name: String): Bitmap = assets.getOrPut(name) {
@@ -57,11 +58,11 @@ internal class ControllerSkin(private val context: Context) {
         buttons.clear(); nodes.clear(); dpadArms.clear()
         nodes.putAll(geometry.associateBy { it.id })
         unit = min(usableW / 2400f, usableH / 1080f) * 1080f
-        this.insetX = insetX; this.insetY = insetY; viewportScale = px
+        this.insetX = insetX; this.insetY = insetY; viewportScaleX = usableW / 2400f; viewportScaleY = usableH / 1080f
         rasterScale = min(1f, min(1080f / h, 2400f / w))
         background = raster(RectF(0f, 0f, w, h)) { c ->
             c.drawColor(Color.rgb(26, 26, 26))
-            layer(c, "background", insetX, insetY)
+            c.drawBitmap(asset("background"), null, RectF(insetX, insetY, insetX + usableW, insetY + usableH), bitmapPaint)
             for (node in geometry) if (node.id.endsWith("_STICK")) positionedLayer(c, "stick-base", node.x, node.y)
             drawDpadBase(c)
         }
@@ -86,7 +87,7 @@ internal class ControllerSkin(private val context: Context) {
     fun drawBackground(c: Canvas) { background?.let { drawSprite(c, it) } }
     fun drawConnectionStroke(c: Canvas, transport: ControllerTransportIndicator?) {
         strokePaint.color = transport.indicatorColor()
-        c.save(); c.translate(insetX, insetY); c.scale(viewportScale, viewportScale)
+        c.save(); c.translate(insetX, insetY); c.scale(viewportScaleX, viewportScaleY)
         for (path in connectionStrokes) c.drawPath(path, strokePaint)
         c.restore()
     }
