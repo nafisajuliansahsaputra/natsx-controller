@@ -23,7 +23,6 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 DisableWelcomePage=no
-WizardResizable=no
 
 [Files]
 Source: "{#PatchDir}\Natsx.Controller.Receiver.dll"; Flags: dontcopy
@@ -31,11 +30,16 @@ Source: "{#PatchDir}\Natsx.Controller.Connection.dll"; Flags: dontcopy
 Source: "{#PatchDir}\Apply-Receiver-Hotfix.ps1"; Flags: dontcopy
 
 [Run]
-Filename: "{app}\Natsx.Controller.Receiver.exe"; WorkingDir: "{app}"; Description: "Buka NATSX Receiver"; Flags: nowait postinstall skipifsilent runasoriginaluser
+Filename: "{code:ReceiverDir}\Natsx.Controller.Receiver.exe"; WorkingDir: "{code:ReceiverDir}"; Description: "Buka NATSX Receiver"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [Code]
 var
   PayloadReady: Boolean;
+
+function ReceiverDir(Param: String): String;
+begin
+  Result := WizardDirValue;
+end;
 
 procedure InitializeWizard;
 begin
@@ -84,7 +88,7 @@ begin
   DeleteFile(ErrorFile);
   Params := '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
     ExpandConstant('{tmp}\Apply-Receiver-Hotfix.ps1') + '" -NonInteractive -NoLaunch -ReceiverPath "' +
-    ExpandConstant('{app}\Natsx.Controller.Receiver.exe') + '" -ErrorFile "' + ErrorFile + '"';
+    AddBackslash(WizardDirValue) + 'Natsx.Controller.Receiver.exe' + '" -ErrorFile "' + ErrorFile + '"';
   if ValidateOnly then Params := Params + ' -ValidateOnly';
   if not Exec(ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe'),
       Params, ExpandConstant('{tmp}'), SW_HIDE, ewWaitUntilTerminated, Code) then
