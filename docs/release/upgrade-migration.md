@@ -28,3 +28,13 @@ A full privacy/reset purge is explicit and separate. On Windows run windows/inst
 Rollback is allowed only when the older application understands the currently stored trust/profile schema and the selected protocol major version.
 
 Do not roll back across an incompatible protocol-major or storage-schema boundary without a documented migration path.
+
+## Development APK to production identity
+
+The currently validated phone APK uses the Android Debug identity. It cannot
+become the production signing identity merely by naming the build `release`.
+A new production certificate does not provide an in-place update of an existing
+APK with a different certificate. Treat the initial development-to-production
+transition as a separate migration requiring re-pairing; do not promise trust
+preservation across that identity change. Subsequent production updates must
+retain the production signing identity and increment VERSION_CODE.

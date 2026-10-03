@@ -510,3 +510,12 @@ Do not start these unless the product scope changes:
 
 - [x] Restore USB purple and Bluetooth soft-white lamp colors; Wi-Fi remains green.
 - [x] Verify Android lint, unit tests and APK build (CI run 37114855960).
+
+## Production signing and input audit
+
+- [x] Add complete release variable/secret-presence inventory without logging secrets.
+- [x] Enforce signing on direct Android release builds and reject Android Debug identities.
+- [x] Add regression coverage for unsigned builds, debug subjects, changelog-prefix mismatch and exact-commit approval.
+- [ ] Verify production input audit, Release Policy CI and Android signing guard CI.
+- [ ] Obtain owner-selected LICENSE, Inno usage confirmation, production Android identity and Windows Authenticode credentials.
+- [ ] Obtain returned Microsoft retail-signed driver packages and physical clean-machine acceptance.

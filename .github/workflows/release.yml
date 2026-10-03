@@ -17,6 +17,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate complete production release inputs
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          NATSX_INNO_LICENSE_CONFIRMED: ${{ vars.NATSX_INNO_LICENSE_CONFIRMED }}
+          NATSX_PHYSICAL_RELEASE_APPROVED_SHA: ${{ vars.NATSX_PHYSICAL_RELEASE_APPROVED_SHA }}
+          NATSX_PRODUCTION_DRIVER_BUNDLE_URL: ${{ vars.NATSX_PRODUCTION_DRIVER_BUNDLE_URL }}
+          NATSX_PRODUCTION_DRIVER_BUNDLE_SHA256: ${{ vars.NATSX_PRODUCTION_DRIVER_BUNDLE_SHA256 }}
+          WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+          HAS_ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+          HAS_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
+          HAS_ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS != '' }}
+          HAS_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD != '' }}
+          HAS_WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 != '' }}
+          HAS_WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD != '' }}
+        run: python3 tools/release_readiness.py --output artifacts/release-input-audit.json --require-ready
+      - name: Upload release input audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-production-release-input-audit
+          path: artifacts/release-input-audit.*
+          if-no-files-found: error
+
       - name: Verify release metadata
         shell: bash
         env:
@@ -47,7 +70,7 @@ jobs:
             exit 1
           fi
 
-          if ! grep -Fq "## $version" CHANGELOG.md; then
+          if ! grep -Eq "^## ${version//./\\.}[[:space:]]*$" CHANGELOG.md; then
             echo "CHANGELOG.md must contain a final ## $version release section." >&2
             exit 1
           fi

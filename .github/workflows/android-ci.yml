@@ -44,6 +44,27 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
+      - name: Verify production Android signing guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/natsx-missing-release-signing.txt"
+          if gradle -p android :app:assembleRelease --stacktrace > "$log" 2>&1; then
+            echo "Unsigned production build unexpectedly succeeded" >&2
+            exit 1
+          fi
+          grep -Fq "Android release signing is not configured" "$log"
+          store="$RUNNER_TEMP/natsx-signing-guard-test.keystore"
+          keytool -genkeypair -noprompt -keystore "$store" -storepass fixturepass -keypass fixturepass -alias debug-subject -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 365
+          if NATSX_RELEASE_STORE_FILE="$store" NATSX_RELEASE_STORE_PASSWORD=fixturepass NATSX_RELEASE_KEY_ALIAS=debug-subject NATSX_RELEASE_KEY_PASSWORD=fixturepass gradle -p android :app:verifyReleaseSigning > "$log" 2>&1; then
+            echo "Android Debug subject was accepted for production" >&2
+            exit 1
+          fi
+          grep -Fq "Android Debug signing identities cannot be used" "$log"
+          keytool -genkeypair -noprompt -keystore "$store" -storepass fixturepass -keypass fixturepass -alias release-fixture -dname "CN=NATSX Nonshipping CI Fixture" -keyalg RSA -keysize 2048 -validity 365
+          NATSX_RELEASE_STORE_FILE="$store" NATSX_RELEASE_STORE_PASSWORD=fixturepass NATSX_RELEASE_KEY_ALIAS=release-fixture NATSX_RELEASE_KEY_PASSWORD=fixturepass gradle -p android :app:verifyReleaseSigning
+          rm -f "$store" "$log"
+
       - name: Android lint
         run: gradle -p android :app:lintDebug --stacktrace
 

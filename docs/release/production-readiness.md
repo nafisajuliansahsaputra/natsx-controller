@@ -67,3 +67,17 @@ controller scope.
 Final physical acceptance is bound to the tested source revision. After clean-machine install, soak, sleep/resume, resource, battery, upgrade, and uninstall validation pass, set `NATSX_PHYSICAL_RELEASE_APPROVED_SHA` to that exact full commit SHA.
 
 A later source change intentionally invalidates the release approval until the variable is moved to the newly validated commit.
+
+## Complete release input audit
+
+The Production release input audit workflow reports every missing input in one
+run using repository variables and secret-presence booleans. It never exposes
+secret values and never changes approval, signing identities, or licenses. Its
+green CI status means the audit executed, not that production is approved.
+`inputs_ready` in the JSON is a configuration inventory only; the release jobs
+still verify actual APK, Authenticode and driver catalog signatures. The Release
+preflight runs the same inventory with `--require-ready` before any signing work.
+
+Android `preReleaseBuild` always depends on `verifyReleaseSigning`. Missing
+credentials, invalid/expired certificates and Android Debug keys/subjects are
+rejected, even for a direct local `assembleRelease` invocation.

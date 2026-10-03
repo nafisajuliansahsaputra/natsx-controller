@@ -143,5 +143,33 @@ tasks.register("verifyReleaseSigning") {
             "Android release keystore does not exist: " +
                 storePath.absolutePath
         }
+
+        val password = checkNotNull(releaseStorePassword).toCharArray()
+        val keyPassword = checkNotNull(releaseKeyPassword).toCharArray()
+        try {
+            val store = java.security.KeyStore.getInstance(storePath, password)
+            val alias = checkNotNull(releaseKeyAlias)
+            check(store.isKeyEntry(alias)) { "Android release alias must contain a private key." }
+            check(store.getKey(alias, keyPassword) is java.security.PrivateKey) {
+                "Android release signing key is unavailable."
+            }
+            val certificate = store.getCertificate(alias) as? java.security.cert.X509Certificate
+                ?: error("Android release signing certificate is unavailable.")
+            certificate.checkValidity()
+            val debugSubject = javax.naming.ldap.LdapName(certificate.subjectX500Principal.name)
+                .rdns.any { it.type.equals("CN", ignoreCase = true) &&
+                    it.value.toString().equals("Android Debug", ignoreCase = true) }
+            check(!alias.equals("androiddebugkey", ignoreCase = true) && !debugSubject) {
+                "Android Debug signing identities cannot be used for production release."
+            }
+        } finally {
+            password.fill('\u0000')
+            keyPassword.fill('\u0000')
+        }
     }
+}
+
+// Production assembly must never silently fall back to an unsigned/debug APK.
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn("verifyReleaseSigning")
 }
