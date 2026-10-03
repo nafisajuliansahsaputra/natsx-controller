@@ -1017,3 +1017,15 @@ before WinUsb_Initialize. Omitting that flag causes ERROR_INVALID_HANDLE (6).
 Both the shared IN/OUT owner and the native bulk-OUT adapter use this flag.
 ReadPipe/WritePipe may still wait synchronously by passing a null OVERLAPPED
 pointer and a non-null transferred-length output, as required by WinUSB.
+
+### USB native reader startup ownership
+
+The native WinUSB stream performs synchronous pipe reads through its ReadAsync
+facade. UsbRealtimeStreamReceiver starts one dedicated receive worker per attached
+stream; it must return before waiting for any input so UsbControllerTransport can
+start its latest-state pump. A blocked native read must never hold attachment or
+keep USB in Stabilizing while valid frames accumulate. USB discovery/session
+monitoring also starts off the Receiver startup caller. Stop cancels the worker
+and disposes the stream; the connection owner aborts native pipes on teardown.
+No task is created per packet. Smart Auto still requires fresh authenticated
+state and the configured recovery stability before USB takes authority.

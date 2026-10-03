@@ -282,10 +282,16 @@ public sealed class UsbRealtimeStreamReceiver : IAsyncDisposable
         _inputStream = inputStream;
         _outputStream = outputStream;
         _runCancellation = runCancellation;
+        // Native WinUSB's Stream adapter performs synchronous pipe reads even
+        // through ReadAsync. Keep its whole receive loop on one worker so
+        // attachment can return and start the state pump/Smart Auto selection.
+        // Do not schedule a new task for each realtime packet.
         _receiveLoop =
-            ReceiveLoopAsync(
-                inputStream,
-                runCancellation.Token);
+            Task.Factory.StartNew(
+                () => ReceiveLoopAsync(inputStream, runCancellation.Token),
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default).Unwrap();
 
         if (outputStream is not null)
         {

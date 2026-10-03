@@ -16,8 +16,10 @@ public sealed class UsbSmartAutoIntegrationTests
             Convert.FromHexString(
                 "00112233445566778899AABBCCDDEEFF"));
 
-    [Fact]
-    public async Task StableUsbTakesPreferenceThenDisconnectFallsBackToWarmWifi()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UsbAttachReturnsThenSmartAutoSelectsUsbWifiAndBluetooth(bool synchronousRead)
     {
         var clock = new ManualTimeProvider();
 
@@ -61,10 +63,12 @@ public sealed class UsbSmartAutoIntegrationTests
                 policy,
                 clock);
 
-        var wifi =
-            new ScriptedWifiTransport(
-                clock,
-                HealthyWifi());
+        var wifi = new ScriptedTransport(clock, HealthyWifi());
+        var bluetooth = new ScriptedTransport(clock, HealthyWifi() with
+        {
+            Transport = TransportKind.Bluetooth,
+            Score = 80,
+        });
 
         using var usbSession =
             new UsbTrustedSession(
@@ -85,6 +89,7 @@ public sealed class UsbSmartAutoIntegrationTests
                 new IControllerTransport[]
                 {
                     wifi,
+                    bluetooth,
                     usb,
                 },
                 policy,
@@ -118,10 +123,21 @@ public sealed class UsbSmartAutoIntegrationTests
 
         await using var usbInput =
             new ControllableTailStream(
-                usbFrame);
+                usbFrame, synchronousRead);
 
-        await usb.AttachAuthenticatedStreamAsync(
-            usbInput);
+        // The native adapter blocks synchronously in ReadAsync while waiting
+        // for the next packet. The old implementation never returned from
+        // attachment and therefore never started the state pump.
+        try
+        {
+            await Task.Run(async () => await usb.AttachAuthenticatedStreamAsync(usbInput))
+                .WaitAsync(TimeSpan.FromSeconds(2));
+        }
+        catch
+        {
+            usbInput.Fail();
+            throw;
+        }
 
         await WaitUntilAsync(
             TimeSpan.FromSeconds(2),
@@ -183,6 +199,18 @@ public sealed class UsbSmartAutoIntegrationTests
         Assert.Equal(
             (uint)12,
             session.LastAcceptedSequence);
+
+        GamepadState bluetoothState = GamepadState.Neutral with
+        {
+            Buttons = GamepadButtons.Y,
+        };
+        bluetooth.Publish(13, bluetoothState);
+        wifi.Fail();
+        runtime.EvaluateOnce();
+        Assert.Equal(TransportKind.Bluetooth, runtime.ActiveTransport);
+        Assert.Equal(TransportKind.Bluetooth, session.AuthoritativeTransport);
+        Assert.Equal(bluetoothState, backend.LastState);
+        Assert.Equal(13u, session.LastAcceptedSequence);
     }
 
     private static byte[] BuildUsbStateFrame(
@@ -232,12 +260,12 @@ public sealed class UsbSmartAutoIntegrationTests
             "Condition was not met before timeout.");
     }
 
-    private sealed class ScriptedWifiTransport :
+    private sealed class ScriptedTransport :
         IControllerTransport
     {
         private readonly TimeProvider _clock;
 
-        public ScriptedWifiTransport(
+        public ScriptedTransport(
             TimeProvider clock,
             TransportHealthSnapshot snapshot)
         {
@@ -251,8 +279,7 @@ public sealed class UsbSmartAutoIntegrationTests
         public event EventHandler<TransportRuntimeStateChangedEventArgs>?
             StateChanged;
 
-        public TransportKind Kind =>
-            TransportKind.Wifi;
+        public TransportKind Kind => Snapshot.Transport;
 
         public TransportRuntimeState State =>
             Snapshot.State;
@@ -300,7 +327,7 @@ public sealed class UsbSmartAutoIntegrationTests
             StateChanged?.Invoke(
                 this,
                 new TransportRuntimeStateChangedEventArgs(
-                    TransportKind.Wifi,
+                    Kind,
                     next));
         }
 
@@ -314,10 +341,20 @@ public sealed class UsbSmartAutoIntegrationTests
             GamepadStateReceived?.Invoke(
                 this,
                 new TransportGamepadStateEventArgs(
-                    TransportKind.Wifi,
+                    Kind,
                     sequence,
                     state,
                     _clock.GetTimestamp()));
+        }
+
+        public void Fail()
+        {
+            Snapshot = Snapshot with
+            {
+                State = TransportRuntimeState.Failed,
+                Grade = TransportHealthGrade.Critical,
+            };
+            StateChanged?.Invoke(this, new TransportRuntimeStateChangedEventArgs(Kind, State));
         }
 
         public ValueTask DisposeAsync() =>
@@ -386,10 +423,12 @@ public sealed class UsbSmartAutoIntegrationTests
         private readonly TaskCompletionSource<bool> _fail =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _position;
+        private readonly bool _synchronousRead;
 
         public ControllableTailStream(
-            byte[] data)
+            byte[] data, bool synchronousRead)
         {
+            _synchronousRead = synchronousRead;
             _data = data.ToArray();
         }
 
@@ -427,6 +466,12 @@ public sealed class UsbSmartAutoIntegrationTests
                 return ValueTask.FromResult(count);
             }
 
+            if (_synchronousRead)
+            {
+                return ValueTask.FromResult(WaitForFailureAsync(cancellationToken)
+                    .GetAwaiter().GetResult());
+            }
+
             return new ValueTask<int>(
                 WaitForFailureAsync(
                     cancellationToken));
@@ -439,6 +484,12 @@ public sealed class UsbSmartAutoIntegrationTests
                 cancellationToken);
 
             return 0;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) Fail();
+            base.Dispose(disposing);
         }
 
         public override int Read(

@@ -288,10 +288,10 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 .ConfigureAwait(false);
 
             _usbMonitorTask =
-                UsbMonitorLoopAsync(
+                Task.Run(() => UsbMonitorLoopAsync(
                     trust,
                     sessionRegistry,
-                    lifetime.Token);
+                    lifetime.Token));
 
             Report(
                 "Receiver ready. Smart Auto is waiting for trusted controller input.");

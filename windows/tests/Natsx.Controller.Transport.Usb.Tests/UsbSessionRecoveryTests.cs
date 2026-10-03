@@ -46,8 +46,17 @@ public sealed class UsbSessionRecoveryTests
         byte[] bytes = Concat(Announcement(session, peer), State(session, 7),
             Announcement(wrong, peer), Announcement(session, peer), State(session, 7), State(session, 8));
         using var input = new MemoryStream(bytes);
-        await using var receiver = new UsbRealtimeStreamReceiver(session, new TransportLifecycle());
+        var lifecycle = new TransportLifecycle();
+        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        lifecycle.StateChanged += state =>
+        {
+            if (state == TransportRuntimeState.Failed) finished.TrySetResult();
+        };
+        await using var receiver = new UsbRealtimeStreamReceiver(session, lifecycle);
         await receiver.StartAsync(input);
+        // MemoryStream reaches EOF after all frames; startup no longer runs
+        // the reader inline, so wait for completion before inspecting counts.
+        await finished.Task.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.Equal(2, receiver.AcceptedControlFrames);
         Assert.Equal(2, receiver.AcceptedFrames);
         Assert.Equal(2, receiver.RejectedFrames);

@@ -498,3 +498,10 @@ Do not start these unless the product scope changes:
 - [x] Open AOA data and native bulk-OUT handles with WinUSB-required FILE_FLAG_OVERLAPPED; diagnose physical Win32 error 6.
 - [x] Verify the rebuilt Windows receiver and installer in CI.
 - [ ] Confirm WinUsb_Initialize succeeds and USB takes over on the physical phone/PC.
+
+## USB native reader startup recovery
+
+- [x] Isolate synchronous native USB reads from attachment and Receiver startup.
+- [x] Add native-shaped blocking-stream regression coverage for attachment, USB authority, unplug Wi-Fi fallback and Wi-Fi failure Bluetooth fallback.
+- [ ] Verify Windows CI, real Receiver launch and complete installer lifecycle.
+- [ ] Confirm the complete sequence on the user's physical phone/PC.
