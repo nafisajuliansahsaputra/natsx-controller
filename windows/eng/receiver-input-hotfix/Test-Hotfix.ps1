@@ -1,3 +1,4 @@
+param([string]$UpdateExe)
 $ErrorActionPreference = 'Stop'
 $payload = (Resolve-Path 'artifacts/receiver-input-hotfix').Path
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('natsx-hotfix-test-' + [Guid]::NewGuid().ToString('N'))
@@ -42,6 +43,26 @@ try {
         foreach ($backup in $backups) {
             if ((Get-FileHash (Join-Path $backup.FullName $name)).Hash -ne $oldHashes[$name]) { throw 'Original backup corrupted.' }
         }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($UpdateExe)) {
+        foreach ($name in $names) {
+            $stream = [IO.File]::Open((Join-Path $testRoot $name), [IO.FileMode]::Append)
+            try { $stream.WriteByte(43) } finally { $stream.Dispose() }
+        }
+        $installer = Start-Process -FilePath (Resolve-Path $UpdateExe).Path -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-',
+            ('/DIR="' + $testRoot + '"'), ('/LOG="' + (Join-Path $testRoot 'setup.log') + '"')
+        ) -Wait -PassThru
+        if ($installer.ExitCode -ne 0) {
+            Get-Content (Join-Path $testRoot 'setup.log') -ErrorAction SilentlyContinue
+            throw "Update EXE failed: $($installer.ExitCode)."
+        }
+        foreach ($name in $names) {
+            if ((Get-FileHash (Join-Path $testRoot $name)).Hash -ne (Get-FileHash (Join-Path $payload $name)).Hash) { throw "EXE failed to update $name." }
+        }
+        if (@(Get-ChildItem $testRoot -Directory).Count -ne 3) { throw 'EXE did not create backup.' }
+        if (Test-Path (Join-Path $testRoot 'unins000.exe')) { throw 'Update must not replace the existing uninstaller.' }
+        Write-Host 'PASS: compiled EXE applies the embedded update and creates a backup.'
     }
     Write-Host 'PASS: validation, missing DLL, identity mismatch, write failure rollback, backup and apply.'
 } finally { Remove-Item $testRoot -Recurse -Force }
