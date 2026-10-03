@@ -143,17 +143,16 @@ keeps circles round and the control groups coherent on other aspect ratios.
 Saved custom positions remain normalized to the window. Android hides both
 system bars and draws through display cutouts; insets do not shrink the canvas.
 
-Gameplay uses the owner-supplied neutral scale: #292929 (800) background,
-#434343 (700) bevel body, #575757 (600) upper-left highlight and #1A1A1A (900)
-soft shadow. One continuous silhouette defines each rim; short 6px blurred
-shadows replace the heavy black halo and duplicate face-edge shadow. White button lettering and glyphs remain white;
-colored green/lavender faces remain intact. Neutral surfaces in exported PNGs
-are retinted once during asset loading, preserving alpha and colored layers.
+Gameplay now follows the white Figma frame 1:2 in file
+`3XXaIyhGotYr3ktNj5sjUo`: #FAFAFA background, original mint/lavender faces,
+white labels/icons and exact exported inset/shadow effects. Original PNG layers
+and key faces are cached in native Canvas sprites. Missing shoulder/utility
+bevels use matching white backplates and gray depth. The prior dark designs
+below are historical and superseded.
 
-Analog plates retain diameter 500 and sockets 445. The movable green cap is
-310px (previously 380); its inner circles shrink proportionally and all layers
-move together. Visual travel is clamped radially to 110 reference pixels
-(previously 60), allowing the cap edge slightly beyond the plate. Full-scale
+Analog plates retain diameter 500, sockets 445 and movable cap diameter 380,
+with the original 280/250 inner layers attached. Visual travel remains clamped
+radially to 110 reference pixels, allowing the cap edge beyond the plate. Full-scale
 input requires 180px travel on the left and 160px on the right; initial capture
 radii are 225px. Captured pointers can continue outside the plate. Calibration,
 recenter, radial clamp, protocol signs and multitouch ownership remain intact.
@@ -714,7 +713,7 @@ repository unit tests plus native surface rendering/input and real Activity
 pairing verification. Five measured contour rows pass at all three viewport
 sizes. Physical GPU timing and extended gameplay remain device checks.
 
-### Supplied Frame 1 SVG — 2026-10-03
+### Historical supplied Frame 1 SVG — superseded by white Figma design
 
 The supplied new 2400 × 1080 SVG supersedes the previous recolored skin. Preserve
 its #1A1A1A background, original shadows, white outlined glyphs, gradients and
@@ -732,3 +731,21 @@ transport, never cable presence or the preferred transport. Contours are native
 paths drawn over the cached backdrop; handovers do not rebuild bitmaps.
 The wider 110px visual travel, 180/160px input radii, 225px capture areas, radial
 clamp, calibration, pointer ownership and input release behavior are retained.
+
+### White Figma design — 2026-10-03
+
+The current screen follows file `3XXaIyhGotYr3ktNj5sjUo`, frame `1:2`, read through
+high-fidelity Figma design context. 25 static layers and 13 key faces are exported
+directly from the original nodes through the Plugin API, retaining their effects,
+text and transforms. `controller-figma/white-assets.json` records their provenance,
+geometry and render bounds. The screenshot is a verification reference only.
+Missing LB/RB and utility white bevel/depth is added behind original faces.
+Transport stroke/light authority and the complete input pipeline are unchanged.
+
+Final Android CI `37126678741` and three-aspect-ratio UI/input verification
+`37126678689` pass. Pixel comparison with the 2400×1080 Figma render measures
+mean RGB channel differences below 0.5/255 across both analogs, D-pad, LT/RT and
+all four face buttons (raster rounding/compositing). Utility/shoulder bevel additions
+and live transport indicators intentionally change those regions. The update APK
+is re-signed using the preserved existing debug identity; production signing
+and physical acceptance remain separate tasks.

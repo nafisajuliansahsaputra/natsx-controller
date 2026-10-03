@@ -546,3 +546,12 @@ Do not start these unless the product scope changes:
 - [x] Add matching missing shoulder/utility bevels; retain widened travel and input mapping.
 - [x] Connect all three thin panel contours and light bar to one authoritative transport palette.
 - [x] Verify new native snapshots, contour handovers, input mapping, lint and APK build in CI (Android 37124310240; UI/input 37124310249).
+
+## White Figma design and matching depth
+
+- [x] Replace the dark skin with the white Figma file `3XXaIyhGotYr3ktNj5sjUo`, frame `1:2`, using high-fidelity design context.
+- [x] Bundle all original static layers and key faces from direct Figma node exports; preserve text, effects and transforms.
+- [x] Add matching missing LB/RB and utility bevel/depth; retain analog travel, input mapping and committed transport contours/light.
+- [x] Verify lint/build, native screenshots at three aspect ratios, pairing and Activity touch-to-authenticated-USB output (Android CI 37126678741; UI/input 37126678689).
+- [x] Compare native rendering with the full-resolution Figma reference and prepare an in-place update APK with the preserved signing identity.
+- [ ] Confirm the updated skin on the user's physical phone and eFootball setup.
