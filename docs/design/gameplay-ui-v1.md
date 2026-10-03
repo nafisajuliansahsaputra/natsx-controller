@@ -143,14 +143,22 @@ keeps circles round and the control groups coherent on other aspect ratios.
 Saved custom positions remain normalized to the window. Android hides both
 system bars and draws through display cutouts; insets do not shrink the canvas.
 
-Analog plates have diameter 500, dark sockets 445, the movable light-green
-third circle 380, and its inner circles 280 and 250. The complete third circle
-and its two children move together. Visual travel is clamped to 60 reference
-pixels radially, reaching the white plate while the dark socket stays fixed. Processing radii, calibration
-and transmitted analog values remain independent of this visual travel.
+Gameplay uses a soft-dark #292929 background, #1A1A1A shadow surfaces and
+subtle charcoal highlights. White button lettering and glyphs remain white;
+colored green/lavender faces remain intact. Neutral surfaces in exported PNGs
+are retinted once during asset loading, preserving alpha and colored layers.
 
-All buttons have a white backplate following the same silhouette as the colored
-face. Shoulder bevels use 12px rims; utility and circular keys use 6px rims.
+Analog plates retain diameter 500 and sockets 445. The movable green cap is
+310px (previously 380); its inner circles shrink proportionally and all layers
+move together. Visual travel is clamped radially to 110 reference pixels
+(previously 60), allowing the cap edge slightly beyond the plate. Full-scale
+input requires 180px travel on the left and 160px on the right; initial capture
+radii are 225px. Captured pointers can continue outside the plate. Calibration,
+recenter, radial clamp, protocol signs and multitouch ownership remain intact.
+
+All buttons keep their silhouette-following beveled backplates with charcoal
+gradients and cached shadows. Shoulder bevels use 12px rims; utility and
+circular keys use 6px rims.
 LT/RT use the original contour for their plate instead of a separately expanded
 rounded rectangle. Native concentric gradients prevent raster seams around the
 analog circles. Shadows, bevels and pressed sprites are cached at layout time;

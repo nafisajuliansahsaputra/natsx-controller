@@ -709,8 +709,8 @@ class ControllerSurfaceView(
         rect(ControlId.GUIDE, 965f, 375f, 1434.301f, 450f)
 
         // Processing radii/travel remain independent of the 500px decorative analog plates.
-        circle(ControlId.LEFT_STICK, 325f, 540f, 142.56f, 1.40f)
-        circle(ControlId.RIGHT_STICK, 1500f, 780f, 113.4f, 1.76f)
+        circle(ControlId.LEFT_STICK, 325f, 540f, 180f, 1.25f)
+        circle(ControlId.RIGHT_STICK, 1500f, 780f, 160f, 1.40625f)
         circle(ControlId.DPAD_UP, 900f, 620f, 80f, 1.10f)
         circle(ControlId.DPAD_LEFT, 740f, 780f, 80f, 1.10f)
         circle(ControlId.DPAD_RIGHT, 1060f, 780f, 80f, 1.10f)

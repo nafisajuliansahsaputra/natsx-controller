@@ -80,32 +80,46 @@ class SkinVerificationInstrumentation : Instrumentation() {
         val stickY = logoViewport.y(540f)
         val scale = logoViewport.scale
         fun pixel(dx: Float, dy: Float = 0f) = bitmap.getPixel((stickX + dx * scale).toInt(), (stickY + dy * scale).toInt())
-        val idleThird = pixel(-180f)
+        val idleThird = pixel(-145f)
         val idleSocket = pixel(205f)
         val fixedSocket = pixel(-215f)
         store.setLeftStick(32767, 0)
         view.draw(canvas)
         check(Color.red(pixel(205f)) > Color.red(idleSocket) + 30) { "Third circle must move, not just the second" }
-        check(Color.red(idleThird) > Color.red(pixel(-180f)) + 10) { "Moving cap must expose the socket" }
+        check(Color.red(idleThird) > Color.red(pixel(-145f)) + 10) { "Moving cap must expose the socket" }
         check(pixel(-215f) == fixedSocket) { "Outer socket must stay fixed" }
         store.neutralize()
         view.draw(canvas)
-        check(pixel(-180f) == idleThird) { "Cap must return to center on release" }
+        check(pixel(-145f) == idleThird) { "Cap must return to center on release" }
         val cardinal = listOf(pixel(100f), pixel(-100f), pixel(0f, 100f), pixel(0f, -100f))
         check(cardinal.maxOf { Color.green(it) } - cardinal.minOf { Color.green(it) } <= 3) {
             "Analog circles must stay concentric and round"
         }
-        // White bevels surround both shoulders and all five utility keys.
+        // Soft dark background and visible charcoal bevels keep the cached depth.
+        check(bitmap.getPixel(5, h / 2) == Color.rgb(41, 41, 41))
+        // Dark bevels surround both shoulders and all five utility keys.
         for ((x, y) in listOf(625f to 44f, 1775f to 44f, 792.65f to 247f, 1607.65f to 247f,
             864.65f to 372f, 1534.65f to 372f, 1199.65f to 372f)) {
             val at = bitmap.getPixel(logoViewport.x(x).toInt(),
                 (logoViewport.y(if (y < 200f) 125f else if (y < 300f) 287.5f else 412.5f) +
                     (y - if (y < 200f) 125f else if (y < 300f) 287.5f else 412.5f) * scale).toInt())
-            check(Color.red(at) > 180 && Color.green(at) > 180 && Color.blue(at) > 180) { "White bevel missing at $x,$y" }
+            check(Color.red(at) in 25..100 && Color.green(at) in 25..100 && Color.blue(at) in 25..100) {
+                "Dark bevel missing at $x,$y"
+            }
         }
         val directory = File(targetContext.getExternalFilesDir(null), "skin-verification").apply { mkdirs() }
         File(directory, "controller-${w}x$h.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        // The outer portion of the third moving disc must also accept analog input.
+        // Full travel stays responsive past the plate, clamps, and releases immediately.
+        for ((cx, cy, leftStick) in listOf(Triple(325f, 540f, true), Triple(1500f, 780f, false))) {
+            val centerPoint = listOf(logoViewport.x(cx) to logoViewport.y(cy))
+            touch(view, MotionEvent.ACTION_DOWN, centerPoint)
+            val beyondPlate = listOf((logoViewport.x(cx) + 280f * scale) to logoViewport.y(cy))
+            touch(view, MotionEvent.ACTION_MOVE, beyondPlate)
+            check(if (leftStick) store.snapshot().leftX == 32767 else store.snapshot().rightX == 32767)
+            touch(view, MotionEvent.ACTION_CANCEL, beyondPlate)
+            check(store.snapshot() == GamepadState.Neutral)
+        }
+        // The outer portion of the stick capture surface also accepts analog input.
         val capEdge = listOf((stickX + 190f * scale) to stickY)
         touch(view, MotionEvent.ACTION_DOWN, capEdge)
         check(store.snapshot().leftX > 0) { "Third circle edge must accept stick input" }

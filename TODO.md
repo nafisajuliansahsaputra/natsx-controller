@@ -526,3 +526,10 @@ Do not start these unless the product scope changes:
 - [x] Add individual button, eight-way D-pad, trigger isolation, both-stick direction and native-state neutralization regression coverage.
 - [x] Verify the rebuilt installer and input regressions in Windows CI (37117781954); Android CI (37117781956) and full Activity touch-to-authenticated-state audit (37117781959) passed.
 - [ ] Confirm up/down and all gameplay controls in joy.cpl/eFootball on the physical PC.
+
+## Soft-dark gameplay and analog comfort
+
+- [x] Retain white lettering/icons and colored faces on #292929 gameplay surfaces with charcoal bevels/highlights/shadows.
+- [x] Shrink the movable cap to 310px, increase radial visual travel to 110px and widen full-scale/capture travel without moving controls.
+- [ ] Verify lint/unit tests, native rendering and complete input mapping in Android CI.
+- [ ] Confirm comfort and contrast on the physical phone.
