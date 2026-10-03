@@ -134,6 +134,14 @@ class SkinVerificationInstrumentation : Instrumentation() {
         view.updateActiveTransport(com.natsx.controller.feature.controller.ControllerTransportIndicator.USB)
         view.draw(canvas)
         val directory = File(targetContext.getExternalFilesDir(null), "skin-verification").apply { mkdirs() }
+        // Composite the production HUD and settings logo for a complete gameplay preview.
+        status.updateState(com.natsx.controller.feature.controller.ControllerHudState(
+            activeTransport = com.natsx.controller.feature.controller.ControllerTransportIndicator.USB,
+            batteryPercent = 68,
+        ))
+        status.draw(canvas)
+        canvas.drawBitmap(logo, null, android.graphics.RectF(logoLeft, logoTop,
+            logoLeft + 60f * scale, logoTop + 60f * scale), paint)
         File(directory, "controller-${w}x$h.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         // Full travel stays responsive past the plate, clamps, and releases immediately.
         for ((cx, cy, leftStick) in listOf(Triple(325f, 540f, true), Triple(1500f, 780f, false))) {

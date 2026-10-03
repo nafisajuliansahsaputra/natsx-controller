@@ -31,7 +31,7 @@ internal class ControllerSkin(private val context: Context) {
     private val buttons = mutableMapOf<String, Button>()
     private val nodes = mutableMapOf<String, Node>()
     private val dpadArms = mutableListOf<Pair<Int, Path>>()
-    private var cap: Button? = null
+    private val caps = mutableMapOf<String, Button>()
     private var unit = 1f
     private var rasterScale = 1f
     private val px get() = unit / 1080f
@@ -55,7 +55,7 @@ internal class ControllerSkin(private val context: Context) {
             centerY - b.getDouble(3).toFloat() / 2f * px)
     }
     fun rebuild(w: Float, h: Float, insetX: Float, insetY: Float, usableW: Float, usableH: Float, geometry: List<Node>) {
-        buttons.clear(); nodes.clear(); dpadArms.clear()
+        buttons.clear(); nodes.clear(); dpadArms.clear(); caps.clear()
         nodes.putAll(geometry.associateBy { it.id })
         unit = min(usableW / 2400f, usableH / 1080f) * 1080f
         this.insetX = insetX; this.insetY = insetY; viewportScaleX = usableW / 2400f; viewportScaleY = usableH / 1080f
@@ -63,7 +63,7 @@ internal class ControllerSkin(private val context: Context) {
         background = raster(RectF(0f, 0f, w, h)) { c ->
             c.drawColor(Color.rgb(26, 26, 26))
             c.drawBitmap(asset("background"), null, RectF(insetX, insetY, insetX + usableW, insetY + usableH), bitmapPaint)
-            for (node in geometry) if (node.id.endsWith("_STICK")) positionedLayer(c, "stick-base", node.x, node.y)
+            for (node in geometry) if (node.id.endsWith("_STICK")) positionedLayer(c, if (node.id == "LEFT_STICK") "stick-base-left" else "stick-base", node.x, node.y)
             drawDpadBase(c)
         }
         for (node in geometry) {
@@ -73,8 +73,11 @@ internal class ControllerSkin(private val context: Context) {
             buttons[node.id] = Button(raster(bounds) { drawKey(it, node.id, r, false) }, raster(bounds) { drawKey(it, node.id, r, true) })
         }
         val capBounds = RectF(-208f * px, -208f * px, 208f * px, 208f * px)
-        cap = Button(raster(capBounds) { positionedLayer(it, "stick-cap", 0f, 0f) },
-            raster(capBounds) { positionedLayer(it, "stick-cap", 0f, 0f); it.drawCircle(0f, 0f, 190f * px, feedbackPaint) })
+        for (id in listOf("LEFT_STICK", "RIGHT_STICK")) {
+            val name = if (id == "LEFT_STICK") "stick-cap-left" else "stick-cap"
+            caps[id] = Button(raster(capBounds) { positionedLayer(it, name, 0f, 0f) },
+                raster(capBounds) { positionedLayer(it, name, 0f, 0f); it.drawCircle(0f, 0f, 190f * px, feedbackPaint) })
+        }
     }
     private fun raster(bounds: RectF, draw: (Canvas) -> Unit): Sprite {
         val bitmap = Bitmap.createBitmap(ceil(bounds.width() * rasterScale).toInt().coerceAtLeast(1),
@@ -96,7 +99,7 @@ internal class ControllerSkin(private val context: Context) {
         drawSprite(c, if (active) button.pressed else button.idle)
     }
     fun drawStick(c: Canvas, id: String, x: Int, y: Int, active: Boolean) {
-        val node = nodes[id] ?: return; val sprite = cap ?: return
+        val node = nodes[id] ?: return; val sprite = caps[id] ?: return
         val nx = (x / if (x < 0) 32768f else 32767f).coerceIn(-1f, 1f)
         val ny = (y / if (y < 0) 32768f else 32767f).coerceIn(-1f, 1f)
         val travel = 110f * px / sqrt(nx * nx + ny * ny).coerceAtLeast(1f)
