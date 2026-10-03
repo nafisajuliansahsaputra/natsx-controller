@@ -474,3 +474,8 @@ Do not start these unless the product scope changes:
 - [x] Use the real foreground service publisher in Activity-to-USB-output verification.
 - [x] Extend the complete analog cap to the white plate (60px radial travel).
 - [ ] Confirm the updated Android/receiver pair on a physical phone and Windows game.
+
+## Receiver click-to-install update
+
+- [ ] Build and verify a standalone Windows update EXE with receiver selection, assembly validation, backup/rollback and unelevated receiver relaunch.
+- [ ] Verify the graphical update on the user's Windows installation.

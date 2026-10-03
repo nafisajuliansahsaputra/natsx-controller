@@ -1,8 +1,15 @@
 [CmdletBinding()]
-param([string]$ReceiverPath)
+param(
+    [string]$ReceiverPath,
+    [switch]$NonInteractive,
+    [switch]$NoLaunch,
+    [switch]$ValidateOnly,
+    [string]$ErrorFile
+)
 $ErrorActionPreference = "Stop"
 try {
     if ([string]::IsNullOrWhiteSpace($ReceiverPath)) {
+        if ($NonInteractive) { throw "Receiver path is required." }
         Add-Type -AssemblyName System.Windows.Forms
         $dialog = New-Object System.Windows.Forms.OpenFileDialog
         $dialog.Title = "Select the existing NATSX Receiver"
@@ -28,7 +35,8 @@ try {
             throw "Assembly version mismatch for $name. Do not apply this patch to a different receiver release."
         }
     }
-    $backup = Join-Path $exe.DirectoryName ("input-hotfix-backup-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+    if ($ValidateOnly) { exit 0 }
+    $backup = Join-Path $exe.DirectoryName ("input-hotfix-backup-" + (Get-Date -Format "yyyyMMdd-HHmmss") + "-" + [Guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Path $backup | Out-Null
     foreach ($name in $names) { Copy-Item -LiteralPath (Join-Path $exe.DirectoryName $name) -Destination $backup }
     try {
@@ -37,10 +45,13 @@ try {
         foreach ($name in $names) { Copy-Item -LiteralPath (Join-Path $backup $name) -Destination (Join-Path $exe.DirectoryName $name) -Force }
         throw
     }
-    Start-Process -FilePath $exe.FullName -WorkingDirectory $exe.DirectoryName
+    if (-not $NoLaunch) { Start-Process -FilePath $exe.FullName -WorkingDirectory $exe.DirectoryName }
     Write-Host "Receiver updated. Existing pairing, drivers and GamepadHost remain installed."
 } catch {
     Write-Host $_.Exception.Message -ForegroundColor Red
-    Read-Host "Press Enter to close"
+    if (-not [string]::IsNullOrWhiteSpace($ErrorFile)) {
+        [IO.File]::WriteAllText($ErrorFile, $_.Exception.Message)
+    }
+    if (-not $NonInteractive) { Read-Host "Press Enter to close" }
     exit 1
 }

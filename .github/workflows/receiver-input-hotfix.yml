@@ -1,7 +1,7 @@
 name: Receiver input hotfix
 on:
   push:
-    branches: ["feat/reference-controller-skin"]
+    branches: ["feat/reference-controller-skin", "fix/receiver-click-update"]
     paths: ["windows/**", ".github/workflows/receiver-input-hotfix.yml"]
 permissions:
   contents: read
@@ -30,6 +30,17 @@ jobs:
           Copy-Item "$output/Natsx.Controller.Connection.dll" artifacts/receiver-input-hotfix/
           Copy-Item windows/eng/receiver-input-hotfix/README.txt artifacts/receiver-input-hotfix/
           Copy-Item windows/eng/receiver-input-hotfix/Apply-Receiver-Hotfix.ps1 artifacts/receiver-input-hotfix/
+      - name: Verify update validation, backup and failure behavior
+        shell: pwsh
+        run: ./windows/eng/receiver-input-hotfix/Test-Hotfix.ps1
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --version 6.7.1 --no-progress -y
+      - name: Build click-to-install Windows update
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe" /DPatchDir="$((Resolve-Path artifacts/receiver-input-hotfix).Path)" /Oartifacts/receiver-input-hotfix windows/eng/receiver-input-hotfix/Receiver-Update.iss
+          if ($LASTEXITCODE -ne 0) { throw "Update application build failed." }
       - uses: actions/upload-artifact@v4
         with:
           name: NATSX-Receiver-Input-Hotfix

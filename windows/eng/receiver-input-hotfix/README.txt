@@ -1,5 +1,15 @@
 NATSX Receiver input hotfix (existing 0.1.1 installation)
 
+Easy Windows application:
+1. Double-click NATSX-Receiver-Input-Update.exe and approve the Windows prompt.
+2. Exit the running receiver through its tray menu > Exit.
+3. Select the existing receiver folder (or browse to its EXE when prompted).
+4. Click Install. Leave "Buka NATSX Receiver" selected to reopen it.
+
+The EXE contains its DLL payload and requires no manual extraction or script commands.
+It checks the existing assembly identities/versions, backs up both DLLs and restores
+them if copying fails. The receiver is launched as the original unelevated user.
+
 This patch updates the receiver and connection DLLs. It does not replace drivers
 or the privileged GamepadHost service. Keep every other installed file.
 
