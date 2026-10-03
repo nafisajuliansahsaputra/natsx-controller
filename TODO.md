@@ -539,3 +539,10 @@ Do not start these unless the product scope changes:
 - [x] Apply the supplied 600/700/800/900 neutral palette consistently to dark rims and surfaces.
 - [x] Remove duplicate face-edge shadows and soften the outer halo without dropping bevel depth or white lettering/icons.
 - [x] Verify render snapshots, Android lint/build and full input regressions (Android CI 37119920104; three-aspect-ratio UI/input verification 37119920069).
+
+## Supplied SVG design and live connection contours
+
+- [x] Use the exact supplied Frame 1 SVG layers, gradients, glyphs and analog texture.
+- [x] Add matching missing shoulder/utility bevels; retain widened travel and input mapping.
+- [x] Connect all three thin panel contours and light bar to one authoritative transport palette.
+- [ ] Verify new native snapshots, contour handovers, input mapping, lint and APK build in CI.

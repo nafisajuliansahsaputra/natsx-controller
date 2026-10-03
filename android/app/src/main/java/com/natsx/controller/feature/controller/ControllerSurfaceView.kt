@@ -25,6 +25,13 @@ class ControllerSurfaceView(
     },
 ) : View(context) {
     private val skin = ControllerSkin(context)
+    private var activeTransport: ControllerTransportIndicator? = null
+
+    fun updateActiveTransport(next: ControllerTransportIndicator?) {
+        if (activeTransport == next) return
+        activeTransport = next
+        invalidate()
+    }
 
     private var inputTuning =
         ControllerInputTuning.Default
@@ -77,6 +84,7 @@ class ControllerSurfaceView(
         val state = stateStore.snapshot()
 
         skin.drawBackground(canvas)
+        skin.drawConnectionStroke(canvas, activeTransport)
         skin.drawDpad(canvas, state.dpad)
         for (control in controls) {
             if (isDpadControl(control.id)) continue

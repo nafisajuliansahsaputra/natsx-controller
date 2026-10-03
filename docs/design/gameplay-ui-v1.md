@@ -713,3 +713,22 @@ Debug APK, instrumentation APK and lint pass. All 133 local checks pass: 130
 repository unit tests plus native surface rendering/input and real Activity
 pairing verification. Five measured contour rows pass at all three viewport
 sizes. Physical GPU timing and extended gameplay remain device checks.
+
+### Supplied Frame 1 SVG — 2026-10-03
+
+The supplied new 2400 × 1080 SVG supersedes the previous recolored skin. Preserve
+its #1A1A1A background, original shadows, white outlined glyphs, gradients and
+textured 380px stick caps. Exact exported layer PNGs live in
+`android/app/src/main/assets/controller/figma-dark`; no screenshot is used as a skin.
+The compressed original is `docs/design/controller-figma/frame-1-dark.svg.gz`.
+Run `python3 scripts/export-controller-svg.py docs/design/controller-figma/frame-1-dark.svg.gz`
+with Inkscape installed to reproduce the exports. Only missing LB/RB and utility
+backplates are added using the supplied dark translucent LT/RT bevel composition.
+
+Thin 1px contours on the top panel and both bottom panels use the same shared
+transport palette as the light bar: committed USB #AA8BE8, Wi-Fi #B2EBB2,
+Bluetooth #F6F6FA, disconnected #B9BBC2. They use Smart Auto's authoritative
+transport, never cable presence or the preferred transport. Contours are native
+paths drawn over the cached backdrop; handovers do not rebuild bitmaps.
+The wider 110px visual travel, 180/160px input radii, 225px capture areas, radial
+clamp, calibration, pointer ownership and input release behavior are retained.

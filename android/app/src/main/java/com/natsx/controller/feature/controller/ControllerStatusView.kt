@@ -171,20 +171,7 @@ class ControllerStatusView(
         val lampHeight = 5f * viewport.scale
         val lampCenterY = viewport.y(52.5f)
 
-        lampPaint.color =
-            when (state.activeTransport) {
-                ControllerTransportIndicator.USB ->
-                    COLOR_USB_LAMP
-
-                ControllerTransportIndicator.WIFI ->
-                    COLOR_WIFI_LAMP
-
-                ControllerTransportIndicator.BLUETOOTH ->
-                    COLOR_BLUETOOTH_LAMP
-
-                null ->
-                    COLOR_OFFLINE_LAMP
-            }
+        lampPaint.color = state.activeTransport.indicatorColor()
 
         tempRect.set(
             contentCenterX - lampWidth / 2f,
@@ -225,7 +212,7 @@ class ControllerStatusView(
         // Keep the original outline/terminal and update only the live charge bar.
         tempRect.set(left + 3.75f * scale, top + 3.75f * scale, left + 22.5f * scale, top + 11.25f * scale)
         lampOutlinePaint.style = Paint.Style.FILL
-        lampOutlinePaint.color = Color.rgb(245, 245, 245)
+        lampOutlinePaint.color = Color.rgb(26, 26, 26)
         canvas.drawRect(tempRect, lampOutlinePaint)
         lampOutlinePaint.style = Paint.Style.STROKE
         lampOutlinePaint.color = COLOR_SURFACE_OUTLINE
@@ -257,17 +244,9 @@ class ControllerStatusView(
         const val COLOR_ERROR =
             0xFFD96C6C.toInt()
         const val COLOR_TEXT =
-            0xFF55525B.toInt()
+            0xFFF6F6FA.toInt()
         const val COLOR_LAVENDER =
             0xFFA88BDF.toInt()
-        const val COLOR_USB_LAMP =
-            0xFFAA8BE8.toInt()
-        const val COLOR_WIFI_LAMP =
-            0xFFB2EBB2.toInt()
-        const val COLOR_BLUETOOTH_LAMP =
-            0xFFF6F6FA.toInt()
-        const val COLOR_OFFLINE_LAMP =
-            0xFFB9BBC2.toInt()
         const val COLOR_SURFACE_OUTLINE =
             0xFFDEDBE5.toInt()
     }

@@ -91,22 +91,47 @@ class SkinVerificationInstrumentation : Instrumentation() {
         store.neutralize()
         view.draw(canvas)
         check(pixel(-145f) == idleThird) { "Cap must return to center on release" }
-        val cardinal = listOf(pixel(100f), pixel(-100f), pixel(0f, 100f), pixel(0f, -100f))
-        check(cardinal.maxOf { Color.green(it) } - cardinal.minOf { Color.green(it) } <= 3) {
-            "Analog circles must stay concentric and round"
-        }
-        // Soft dark background and visible charcoal bevels keep the cached depth.
-        check(bitmap.getPixel(5, h / 2) == Color.rgb(41, 41, 41))
-        // Dark bevels surround both shoulders and all five utility keys.
+        // Original SVG background and texture, without a neutral-pixel recoloring pass.
+        check(bitmap.getPixel(5, h / 2) == Color.rgb(26, 26, 26))
+        val texture = (0..8).map { pixel(-60f + it * 15f, 20f) }
+        check(texture.toSet().size > 4) { "Original SVG stick texture must be preserved" }
+        // Missing bevels follow the dark translucent backplates in the supplied SVG.
         for ((x, y) in listOf(625f to 44f, 1775f to 44f, 792.65f to 247f, 1607.65f to 247f,
             864.65f to 372f, 1534.65f to 372f, 1199.65f to 372f)) {
-            val at = bitmap.getPixel(logoViewport.x(x).toInt(),
-                (logoViewport.y(if (y < 200f) 125f else if (y < 300f) 287.5f else 412.5f) +
-                    (y - if (y < 200f) 125f else if (y < 300f) 287.5f else 412.5f) * scale).toInt())
-            check(Color.red(at) in 25..100 && Color.green(at) in 25..100 && Color.blue(at) in 25..100) {
-                "Dark bevel missing at $x,$y"
-            }
+            val at = bitmap.getPixel(logoViewport.x(x).toInt(), logoViewport.y(y).toInt())
+            check(Color.red(at) > 26 && Color.red(at) < 90 &&
+                kotlin.math.abs(Color.red(at) - Color.green(at)) <= 3) { "Matching bevel missing at $x,$y" }
         }
+        // The same authoritative transport colors both the light and all three contours.
+        val status = com.natsx.controller.feature.controller.ControllerStatusView(targetContext)
+        status.layout(0, 0, w, h)
+        val expected = listOf(
+            com.natsx.controller.feature.controller.ControllerTransportIndicator.WIFI to Color.rgb(178,235,178),
+            com.natsx.controller.feature.controller.ControllerTransportIndicator.USB to Color.rgb(170,139,232),
+            com.natsx.controller.feature.controller.ControllerTransportIndicator.BLUETOOTH to Color.rgb(246,246,250),
+            null to Color.rgb(185,187,194),
+        )
+        for ((transport, color) in expected) {
+            view.updateActiveTransport(transport)
+            view.draw(canvas)
+            status.updateState(com.natsx.controller.feature.controller.ControllerHudState(activeTransport = transport))
+            status.draw(canvas)
+            val lamp = bitmap.getPixel(logoViewport.x(1200f).toInt(), logoViewport.y(52.5f).toInt())
+            check(lamp == color) { "Light must show $transport: $lamp != $color" }
+            for ((sx, sy) in listOf(1200f to 325.5f, 200f to 869.5f, 2200f to 869.5f)) {
+                val x = logoViewport.x(sx).toInt(); val y = logoViewport.y(sy).toInt()
+                val stroke = (-2..2).map { bitmap.getPixel(x, (y+it).coerceIn(0,h-1)) }.maxBy { Color.red(it)+Color.green(it)+Color.blue(it) }
+                check(Color.red(stroke)+Color.green(stroke)+Color.blue(stroke) > 120) { "Contour missing at $sx,$sy" }
+                when (transport) {
+                    com.natsx.controller.feature.controller.ControllerTransportIndicator.WIFI -> check(Color.green(stroke) > Color.red(stroke))
+                    com.natsx.controller.feature.controller.ControllerTransportIndicator.USB -> check(Color.blue(stroke) > Color.red(stroke) && Color.red(stroke) > Color.green(stroke))
+                    else -> check(kotlin.math.abs(Color.red(stroke) - Color.green(stroke)) <= 3)
+                }
+            }
+            check(store.snapshot() == GamepadState.Neutral) { "Connection indicators cannot change input" }
+        }
+        view.updateActiveTransport(com.natsx.controller.feature.controller.ControllerTransportIndicator.USB)
+        view.draw(canvas)
         val directory = File(targetContext.getExternalFilesDir(null), "skin-verification").apply { mkdirs() }
         File(directory, "controller-${w}x$h.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         // Full travel stays responsive past the plate, clamps, and releases immediately.
@@ -161,6 +186,7 @@ class SkinVerificationInstrumentation : Instrumentation() {
         val cachedBackground = backgroundField.get(skin)
         repeat(60) {
             store.setLeftStick(it * 500, -it * 400)
+            view.updateActiveTransport(expected[it % expected.size].first)
             view.draw(canvas)
         }
         check(backgroundField.get(skin) === cachedBackground) { "Gameplay must reuse its raster cache" }

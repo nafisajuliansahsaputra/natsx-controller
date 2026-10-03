@@ -527,6 +527,7 @@ class MainActivity : Activity() {
             currentConnectionStatus,
         )
 
+        controllerView.updateActiveTransport(activeTransport)
         controllerStatusView.updateState(
             ControllerHudState(
                 activeTransport =
