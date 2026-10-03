@@ -15,6 +15,7 @@ try {
     $first = Start-Process -FilePath $Receiver -PassThru
     $deadline = [DateTime]::UtcNow.AddSeconds(30)
     $ready = $false
+    $lastStatus = 'No Receiver window found'
     while ([DateTime]::UtcNow -lt $deadline) {
         $first.Refresh()
         if ($first.HasExited) { throw 'Primary Receiver exited before becoming ready.' }
@@ -23,12 +24,13 @@ try {
             $condition = [System.Windows.Automation.PropertyCondition]::new(
                 [System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'StatusText')
             $status = $window.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
-            if ($null -ne $status -and $status.Current.Name -like 'Receiver ready.*') { $ready = $true; break }
+            if ($null -ne $status) { $lastStatus = $status.Current.Name }
             if ($null -ne $status -and $status.Current.Name -like 'Receiver could not start:*') { throw $status.Current.Name }
+            if ($window.Current.ItemStatus -eq 'Ready') { $ready = $true; break }
         }
         Start-Sleep -Milliseconds 200
     }
-    if (-not $ready) { throw 'Actual Receiver UI did not become ready.' }
+    if (-not $ready) { throw "Actual Receiver UI did not become ready. Last diagnostic: $lastStatus" }
     foreach ($background in @($true, $false)) {
         $start = @{ FilePath=$Receiver; PassThru=$true }
         if ($background) { $start.ArgumentList='--background' }

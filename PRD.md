@@ -110,12 +110,12 @@ A Windows gamer who:
 
 ### Normal use
 
-1. Open the Android app.
-2. The app discovers the trusted PC.
-3. Smart Connection Manager evaluates available transports.
-4. The best healthy transport becomes active.
-5. The controller layout opens.
-6. Game input works immediately.
+1. Open the Windows Receiver and the Android app; pairing and controller input require both application runtimes to be running.
+2. The app discovers the trusted PC and connects over Wi-Fi when USB is absent.
+3. Plugging in a data-capable USB cable attaches the authenticated USB link; fresh state and the recovery stability check allow automatic USB takeover.
+4. Unplugging USB automatically returns authority to ready Wi-Fi; unavailable or unhealthy Wi-Fi falls back to ready trusted Bluetooth.
+5. The controller layout opens and game input uses the selected transport.
+6. Receiver exit stops transport acceptance; minimized/tray operation remains an open Receiver runtime.
 
 No repeated pairing code or manual IP entry should be required during normal use.
 

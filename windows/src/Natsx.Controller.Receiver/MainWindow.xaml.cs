@@ -62,6 +62,8 @@ public partial class MainWindow : Window
         _isStarting =
             true;
 
+        System.Windows.Automation.AutomationProperties.SetItemStatus(this, "Starting");
+
         RetryReceiverButton.IsEnabled =
             false;
 
@@ -77,9 +79,15 @@ public partial class MainWindow : Window
 
             StatusText.Text =
                 "Receiver ready. Smart Auto is waiting for trusted controller input.";
+
+            // Diagnostic messages can replace StatusText immediately. Expose
+            // completion of the actual startup separately to accessibility
+            // clients and the installed-Receiver launch verification.
+            System.Windows.Automation.AutomationProperties.SetItemStatus(this, "Ready");
         }
         catch (Exception exception)
         {
+            System.Windows.Automation.AutomationProperties.SetItemStatus(this, "Failed");
             string message =
                 DescribeStartupFailure(
                     exception);
