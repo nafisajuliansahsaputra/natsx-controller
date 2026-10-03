@@ -41,5 +41,10 @@ with tempfile.TemporaryDirectory() as temp:
   source = pathlib.Path(temp)/(name+'.svg'); ET.ElementTree(svg).write(source, encoding='utf-8', xml_declaration=True)
   x,y,w,h = bounds
   subprocess.run(['inkscape', str(source), '--export-type=png', '--export-area='+':'.join(map(str,[x,y,x+w,y+h])), '--export-filename='+str(out/(name+'.png'))], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+# Inkscape can exit successfully even when an export file is empty. Fail closed.
+for name in parts:
+ data = (out/(name+'.png')).read_bytes()
+ if not data.startswith(b'\x89PNG\r\n\x1a\n') or not data.endswith(b'\x00\x00\x00\x00IEND\xaeB`\x82'):
+  raise RuntimeError('Incomplete PNG export: '+name)
 (out/'manifest.json').write_text(json.dumps({'viewport':[2400,1080], 'parts':{name:bounds for name,(_,bounds) in parts.items()}, 'strokes':strokes}, indent=2)+'\n')
 print('Exported',len(parts),'original layer assets')
