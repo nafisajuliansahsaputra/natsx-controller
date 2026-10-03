@@ -492,3 +492,9 @@ Do not start these unless the product scope changes:
 - [x] Verify USB rejoin after logical-session rotation without requiring a cable reconnect.
 - [x] Expose USB open/join failures in receiver diagnostics.
 - [ ] Confirm USB takeover and unplug fallback with the updated pair on physical devices.
+
+## Native WinUSB initialization hotfix
+
+- [x] Open AOA data and native bulk-OUT handles with WinUSB-required FILE_FLAG_OVERLAPPED; diagnose physical Win32 error 6.
+- [ ] Verify the rebuilt Windows receiver and installer in CI.
+- [ ] Confirm WinUsb_Initialize succeeds and USB takes over on the physical phone/PC.

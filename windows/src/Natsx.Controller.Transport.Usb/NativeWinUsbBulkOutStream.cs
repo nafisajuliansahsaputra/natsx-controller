@@ -21,6 +21,7 @@ internal sealed class NativeWinUsbBulkOutStream : Stream
     private const uint FileShareWrite = 0x00000002;
     private const uint OpenExisting = 3;
     private const uint FileAttributeNormal = 0x00000080;
+    private const uint FileFlagOverlapped = 0x40000000;
 
     private readonly SafeFileHandle _deviceHandle;
     private readonly SemaphoreSlim _writeGate =
@@ -73,7 +74,9 @@ internal sealed class NativeWinUsbBulkOutStream : Stream
                 FileShareRead | FileShareWrite,
                 IntPtr.Zero,
                 OpenExisting,
-                FileAttributeNormal,
+                // WinUsb_Initialize requires an overlapped device handle,
+                // even when individual ReadPipe/WritePipe calls wait synchronously.
+                FileAttributeNormal | FileFlagOverlapped,
                 IntPtr.Zero);
 
         if (deviceHandle.IsInvalid)

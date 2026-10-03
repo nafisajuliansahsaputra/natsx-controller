@@ -19,6 +19,7 @@ internal sealed class NativeWinUsbAoaConnectionOwner : IDisposable
     private const uint FileShareWrite = 0x00000002;
     private const uint OpenExisting = 3;
     private const uint FileAttributeNormal = 0x00000080;
+    private const uint FileFlagOverlapped = 0x40000000;
 
     private const uint PipeTransferTimeoutPolicy = 3;
     private const int ErrorSemTimeout = 121;
@@ -81,7 +82,9 @@ internal sealed class NativeWinUsbAoaConnectionOwner : IDisposable
                 FileShareRead | FileShareWrite,
                 IntPtr.Zero,
                 OpenExisting,
-                FileAttributeNormal,
+                // WinUsb_Initialize requires an overlapped device handle,
+                // even when individual ReadPipe/WritePipe calls wait synchronously.
+                FileAttributeNormal | FileFlagOverlapped,
                 IntPtr.Zero);
 
         if (deviceHandle.IsInvalid)

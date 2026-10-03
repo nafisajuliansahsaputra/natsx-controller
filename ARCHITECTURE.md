@@ -1009,3 +1009,11 @@ current session automatically. Losing wireless connectivity alone keeps working
 USB alive. USB open/join errors are shown in the receiver instead of being hidden
 behind accessory-presence status. Health, cooldown and takeover thresholds remain
 unchanged; authenticated fresh state still must stabilize before USB selection.
+
+### Native WinUSB handle contract
+
+Every AOA native WinUSB data handle must be opened with FILE_FLAG_OVERLAPPED
+before WinUsb_Initialize. Omitting that flag causes ERROR_INVALID_HANDLE (6).
+Both the shared IN/OUT owner and the native bulk-OUT adapter use this flag.
+ReadPipe/WritePipe may still wait synchronously by passing a null OVERLAPPED
+pointer and a non-null transferred-length output, as required by WinUSB.
