@@ -261,11 +261,11 @@ class ControllerStatusView(
         const val COLOR_LAVENDER =
             0xFFA88BDF.toInt()
         const val COLOR_USB_LAMP =
-            0xFFB2EBB2.toInt()
+            0xFFAA8BE8.toInt()
         const val COLOR_WIFI_LAMP =
             0xFFB2EBB2.toInt()
         const val COLOR_BLUETOOTH_LAMP =
-            0xFFB2EBB2.toInt()
+            0xFFF6F6FA.toInt()
         const val COLOR_OFFLINE_LAMP =
             0xFFB9BBC2.toInt()
         const val COLOR_SURFACE_OUTLINE =
