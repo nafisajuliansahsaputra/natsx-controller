@@ -531,5 +531,5 @@ Do not start these unless the product scope changes:
 
 - [x] Retain white lettering/icons and colored faces on #292929 gameplay surfaces with charcoal bevels/highlights/shadows.
 - [x] Shrink the movable cap to 310px, increase radial visual travel to 110px and widen full-scale/capture travel without moving controls.
-- [ ] Verify lint/unit tests, native rendering and complete input mapping in Android CI.
+- [x] Verify lint/unit tests, native rendering and complete input mapping in Android CI (37119260532) and three-aspect-ratio UI verification (37119260528).
 - [ ] Confirm comfort and contrast on the physical phone.
