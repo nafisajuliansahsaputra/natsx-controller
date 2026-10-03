@@ -75,7 +75,7 @@ class SkinVerificationInstrumentation : Instrumentation() {
         check(Color.green(center) > Color.red(center) + 20)
         check(Color.green(rim) > Color.red(rim) + 50)
         check(Color.green(center) > Color.green(rim))
-        // The third circle moves as a complete cap; the dark socket stays concentric/fixed.
+        // The third circle moves as a complete cap; the green socket stays concentric/fixed.
         val stickX = logoViewport.x(325f)
         val stickY = logoViewport.y(540f)
         val scale = logoViewport.scale
@@ -91,16 +91,16 @@ class SkinVerificationInstrumentation : Instrumentation() {
         store.neutralize()
         view.draw(canvas)
         check(pixel(-145f) == idleThird) { "Cap must return to center on release" }
-        // Original SVG background and texture, without a neutral-pixel recoloring pass.
-        check(bitmap.getPixel(5, h / 2) == Color.rgb(26, 26, 26))
+        // Original Figma PNG exports retain their effects and texture.
+        check(bitmap.getPixel(5, h / 2) == Color.rgb(250, 250, 250))
         val texture = (0..8).map { pixel(-60f + it * 15f, 20f) }
-        check(texture.toSet().size > 4) { "Original SVG stick texture must be preserved" }
-        // Missing bevels follow the dark translucent backplates in the supplied SVG.
+        check(texture.toSet().size > 4) { "Original Figma stick texture must be preserved" }
+        // Added bevels retain neutral white backplates and matching gray depth.
         for ((x, y) in listOf(625f to 44f, 1775f to 44f, 792.65f to 247f, 1607.65f to 247f,
             864.65f to 372f, 1534.65f to 372f, 1199.65f to 372f)) {
             val cy = if (y < 200f) 125f else if (y < 300f) 287.5f else 412.5f
             val at = bitmap.getPixel(logoViewport.x(x).toInt(), (logoViewport.y(cy) + (y-cy)*scale).toInt())
-            check(Color.red(at) > 26 && Color.red(at) < 90 &&
+            check(Color.red(at) > 90 && Color.red(at) <= 255 &&
                 kotlin.math.abs(Color.red(at) - Color.green(at)) <= 3) { "Matching bevel missing at $x,$y" }
         }
         // The same authoritative transport colors both the light and all three contours.
@@ -121,13 +121,13 @@ class SkinVerificationInstrumentation : Instrumentation() {
             check(lamp == color) { "Light must show $transport: $lamp != $color" }
             for ((sx, sy) in listOf(1200f to 325.5f, 200f to 869.5f, 2200f to 869.5f)) {
                 val x = logoViewport.x(sx).toInt(); val y = logoViewport.y(sy).toInt()
-                val stroke = (-2..2).map { bitmap.getPixel(x, (y+it).coerceIn(0,h-1)) }.maxBy { Color.red(it)+Color.green(it)+Color.blue(it) }
-                check(Color.red(stroke)+Color.green(stroke)+Color.blue(stroke) > 120) { "Contour missing at $sx,$sy" }
-                when (transport) {
-                    com.natsx.controller.feature.controller.ControllerTransportIndicator.WIFI -> check(Color.green(stroke) > Color.red(stroke))
-                    com.natsx.controller.feature.controller.ControllerTransportIndicator.USB -> check(Color.blue(stroke) > Color.red(stroke) && Color.red(stroke) > Color.green(stroke))
-                    else -> check(kotlin.math.abs(Color.red(stroke) - Color.green(stroke)) <= 3)
+                val stroke = (-2..2).map { bitmap.getPixel(x, (y+it).coerceIn(0,h-1)) }.minBy {
+                    kotlin.math.abs(Color.red(it)-Color.red(color)) +
+                        kotlin.math.abs(Color.green(it)-Color.green(color)) + kotlin.math.abs(Color.blue(it)-Color.blue(color))
                 }
+                val distance = kotlin.math.abs(Color.red(stroke)-Color.red(color)) +
+                    kotlin.math.abs(Color.green(stroke)-Color.green(color)) + kotlin.math.abs(Color.blue(stroke)-Color.blue(color))
+                check(distance <= 110) { "Contour must follow $transport at $sx,$sy: $stroke vs $color" }
             }
             check(store.snapshot() == GamepadState.Neutral) { "Connection indicators cannot change input" }
         }

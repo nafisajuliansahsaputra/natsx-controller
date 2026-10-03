@@ -6,12 +6,14 @@ import android.graphics.BitmapFactory
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
+import android.graphics.Shader
+import android.graphics.Typeface
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import com.natsx.controller.core.gamepad.DpadState
-import org.json.JSONObject
 import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -26,7 +28,7 @@ internal class ControllerSkin(private val context: Context) {
     private val editorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1f }
     private val assets = mutableMapOf<String, Bitmap>()
-    private val manifest = context.assets.open("controller/figma-dark/manifest.json").bufferedReader().use { JSONObject(it.readText()) }
+    private val font = Typeface.createFromAsset(context.assets, "controller/jakarta-bold.ttf")
     private var background: Sprite? = null
     private val buttons = mutableMapOf<String, Button>()
     private val nodes = mutableMapOf<String, Node>()
@@ -42,17 +44,18 @@ internal class ControllerSkin(private val context: Context) {
     private val connectionStrokes = ConnectionStrokePaths.create()
 
     private fun asset(name: String): Bitmap = assets.getOrPut(name) {
-        context.assets.open("controller/figma-dark/$name.png").use { checkNotNull(BitmapFactory.decodeStream(it)) }
+        context.assets.open("controller/figma-white/$name.png").use { checkNotNull(BitmapFactory.decodeStream(it)) }
     }
-    private fun layer(c: Canvas, name: String, dx: Float = 0f, dy: Float = 0f) {
-        val b = manifest.getJSONObject("parts").getJSONArray(name)
-        val w = b.getDouble(2).toFloat(); val h = b.getDouble(3).toFloat()
-        c.drawBitmap(asset(name), null, RectF(dx, dy, dx + w * px, dy + h * px), bitmapPaint)
+    private fun layer(c: Canvas, name: String, x: Float, y: Float, w: Float, h: Float) {
+        c.drawBitmap(asset(name), null, RectF(x, y, x + w, y + h), bitmapPaint)
     }
-    private fun positionedLayer(c: Canvas, name: String, centerX: Float, centerY: Float) {
-        val b = manifest.getJSONObject("parts").getJSONArray(name)
-        layer(c, name, centerX - b.getDouble(2).toFloat() / 2f * px,
-            centerY - b.getDouble(3).toFloat() / 2f * px)
+    private fun centered(c: Canvas, name: String, x: Float, y: Float, w: Float, h: Float = w) {
+        layer(c, name, x - w / 2f * px, y - h / 2f * px, w * px, h * px)
+    }
+    private fun drawCap(c: Canvas, id: String) {
+        centered(c, if (id == "LEFT_STICK") "imgEllipse19" else "imgEllipse16", 0f, 0f, 380f)
+        centered(c, "imgEllipse18", 0f, 0f, 304f)
+        centered(c, if (id == "LEFT_STICK") "imgEllipse20" else "imgEllipse17", 0f, 0f, 250f)
     }
     fun rebuild(w: Float, h: Float, insetX: Float, insetY: Float, usableW: Float, usableH: Float, geometry: List<Node>) {
         buttons.clear(); nodes.clear(); dpadArms.clear(); caps.clear()
@@ -61,9 +64,17 @@ internal class ControllerSkin(private val context: Context) {
         this.insetX = insetX; this.insetY = insetY; viewportScaleX = usableW / 2400f; viewportScaleY = usableH / 1080f
         rasterScale = min(1f, min(1080f / h, 2400f / w))
         background = raster(RectF(0f, 0f, w, h)) { c ->
-            c.drawColor(Color.rgb(26, 26, 26))
-            c.drawBitmap(asset("background"), null, RectF(insetX, insetY, insetX + usableW, insetY + usableH), bitmapPaint)
-            for (node in geometry) if (node.id.endsWith("_STICK")) positionedLayer(c, if (node.id == "LEFT_STICK") "stick-base-left" else "stick-base", node.x, node.y)
+            c.drawColor(Color.rgb(250, 250, 250))
+            c.save(); c.translate(insetX, insetY); c.scale(viewportScaleX, viewportScaleY)
+            // Original PNG exports include their effects, clipping and affine transforms.
+            layer(c, "imgVector", 745.5359f, 0f, 909f, 327f)
+            layer(c, "imgVector1", 1730.5359f, 844f, 670f, 236f)
+            layer(c, "imgVector2", 0f, 844f, 658f, 236f)
+            c.restore()
+            for (node in geometry) if (node.id.endsWith("_STICK")) {
+                centered(c, if (node.id == "LEFT_STICK") "imgEllipse5" else "imgEllipse4", node.x, node.y, 548f)
+                centered(c, "imgEllipse15", node.x - .5f * px, node.y - .5f * px, 481f)
+            }
             drawDpadBase(c)
         }
         for (node in geometry) {
@@ -74,9 +85,8 @@ internal class ControllerSkin(private val context: Context) {
         }
         val capBounds = RectF(-208f * px, -208f * px, 208f * px, 208f * px)
         for (id in listOf("LEFT_STICK", "RIGHT_STICK")) {
-            val name = if (id == "LEFT_STICK") "stick-cap-left" else "stick-cap"
-            caps[id] = Button(raster(capBounds) { positionedLayer(it, name, 0f, 0f) },
-                raster(capBounds) { positionedLayer(it, name, 0f, 0f); it.drawCircle(0f, 0f, 190f * px, feedbackPaint) })
+            caps[id] = Button(raster(capBounds) { drawCap(it, id) },
+                raster(capBounds) { drawCap(it, id); it.drawCircle(0f, 0f, 190f * px, feedbackPaint) })
         }
     }
     private fun raster(bounds: RectF, draw: (Canvas) -> Unit): Sprite {
@@ -113,16 +123,19 @@ internal class ControllerSkin(private val context: Context) {
         editorPaint.color = Color.parseColor(if (selected) "#574379" else "#B7A5D8")
         c.drawCircle(x, y, 19f * px, editorPaint)
     }
-    private fun drawMissingBevel(c: Canvas, key: Path, rim: Float) {
-        // Same neutral, translucent backplate and soft spread as the supplied LT/RT bevel.
+    private fun drawWhiteBevel(c: Canvas, key: Path, rim: Float) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0x40292929; style = Paint.Style.FILL_AND_STROKE
-            strokeJoin = Paint.Join.ROUND; strokeWidth = 2f * rim
-            maskFilter = BlurMaskFilter(6f * px, BlurMaskFilter.Blur.NORMAL)
+            color = Color.WHITE
+            style = Paint.Style.FILL_AND_STROKE
+            strokeJoin = Paint.Join.ROUND
+            strokeWidth = 2f * (rim * 2f)
+            maskFilter = BlurMaskFilter(rim, BlurMaskFilter.Blur.NORMAL)
         }
         c.drawPath(key, p)
-        p.maskFilter = null; c.drawPath(key, p)
+        p.maskFilter = null; p.strokeWidth = 2f * rim
+        c.drawPath(key, p)
     }
+
     /** Figma rounded rectangles under their original affine transforms, unioned without seams. */
     private fun keyPath(id: String, r: RectF): Path {
         val w = r.width(); val h = r.height()
@@ -157,18 +170,56 @@ internal class ControllerSkin(private val context: Context) {
 
 
     private fun drawKey(c: Canvas, id: String, r: RectF, active: Boolean) {
+        val mint = id in listOf("BACK", "START", "L3", "R3", "GUIDE")
+        val circle = id in listOf("A", "B", "X", "Y")
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
         val key = keyPath(id, r)
-        if (id in listOf("LB", "RB", "BACK", "START", "L3", "R3", "GUIDE")) {
-            drawMissingBevel(c, key, (if (id == "LB" || id == "RB") 12f else 6f) * px)
+        if (circle) centered(c, "imgEllipse21", r.centerX(), r.centerY(), 237.820f)
+        else drawWhiteBevel(c, key, (if (mint) 6f else 12f) * px)
+        val depth = (if (mint) 6f else 12f) * px
+        // Add the same drop depth to the originally flat LB/RB and utility keys.
+        p.color = Color.parseColor("#767676")
+        p.style = Paint.Style.FILL_AND_STROKE; p.strokeWidth = depth
+        p.maskFilter = BlurMaskFilter(depth, BlurMaskFilter.Blur.NORMAL)
+        c.drawPath(key, p)
+        p.maskFilter = null; p.style = Paint.Style.FILL
+        p.color = Color.parseColor(if (mint) "#B2EBB2" else "#C3B1E1")
+        c.drawPath(key, p)
+        c.save(); c.clipPath(key)
+        val outside = Path(key).apply { fillType = Path.FillType.INVERSE_WINDING }
+        // Software bitmap canvas reproduces inset shadows once; no blur in onDraw/onTouch.
+        p.color = Color.TRANSPARENT
+        p.setShadowLayer(depth, depth, depth, Color.parseColor("#80FFFFFF")); c.drawPath(outside, p)
+        p.setShadowLayer(depth, -depth, -depth, Color.parseColor("#40000000")); c.drawPath(outside, p)
+        p.clearShadowLayer()
+        if (active) { p.color = 0x224D3A7C; c.drawPath(key, p) }
+        c.restore()
+        p.color = Color.WHITE; p.textAlign = Paint.Align.CENTER; p.typeface = font
+        p.textSize = (if (mint) 24f else 48f) * px
+        val label = when (id) { "L3" -> "LS"; "R3" -> "RS"; "BACK", "START", "GUIDE" -> ""; else -> id }
+        if (label.isNotEmpty()) c.drawText(label, r.centerX(), r.centerY() - (p.ascent() + p.descent()) / 2f, p)
+        else {
+            val icon = when (id) { "BACK" -> "imgFluentTabDesktopMultiple24Regular"; "START" -> "imgCharmMenuHamburger"; else -> "imgFluentShareIos20Filled" }
+            layer(c, icon, r.centerX() - 15f * px, r.centerY() - 15f * px, 30f * px, 30f * px)
         }
-        positionedLayer(c, id, r.centerX(), r.centerY())
-        if (active) c.drawPath(key, feedbackPaint)
     }
+
     private fun drawDpadBase(c: Canvas) {
         val up = nodes["DPAD_UP"] ?: return; val down = nodes["DPAD_DOWN"] ?: return
         val left = nodes["DPAD_LEFT"] ?: return; val right = nodes["DPAD_RIGHT"] ?: return
         val x = (left.x + right.x) / 2f; val y = (up.y + down.y) / 2f
-        positionedLayer(c, "dpad", x, y)
+        centered(c, "imgEllipse5", x, y, 548f)
+        centered(c, "imgEllipse6", x, y, 516f)
+        // Direct node exports already contain the design's rotation/reflection.
+        layer(c, "imgRectangle20", down.x - 98f * px, down.y - 92f * px, 196f * px, 184f * px)
+        layer(c, "imgRectangle23", up.x - 95f * px, up.y - 92f * px, 190f * px, 184f * px)
+        layer(c, "imgRectangle21", right.x - 92f * px, right.y - 95f * px, 184f * px, 199f * px)
+        layer(c, "imgRectangle22", left.x - 92f * px, left.y - 95f * px, 184f * px, 199f * px)
+        val centerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(0f, y - 80f * px, 0f, y + 80f * px,
+                Color.rgb(164,132,206), Color.rgb(195,177,225), Shader.TileMode.CLAMP)
+        }
+        c.drawRect(x - 80f * px, y - 80f * px, x + 80f * px, y + 80f * px, centerPaint)
         val disk = Path().apply { addCircle(x, y, 240f * px, Path.Direction.CW) }
         for ((bit, node) in listOf(DpadState.UP to up, DpadState.DOWN to down, DpadState.LEFT to left, DpadState.RIGHT to right)) {
             val path = Path().apply {

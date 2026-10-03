@@ -14,7 +14,7 @@ class ControllerStatusView(
     context: Context,
 ) : View(context) {
     private val iconBitmaps = listOf("imgGroup", "imgBiUsbSymbol", "imgGroup1", "imgAkarIconsBluetooth").associateWith { name ->
-        context.assets.open("controller/$name.png").use { android.graphics.BitmapFactory.decodeStream(it)!! }
+        context.assets.open("controller/figma-white/$name.png").use { android.graphics.BitmapFactory.decodeStream(it)!! }
     }
     private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val activeFilter = android.graphics.PorterDuffColorFilter(COLOR_ACTIVE, android.graphics.PorterDuff.Mode.SRC_IN)
@@ -157,7 +157,7 @@ class ControllerStatusView(
         drawTransportAsset(canvas, "imgBiUsbSymbol", viewport.x(1143.201f), viewport.y(245f),
             30f * viewport.scale, 30f * viewport.scale, ControllerTransportIndicator.USB)
         drawTransportAsset(canvas, "imgGroup1", viewport.x(1224.701f), viewport.y(250.25f),
-            27f * viewport.scale, 20f * viewport.scale, ControllerTransportIndicator.WIFI)
+            27f * viewport.scale, 19.5003f * viewport.scale, ControllerTransportIndicator.WIFI)
         drawTransportAsset(canvas, "imgAkarIconsBluetooth", viewport.x(1303.201f), viewport.y(245f),
             30f * viewport.scale, 30f * viewport.scale, ControllerTransportIndicator.BLUETOOTH)
 
@@ -212,7 +212,7 @@ class ControllerStatusView(
         // Keep the original outline/terminal and update only the live charge bar.
         tempRect.set(left + 3.75f * scale, top + 3.75f * scale, left + 22.5f * scale, top + 11.25f * scale)
         lampOutlinePaint.style = Paint.Style.FILL
-        lampOutlinePaint.color = Color.rgb(26, 26, 26)
+        lampOutlinePaint.color = Color.rgb(250, 250, 250)
         canvas.drawRect(tempRect, lampOutlinePaint)
         lampOutlinePaint.style = Paint.Style.STROKE
         lampOutlinePaint.color = COLOR_SURFACE_OUTLINE
@@ -236,7 +236,7 @@ class ControllerStatusView(
         const val COLOR_ACTIVE =
             0xFFB2EBB2.toInt()
         const val COLOR_INACTIVE =
-            0xFFB8BBC2.toInt()
+            0xFFD6D6D6.toInt()
         const val COLOR_WARNING =
             0xFFE9B35E.toInt()
         const val COLOR_CRITICAL =
@@ -244,7 +244,7 @@ class ControllerStatusView(
         const val COLOR_ERROR =
             0xFFD96C6C.toInt()
         const val COLOR_TEXT =
-            0xFFF6F6FA.toInt()
+            0xFF55525B.toInt()
         const val COLOR_LAVENDER =
             0xFFA88BDF.toInt()
         const val COLOR_SURFACE_OUTLINE =

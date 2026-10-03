@@ -1,0 +1,432 @@
+{
+  "fileKey": "3XXaIyhGotYr3ktNj5sjUo",
+  "frame": "1:2",
+  "export": "Figma Plugin API PNG at scale 1; original node transforms and effects retained",
+  "parts": [
+    {
+      "name": "imgEllipse17",
+      "id": "1:8",
+      "bounds": {
+        "x": 1375,
+        "y": 655,
+        "width": 250,
+        "height": 250
+      },
+      "renderBounds": {
+        "x": 1375,
+        "y": 655,
+        "width": 250,
+        "height": 250
+      },
+      "size": 69825
+    },
+    {
+      "name": "imgEllipse20",
+      "id": "1:14",
+      "bounds": {
+        "x": 200,
+        "y": 415,
+        "width": 250,
+        "height": 250
+      },
+      "renderBounds": {
+        "x": 200,
+        "y": 415,
+        "width": 250,
+        "height": 250
+      },
+      "size": 69825
+    },
+    {
+      "name": "imgDsdasdads1",
+      "id": "1:83",
+      "bounds": {
+        "x": 1168.200927734375,
+        "y": 120,
+        "width": 60,
+        "height": 60
+      },
+      "renderBounds": {
+        "x": 1168.200927734375,
+        "y": 120,
+        "width": 60,
+        "height": 60
+      },
+      "size": 2008
+    },
+    {
+      "name": "imgEllipse4",
+      "id": "1:4",
+      "bounds": {
+        "x": 1250,
+        "y": 530,
+        "width": 500,
+        "height": 500
+      },
+      "renderBounds": {
+        "x": 1226,
+        "y": 506,
+        "width": 548,
+        "height": 548
+      },
+      "size": 35287
+    },
+    {
+      "name": "imgEllipse15",
+      "id": "1:5",
+      "bounds": {
+        "x": 1277,
+        "y": 557,
+        "width": 445,
+        "height": 445
+      },
+      "renderBounds": {
+        "x": 1259,
+        "y": 539,
+        "width": 481,
+        "height": 481
+      },
+      "size": 81265
+    },
+    {
+      "name": "imgEllipse16",
+      "id": "1:6",
+      "bounds": {
+        "x": 1310,
+        "y": 590,
+        "width": 380,
+        "height": 380
+      },
+      "renderBounds": {
+        "x": 1310,
+        "y": 590,
+        "width": 380,
+        "height": 380
+      },
+      "size": 27665
+    },
+    {
+      "name": "imgEllipse18",
+      "id": "1:7",
+      "bounds": {
+        "x": 1360,
+        "y": 640,
+        "width": 280,
+        "height": 280
+      },
+      "renderBounds": {
+        "x": 1348,
+        "y": 628,
+        "width": 304,
+        "height": 304
+      },
+      "size": 13476
+    },
+    {
+      "name": "imgEllipse5",
+      "id": "1:10",
+      "bounds": {
+        "x": 75,
+        "y": 290,
+        "width": 500,
+        "height": 500
+      },
+      "renderBounds": {
+        "x": 51,
+        "y": 266,
+        "width": 548,
+        "height": 548
+      },
+      "size": 33164
+    },
+    {
+      "name": "imgEllipse19",
+      "id": "1:12",
+      "bounds": {
+        "x": 135,
+        "y": 350,
+        "width": 380,
+        "height": 380
+      },
+      "renderBounds": {
+        "x": 135,
+        "y": 350,
+        "width": 380,
+        "height": 380
+      },
+      "size": 27665
+    },
+    {
+      "name": "imgEllipse6",
+      "id": "1:16",
+      "bounds": {
+        "x": 660,
+        "y": 540,
+        "width": 480,
+        "height": 480
+      },
+      "renderBounds": {
+        "x": 642,
+        "y": 522,
+        "width": 516,
+        "height": 516
+      },
+      "size": 157425
+    },
+    {
+      "name": "imgVector",
+      "id": "1:25",
+      "bounds": {
+        "x": 749,
+        "y": 0,
+        "width": 901.8076171875,
+        "height": 325.00201416015625
+      },
+      "renderBounds": {
+        "x": 745.535888671875,
+        "y": 0,
+        "width": 908.73583984375,
+        "height": 327.00201416015625
+      },
+      "size": 11418
+    },
+    {
+      "name": "imgFluentTabDesktopMultiple24Regular",
+      "id": "1:39",
+      "bounds": {
+        "x": 777.650634765625,
+        "y": 272.5,
+        "width": 30,
+        "height": 30
+      },
+      "renderBounds": {
+        "x": 777.650634765625,
+        "y": 272.5,
+        "width": 30,
+        "height": 30
+      },
+      "size": 497
+    },
+    {
+      "name": "imgFluentShareIos20Filled",
+      "id": "1:53",
+      "bounds": {
+        "x": 1184.650634765625,
+        "y": 397.5,
+        "width": 30,
+        "height": 30
+      },
+      "renderBounds": {
+        "x": 1184.650634765625,
+        "y": 397.5,
+        "width": 30,
+        "height": 30
+      },
+      "size": 399
+    },
+    {
+      "name": "imgVector1",
+      "id": "1:55",
+      "bounds": {
+        "x": 1758,
+        "y": 870,
+        "width": 642.412353515625,
+        "height": 210.00009155273438
+      },
+      "renderBounds": {
+        "x": 1730.535888671875,
+        "y": 844,
+        "width": 669.464111328125,
+        "height": 236
+      },
+      "size": 13761
+    },
+    {
+      "name": "imgVector2",
+      "id": "1:56",
+      "bounds": {
+        "x": 0,
+        "y": 870,
+        "width": 642.412353515625,
+        "height": 210.00009155273438
+      },
+      "renderBounds": {
+        "x": 0,
+        "y": 844,
+        "width": 657.87646484375,
+        "height": 236
+      },
+      "size": 13922
+    },
+    {
+      "name": "imgEllipse21",
+      "id": "1:58",
+      "bounds": {
+        "x": 2141,
+        "y": 445,
+        "width": 189.82000732421875,
+        "height": 189.82000732421875
+      },
+      "renderBounds": {
+        "x": 2117,
+        "y": 421,
+        "width": 237.820068359375,
+        "height": 237.82000732421875
+      },
+      "size": 12758
+    },
+    {
+      "name": "imgCharmMenuHamburger",
+      "id": "1:76",
+      "bounds": {
+        "x": 1592.650634765625,
+        "y": 272.5,
+        "width": 30,
+        "height": 30
+      },
+      "renderBounds": {
+        "x": 1592.650634765625,
+        "y": 272.5,
+        "width": 30,
+        "height": 30
+      },
+      "size": 260
+    },
+    {
+      "name": "imgGroup",
+      "id": "1:86",
+      "bounds": {
+        "x": 1063.200927734375,
+        "y": 252.5,
+        "width": 30,
+        "height": 15
+      },
+      "renderBounds": {
+        "x": 1063.200927734375,
+        "y": 252.5,
+        "width": 30,
+        "height": 15
+      },
+      "size": 487
+    },
+    {
+      "name": "imgBiUsbSymbol",
+      "id": "1:89",
+      "bounds": {
+        "x": 1143.200927734375,
+        "y": 245,
+        "width": 30,
+        "height": 30
+      },
+      "renderBounds": {
+        "x": 1143.200927734375,
+        "y": 245,
+        "width": 30,
+        "height": 30
+      },
+      "size": 715
+    },
+    {
+      "name": "imgGroup1",
+      "id": "1:92",
+      "bounds": {
+        "x": 1225.700927734375,
+        "y": 251.24969482421875,
+        "width": 25,
+        "height": 17.50031280517578
+      },
+      "renderBounds": {
+        "x": 1224.700927734375,
+        "y": 250.24969482421875,
+        "width": 27,
+        "height": 19.50030517578125
+      },
+      "size": 692
+    },
+    {
+      "name": "imgAkarIconsBluetooth",
+      "id": "1:95",
+      "bounds": {
+        "x": 1303.200927734375,
+        "y": 245,
+        "width": 30,
+        "height": 30
+      },
+      "renderBounds": {
+        "x": 1303.200927734375,
+        "y": 245,
+        "width": 30,
+        "height": 30
+      },
+      "size": 689
+    },
+    {
+      "name": "imgRectangle20",
+      "id": "1:97",
+      "bounds": {
+        "x": 820,
+        "y": 860.0000610351562,
+        "width": 160,
+        "height": 160
+      },
+      "renderBounds": {
+        "x": 802,
+        "y": 848.0000610351562,
+        "width": 196,
+        "height": 183.99993896484375
+      },
+      "size": 24121
+    },
+    {
+      "name": "imgRectangle23",
+      "id": "1:98",
+      "bounds": {
+        "x": 820,
+        "y": 540,
+        "width": 160,
+        "height": 160
+      },
+      "renderBounds": {
+        "x": 805,
+        "y": 528,
+        "width": 190,
+        "height": 184
+      },
+      "size": 22437
+    },
+    {
+      "name": "imgRectangle21",
+      "id": "1:99",
+      "bounds": {
+        "x": 980,
+        "y": 700,
+        "width": 160,
+        "height": 160
+      },
+      "renderBounds": {
+        "x": 968,
+        "y": 685,
+        "width": 184,
+        "height": 199
+      },
+      "size": 37521
+    },
+    {
+      "name": "imgRectangle22",
+      "id": "1:100",
+      "bounds": {
+        "x": 660,
+        "y": 700,
+        "width": 160,
+        "height": 160
+      },
+      "renderBounds": {
+        "x": 648,
+        "y": 685,
+        "width": 184,
+        "height": 199
+      },
+      "size": 37134
+    }
+  ]
+}
