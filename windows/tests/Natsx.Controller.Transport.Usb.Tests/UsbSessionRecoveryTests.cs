@@ -19,7 +19,7 @@ public sealed class UsbSessionRecoveryTests
         byte[] announcement = Announcement(session, peer);
         using var input = new MemoryStream(Concat(State(session, 100), announcement));
         byte[] first = await UsbInitialSessionReader.ReadAsync(input);
-        Assert.Equal(announcement, first);
+        Assert.Equal(announcement[UsbStreamFrameCodec.LengthPrefixSize..], first);
         var server = new UsbSecondarySessionJoinServer(PeerId.CreateRandom(), registry);
         using var joined = await server.JoinUplinkOnlyAsync(first);
         Assert.Equal(id, joined.Session.SessionId);

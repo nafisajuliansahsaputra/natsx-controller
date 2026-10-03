@@ -69,3 +69,11 @@ jobs:
           name: natsx-controller-android-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Upload Android signing tooling for verified local update signing
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: natsx-android-signing-tooling
+          path: ${{ env.ANDROID_HOME }}/build-tools/36.0.0/lib/apksigner.jar
+          if-no-files-found: error
