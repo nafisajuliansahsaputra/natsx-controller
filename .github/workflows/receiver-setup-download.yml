@@ -1,0 +1,58 @@
+name: Prepare verified receiver setup download
+on:
+  push:
+    branches: ["fix/receiver-click-update"]
+    paths: [".github/workflows/receiver-setup-download.yml"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: NATSX-Receiver-Setup-Existing-Drivers
+          repository: nafisajuliansahsaputra/natsx-controller
+          run-id: 37102179484
+          github-token: ${{ github.token }}
+          path: setup
+      - name: Split verified EXE for workspace transfer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          files=list(Path('setup').glob('*.exe'))
+          assert len(files)==1
+          data=files[0].read_bytes()
+          size=24*1024*1024
+          for i,start in enumerate(range(0,len(data),size)):
+              p=Path(f'parts/{i}/setup.part{i}')
+              p.parent.mkdir(parents=True,exist_ok=True)
+              p.write_bytes(data[start:start+size])
+          assert len(data)<=size*5
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: setup-part-0
+          path: parts/0/*
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: setup-part-1
+          path: parts/1/*
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: setup-part-2
+          path: parts/2/*
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: setup-part-3
+          path: parts/3/*
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: setup-part-4
+          path: parts/4/*
+          compression-level: 0
