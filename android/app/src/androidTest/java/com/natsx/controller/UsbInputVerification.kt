@@ -8,7 +8,6 @@ import com.natsx.controller.core.gamepad.GamepadState
 import com.natsx.controller.core.protocol.GamepadStateCodec
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
 import com.natsx.controller.core.protocol.SessionId
-import com.natsx.controller.core.session.ControllerRealtimePublisher
 import com.natsx.controller.core.transport.usb.UsbRealtimeSender
 import com.natsx.controller.core.transport.usb.UsbStreamFrameCodec
 import com.natsx.controller.core.transport.usb.UsbTrustedSession
@@ -38,7 +37,6 @@ internal object UsbInputVerification {
             }
         }
         val sender = UsbRealtimeSender(output, session)
-        val publisher = ControllerRealtimePublisher(app.gamepadStateStore, app.realtimeBroadcaster)
         fun receive(predicate: (GamepadState) -> Boolean) {
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
             while (System.nanoTime() < deadline) {
@@ -53,8 +51,7 @@ internal object UsbInputVerification {
             try { check(root.dispatchTouchEvent(event)) } finally { event.recycle() }
         }
         try {
-            publisher.addSink(sender)
-            publisher.start()
+            app.realtimeBroadcaster.addSink(sender)
             val ax = viewport.x(2074.91f)
             val ay = viewport.y(539.91f) + 161f * viewport.scale
             touch(MotionEvent.ACTION_DOWN, ax, ay)
@@ -75,8 +72,7 @@ internal object UsbInputVerification {
             check(sender.sentFrames > 0 && sender.sendFailures == 0L)
         } finally {
             onMain { app.gamepadStateStore.neutralize() }
-            publisher.removeSink(sender)
-            publisher.close()
+            app.realtimeBroadcaster.removeSink(sender)
             sender.close()
             session.close()
             key.fill(0)

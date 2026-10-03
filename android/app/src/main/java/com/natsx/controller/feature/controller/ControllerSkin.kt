@@ -96,7 +96,7 @@ internal class ControllerSkin(private val context: Context) {
         val nx = (x / if (x < 0) 32768f else 32767f).coerceIn(-1f, 1f)
         val ny = (y / if (y < 0) 32768f else 32767f).coerceIn(-1f, 1f)
         val magnitude = sqrt(nx * nx + ny * ny).coerceAtLeast(1f)
-        val travel = min(node.travel, 32.5f * px) / magnitude
+        val travel = 60f * px / magnitude
         c.save(); c.translate(node.x + nx * travel, node.y - ny * travel)
         drawSprite(c, if (active) sprite.pressed else sprite.idle); c.restore()
     }

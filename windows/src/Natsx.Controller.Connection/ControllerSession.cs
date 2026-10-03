@@ -60,6 +60,15 @@ public sealed class ControllerSession
         return true;
     }
 
+    // Only call after retiring every transport of the previous authenticated session.
+    public void Reset()
+    {
+        AuthoritativeTransport = null;
+        CurrentState = GamepadState.Neutral;
+        _hasAcceptedSequence = false;
+        _lastAcceptedSequence = 0;
+    }
+
     public void Neutralize()
     {
         CurrentState = GamepadState.Neutral;

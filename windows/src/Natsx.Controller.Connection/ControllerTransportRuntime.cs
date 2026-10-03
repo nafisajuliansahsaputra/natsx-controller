@@ -76,6 +76,31 @@ public sealed class ControllerTransportRuntime : IAsyncDisposable
         }
     }
 
+    /// <summary>Starts a new authenticated logical session, keeping the virtual device alive.
+    /// All previous transports must be retired first. Ordinary failover must not reset ordering.</summary>
+    public void ResetLogicalSession()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        lock (_transportGate)
+        {
+            if (_transports.Count != 0)
+            {
+                throw new InvalidOperationException("Retire previous transports before resetting the logical session.");
+            }
+        }
+        lock (_stateGate)
+        {
+            _inputSafety.ForceNeutral();
+            _session.Reset();
+            _latestStates.Clear();
+            _packetRates.Clear();
+        }
+        lock (_connectionGate)
+        {
+            _connectionManager.ClearActiveTransport();
+        }
+    }
+
     public event Action<HandoverProposal>? HandoverCommitted;
 
     public event Action<TransportKind, Exception>? TransportFaulted;

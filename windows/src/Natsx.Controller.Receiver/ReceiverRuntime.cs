@@ -34,6 +34,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
     private WifiTrustedControlProcessor? _wifiControlProcessor;
     private WifiDiscoveryResponder? _wifiDiscovery;
     private WifiTrustedSession? _wifiSession;
+    private SessionId? _logicalSessionId;
     private UdpClient? _wifiPairingClient;
     private Task? _wifiPairingTask;
     private Task? _diagnosticsTask;
@@ -509,6 +510,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 throw new InvalidOperationException(
                     "Bluetooth peer trust was revoked before the transport could attach.");
             }
+
+            await PrepareAuthenticatedSessionAsync(trustedSession.SessionId, runtime, lifetime.Token)
+                .ConfigureAwait(false);
 
             await runtime
                 .DetachTransportAsync(
@@ -1023,6 +1027,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                     "Wi-Fi peer trust was revoked before the transport could attach.");
             }
 
+            await PrepareAuthenticatedSessionAsync(incomingSession.SessionId, runtime, lifetime.Token)
+                .ConfigureAwait(false);
+
             if (_wifiSession is not null)
             {
                 await runtime
@@ -1088,6 +1095,30 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 _transportMutationGate.Release();
             }
         }
+    }
+
+    // Called under _transportMutationGate, after authentication and peer trust validation.
+    private async ValueTask PrepareAuthenticatedSessionAsync(
+        SessionId sessionId, ControllerTransportRuntime runtime, CancellationToken cancellationToken)
+    {
+        if (_logicalSessionId == sessionId)
+        {
+            return; // Wi-Fi/USB/Bluetooth warm links share ordering within this session.
+        }
+
+        await DeactivateUsbCandidateAsync(runtime).ConfigureAwait(false);
+        await runtime.DetachTransportAsync(TransportKind.Wifi, cancellationToken).ConfigureAwait(false);
+        _wifiSession?.Dispose();
+        _wifiSession = null;
+        await runtime.DetachTransportAsync(TransportKind.Bluetooth, cancellationToken).ConfigureAwait(false);
+        _bluetoothSessionOwner?.Dispose();
+        _bluetoothSessionOwner = null;
+        _bluetoothSocket?.Dispose();
+        _bluetoothSocket = null;
+
+        runtime.ResetLogicalSession();
+        _logicalSessionId = sessionId;
+        Report("New authenticated controller session. Input sequence reset; virtual controller retained.");
     }
 
     private async Task UsbMonitorLoopAsync(
@@ -1515,6 +1546,9 @@ public sealed class ReceiverRuntime : IAsyncDisposable
                 throw new InvalidOperationException(
                     "USB peer trust was revoked before the transport could attach.");
             }
+
+            await PrepareAuthenticatedSessionAsync(trustedSession.SessionId, runtime, cancellationToken)
+                .ConfigureAwait(false);
 
             transport =
                 new UsbControllerTransport(
@@ -2346,6 +2380,7 @@ public sealed class ReceiverRuntime : IAsyncDisposable
 
         _sessionRegistry?.Dispose();
         _sessionRegistry = null;
+        _logicalSessionId = null;
         _trustServices = null;
 
         lifetime?.Dispose();

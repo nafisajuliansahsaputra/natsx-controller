@@ -1,0 +1,37 @@
+name: Receiver input hotfix
+on:
+  push:
+    branches: ["feat/reference-controller-skin"]
+    paths: ["windows/**", ".github/workflows/receiver-input-hotfix.yml"]
+permissions:
+  contents: read
+jobs:
+  verify-and-package:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Fetch pinned virtual-controller SDK
+        shell: pwsh
+        run: ./windows/eng/fetch-hidmaestro.ps1
+      - name: Verify session ordering and input safety
+        run: dotnet test windows/tests/Natsx.Controller.Connection.Tests/Natsx.Controller.Connection.Tests.csproj --configuration Release --verbosity normal
+      - name: Build receiver
+        run: dotnet build windows/src/Natsx.Controller.Receiver/Natsx.Controller.Receiver.csproj --configuration Release
+      - name: Prepare existing-installation patch
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/receiver-input-hotfix | Out-Null
+          $output = "windows/src/Natsx.Controller.Receiver/bin/Release/net10.0-windows10.0.19041.0"
+          Copy-Item "$output/Natsx.Controller.Receiver.dll" artifacts/receiver-input-hotfix/
+          Copy-Item "$output/Natsx.Controller.Connection.dll" artifacts/receiver-input-hotfix/
+          Copy-Item windows/eng/receiver-input-hotfix/README.txt artifacts/receiver-input-hotfix/
+          Copy-Item windows/eng/receiver-input-hotfix/Apply-Receiver-Hotfix.ps1 artifacts/receiver-input-hotfix/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NATSX-Receiver-Input-Hotfix
+          path: artifacts/receiver-input-hotfix/
+          if-no-files-found: error

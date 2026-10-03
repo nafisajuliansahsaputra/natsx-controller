@@ -466,3 +466,11 @@ Do not start these unless the product scope changes:
 - [x] Restore the canonical app identity and show authenticated receiver readiness.
 - [x] Add repeatable Activity-to-authenticated-USB-output loopback verification.
 - [ ] Confirm the updated APK against a physical phone and Windows receiver/game.
+
+## Authenticated session input recovery
+
+- [x] Retire previous-session links and reset sequence history on authenticated logical-session ID changes; preserve ordering during same-session failover.
+- [x] Verify restarted sequence zero reaches the existing virtual backend, with duplicate rejection and release preserved.
+- [x] Use the real foreground service publisher in Activity-to-USB-output verification.
+- [x] Extend the complete analog cap to the white plate (60px radial travel).
+- [ ] Confirm the updated Android/receiver pair on a physical phone and Windows game.

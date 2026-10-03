@@ -991,3 +991,7 @@ These are not excuses to block unrelated work.
 - exact rumble capability mapping.
 
 Resolve them in order of milestone dependency and record the decision.
+
+### Authenticated session epochs
+
+Input ordering is scoped to an authenticated logical session, not the receiver process lifetime. A new trusted session ID retires all old transport wrappers, neutralizes input and clears session sequence history before attaching the new link. Same-session Wi-Fi/Bluetooth/USB joins and failover retain the global sequence and anti-replay rules. The virtual backend stays alive across both cases.

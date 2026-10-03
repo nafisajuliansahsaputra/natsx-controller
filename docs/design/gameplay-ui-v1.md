@@ -145,8 +145,8 @@ system bars and draws through display cutouts; insets do not shrink the canvas.
 
 Analog plates have diameter 500, dark sockets 445, the movable light-green
 third circle 380, and its inner circles 280 and 250. The complete third circle
-and its two children move together. Visual travel is clamped to 32.5 reference
-pixels radially, leaving the dark socket fixed. Processing radii, calibration
+and its two children move together. Visual travel is clamped to 60 reference
+pixels radially, reaching the white plate while the dark socket stays fixed. Processing radii, calibration
 and transmitted analog values remain independent of this visual travel.
 
 All buttons have a white backplate following the same silhouette as the colored

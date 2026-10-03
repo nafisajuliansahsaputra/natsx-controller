@@ -16,7 +16,7 @@ The shared node 1:116 is the RB background; the complete reference is frame 1:2,
 
 Every key now has a white backplate following its original contour: 12px shoulder rims and 6px utility/circular rims. LT/RT no longer combine mismatched expanded rectangles. Native rounded rectangles retain the Figma affine transforms and are unioned before bevel rendering. Gradients, shadows and pressed states are cached during layout; gameplay draws cached bitmaps.
 
-The analog is rendered with concentric native circles: fixed white plate diameter 500 and dark socket 445; movable third light-green circle 380, with its inner 280/250 circles attached. Radial visual travel is limited to 32.5px so the complete moving cap stays inside the socket. Existing input calibration and processing radii are unchanged. Original SVG exports remain the provenance for paths, colors and assets.
+The analog is rendered with concentric native circles: fixed white plate diameter 500 and dark socket 445; movable third light-green circle 380, with its inner 280/250 circles attached. Radial visual travel is limited to 60px so the complete moving cap stays inside the white plate. Existing input calibration and processing radii are unchanged. Original SVG exports remain the provenance for paths, colors and assets.
 
 The canvas fills the window with independently adapted anchors and uniform control dimensions; circle shapes and D-pad/ABXY spacing stay coherent. Android hides system bars and permits drawing through cutouts. Saved custom layouts retain their placements; restore the default layout in settings to see Figma's defaults.
 

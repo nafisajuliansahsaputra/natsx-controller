@@ -5,6 +5,35 @@ namespace Natsx.Controller.Connection.Tests;
 public sealed class ControllerTransportRuntimeTests
 {
     [Fact]
+    public async Task NewLogicalSession_RetiresOldOrderingWithoutRecreatingTheBackend()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new FakeBackend();
+        var session = new ControllerSession();
+        var safety = new InputSafetyEngine(session, backend, ConnectionPolicy.Competitive, clock);
+        var manager = new SmartConnectionManager(ConnectionPolicy.Competitive, clock);
+        var old = new ScriptedControllerTransport(TransportKind.Wifi, clock,
+            new TransportHealthSnapshot(TransportKind.Wifi, TransportRuntimeState.Available,
+                TimeSpan.Zero, TimeSpan.Zero, 0, TimeSpan.Zero, 0, TransportHealthGrade.Warning));
+        await using var runtime = new ControllerTransportRuntime(session, safety, manager,
+            new IControllerTransport[] { old }, ConnectionPolicy.Competitive, clock);
+        session.SetAuthoritativeTransport(TransportKind.Wifi);
+        Assert.True(safety.TryAccept(TransportKind.Wifi, 500_000, GamepadState.Neutral));
+        Assert.Throws<InvalidOperationException>(() => runtime.ResetLogicalSession());
+        await runtime.DetachTransportAsync(TransportKind.Wifi);
+        runtime.ResetLogicalSession();
+        Assert.Null(session.LastAcceptedSequence);
+        session.SetAuthoritativeTransport(TransportKind.Usb);
+        var pressed = GamepadState.Neutral with { Buttons = GamepadButtons.A, LeftX = 20000 };
+        Assert.True(safety.TryAccept(TransportKind.Usb, 0, pressed));
+        Assert.Equal(pressed, session.CurrentState);
+        Assert.Equal(pressed, backend.LastState);
+        Assert.False(safety.TryAccept(TransportKind.Usb, 0, GamepadState.Neutral));
+        Assert.True(safety.TryAccept(TransportKind.Usb, 1, GamepadState.Neutral));
+        Assert.Equal(GamepadState.Neutral, backend.LastState);
+    }
+
+    [Fact]
     public async Task LifecycleEvents_UpdateManagerStateWithoutPollingTick()
     {
         var clock = new ManualTimeProvider();
