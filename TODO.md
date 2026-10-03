@@ -524,5 +524,5 @@ Do not start these unless the product scope changes:
 
 - [x] Correct both Windows HIDMaestro stick Y axes without changing Android/wire directions.
 - [x] Add individual button, eight-way D-pad, trigger isolation, both-stick direction and native-state neutralization regression coverage.
-- [ ] Verify the rebuilt installer and input regressions in Windows CI.
+- [x] Verify the rebuilt installer and input regressions in Windows CI (37117781954); Android CI (37117781956) and full Activity touch-to-authenticated-state audit (37117781959) passed.
 - [ ] Confirm up/down and all gameplay controls in joy.cpl/eFootball on the physical PC.
