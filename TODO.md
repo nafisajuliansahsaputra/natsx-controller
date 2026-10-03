@@ -488,7 +488,7 @@ Do not start these unless the product scope changes:
 
 ## USB attached-session recovery
 
-- [ ] Verify periodic authenticated USB session announcements and reopened-reader recovery in Android/Windows CI.
-- [ ] Verify USB rejoin after logical-session rotation without requiring a cable reconnect.
-- [ ] Expose USB open/join failures in receiver diagnostics.
+- [x] Verify periodic authenticated USB session announcements and reopened-reader recovery in Android/Windows CI.
+- [x] Verify USB rejoin after logical-session rotation without requiring a cable reconnect.
+- [x] Expose USB open/join failures in receiver diagnostics.
 - [ ] Confirm USB takeover and unplug fallback with the updated pair on physical devices.
