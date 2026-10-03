@@ -1,0 +1,32 @@
+name: Fetch Figma design assets
+on:
+  push:
+    branches: ["fix/receiver-click-update"]
+    paths: [".github/workflows/figma-assets-temporary.yml"]
+permissions:
+  contents: read
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download and validate Figma assets
+        env:
+          ASSETS: '[{"name":"imgEllipse17","url":"https://www.figma.com/api/mcp/asset/393d27d3-0964-4209-855f-019998ce80a1.png"},{"name":"imgEllipse20","url":"https://www.figma.com/api/mcp/asset/abc62dfc-d991-44a1-a3f3-cca5be5107c4.png"},{"name":"imgDsdasdads1","url":"https://www.figma.com/api/mcp/asset/4b90a087-a7ad-4563-bbdb-9b49e0b18015.png"},{"name":"imgEllipse4","url":"https://www.figma.com/api/mcp/asset/d2968e0b-d6e5-41c4-9d6e-79d21d005dea.svg"},{"name":"imgEllipse15","url":"https://www.figma.com/api/mcp/asset/bfefe3da-d95d-46e4-85e0-ae07cd216f6c.svg"},{"name":"imgEllipse16","url":"https://www.figma.com/api/mcp/asset/7db5ccf8-f29e-45f0-b627-db7018fc9be0.svg"},{"name":"imgEllipse18","url":"https://www.figma.com/api/mcp/asset/6b376851-b5fc-47d6-955d-11e4e527c11d.svg"},{"name":"imgEllipse5","url":"https://www.figma.com/api/mcp/asset/3a6add8c-337b-4b0a-85ad-d18bfbd1314e.svg"},{"name":"imgEllipse19","url":"https://www.figma.com/api/mcp/asset/3517fe29-cb31-4f5c-b88c-68619a19cc52.svg"},{"name":"imgEllipse6","url":"https://www.figma.com/api/mcp/asset/8107d38b-336e-4061-976d-ed6c21e81391.svg"},{"name":"imgVector","url":"https://www.figma.com/api/mcp/asset/22158343-0d26-4932-a047-456c61b69070.svg"},{"name":"imgFluentTabDesktopMultiple24Regular","url":"https://www.figma.com/api/mcp/asset/f5e1ec99-33bf-4475-b4dc-cecd83893566.svg"},{"name":"imgFluentShareIos20Filled","url":"https://www.figma.com/api/mcp/asset/407aea4c-3507-4b31-a414-f6939379a8bc.svg"},{"name":"imgVector1","url":"https://www.figma.com/api/mcp/asset/df9cdaef-f452-41aa-904c-a7d86e02cae3.svg"},{"name":"imgVector2","url":"https://www.figma.com/api/mcp/asset/3944ba5c-1577-4100-99a9-e1cc0d0b9c55.svg"},{"name":"imgEllipse21","url":"https://www.figma.com/api/mcp/asset/c26b4eb9-cf37-40d1-af40-8f920cfecb3a.svg"},{"name":"imgCharmMenuHamburger","url":"https://www.figma.com/api/mcp/asset/347663cc-13cb-488e-961e-6726b62ace65.svg"},{"name":"imgGroup","url":"https://www.figma.com/api/mcp/asset/32828e8c-0244-4a94-9ea3-a17a23cc1419.svg"},{"name":"imgBiUsbSymbol","url":"https://www.figma.com/api/mcp/asset/18afadd4-dcb7-4f40-979a-00a2b3294542.svg"},{"name":"imgGroup1","url":"https://www.figma.com/api/mcp/asset/80fd9878-b206-486c-a463-bfb2cd8a9953.svg"},{"name":"imgAkarIconsBluetooth","url":"https://www.figma.com/api/mcp/asset/f2e074da-9c94-4b01-86cf-be70ac22b34b.svg"},{"name":"imgRectangle20","url":"https://www.figma.com/api/mcp/asset/7157f72c-0efd-499f-82c5-0cd43a84a571.svg"},{"name":"imgRectangle23","url":"https://www.figma.com/api/mcp/asset/0143e4f1-599f-4d91-96ab-663d01efb5c7.svg"},{"name":"imgRectangle21","url":"https://www.figma.com/api/mcp/asset/ab1d78c0-c482-44b0-9fce-90c23c2805f7.svg"},{"name":"imgRectangle22","url":"https://www.figma.com/api/mcp/asset/86d4d5c4-23e8-46da-889a-449fd2960f56.svg"},{"name":"reference","url":"https://www.figma.com/api/mcp/asset/5b65f1f7-efda-4b82-9003-cb4481264206.png"}]'
+        run: |
+          mkdir assets
+          python3 - <<'PY'
+          import json, os, urllib.request, pathlib, xml.etree.ElementTree as ET
+          for asset in json.loads(os.environ["ASSETS"]):
+              ext = asset["url"].rsplit(".", 1)[1]
+              data = urllib.request.urlopen(asset["url"], timeout=45).read()
+              if ext == "png":
+                  assert data.startswith(b"\x89PNG\r\n\x1a\n"), "invalid PNG: "+asset["name"]
+              else:
+                  assert ET.fromstring(data).tag.endswith("svg"), "invalid SVG: "+asset["name"]
+              pathlib.Path("assets", asset["name"]+"."+ext).write_bytes(data)
+              print(asset["name"], len(data))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: figma-white-assets
+          path: assets/
