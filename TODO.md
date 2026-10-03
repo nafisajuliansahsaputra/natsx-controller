@@ -545,4 +545,4 @@ Do not start these unless the product scope changes:
 - [x] Use the exact supplied Frame 1 SVG layers, gradients, glyphs and analog texture.
 - [x] Add matching missing shoulder/utility bevels; retain widened travel and input mapping.
 - [x] Connect all three thin panel contours and light bar to one authoritative transport palette.
-- [ ] Verify new native snapshots, contour handovers, input mapping, lint and APK build in CI.
+- [x] Verify new native snapshots, contour handovers, input mapping, lint and APK build in CI (Android 37124310240; UI/input 37124310249).
