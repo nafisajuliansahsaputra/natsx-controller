@@ -73,6 +73,7 @@ public sealed class PipeVirtualGamepadBackend : IVirtualGamepadBackend
             {
                 _desiredStarted =
                     true;
+                _lastConnectionError = null;
                 _latestState =
                     GamepadState.Neutral;
 

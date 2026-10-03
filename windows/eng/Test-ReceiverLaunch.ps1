@@ -29,9 +29,9 @@ try {
         Start-Sleep -Milliseconds 200
     }
     if (-not $ready) { throw 'Actual Receiver UI did not become ready.' }
-    foreach ($argsList in @(@('--background'), @())) {
+    foreach ($background in @($true, $false)) {
         $start = @{ FilePath=$Receiver; PassThru=$true }
-        if ($argsList.Count -gt 0) { $start.ArgumentList=$argsList }
+        if ($background) { $start.ArgumentList='--background' }
         $second = Start-Process @start
         if (-not $second.WaitForExit(10000) -or $second.ExitCode -ne 0) { throw 'Repeated launch did not hand off to the existing Receiver.' }
         $first.Refresh()
