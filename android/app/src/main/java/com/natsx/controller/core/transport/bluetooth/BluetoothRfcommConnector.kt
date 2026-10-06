@@ -1,10 +1,14 @@
 package com.natsx.controller.core.transport.bluetooth
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.content.Context
+import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.PeerId
+import com.natsx.controller.core.protocol.RumblePayload
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.protocol.TrustedSessionRegistry
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.RealtimeStateSink
@@ -44,6 +48,10 @@ class AndroidBluetoothRfcommSocket(
 
 interface BluetoothRealtimeLink : RealtimeStateSink, Closeable {
     val lastHeartbeatReceivedNanos: Long
+
+    fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean
 }
 
 fun interface BluetoothRealtimeLinkFactory {
@@ -66,6 +74,19 @@ class BluetoothRfcommRealtimeLink internal constructor(
         }
 
         sender.publish(envelope)
+    }
+
+    override fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean {
+        if (closed) {
+            return false
+        }
+
+        return sender
+            .trySendTransportPreference(
+                payload,
+            )
     }
 
     override fun close() {
@@ -98,6 +119,8 @@ class BluetoothRfcommRealtimeLink internal constructor(
 class BluetoothRfcommConnector(
     private val socketProvider: BluetoothRfcommSocketProvider,
     private val secondaryJoinClient: BluetoothSecondarySessionJoinClient,
+    private val rumbleSink: (RumblePayload) -> Unit = {},
+    private val handoverSink: (HandoverPayload) -> Unit = {},
 ) : BluetoothRealtimeLinkFactory {
     override fun create(): BluetoothRfcommRealtimeLink = connect()
 
@@ -119,6 +142,8 @@ class BluetoothRfcommConnector(
                         outputStream = socket.outputStream,
                         trustedSession = session,
                         inputStream = socket.inputStream,
+                        rumbleSink = rumbleSink,
+                        handoverSink = handoverSink,
                     )
 
                 return BluetoothRfcommRealtimeLink(
@@ -144,6 +169,7 @@ class BluetoothRfcommConnector(
                 "65dbf3c2-1b88-4ac8-9a1d-3b7c9f5f6e11",
             )
 
+        @SuppressLint("MissingPermission")
         fun forDevice(
             context: Context,
             device: BluetoothDevice,
@@ -152,6 +178,8 @@ class BluetoothRfcommConnector(
             sessionRegistry: TrustedSessionRegistry,
             permissionGate: BluetoothPermissionGate =
                 BluetoothPermissionGate(context),
+            rumbleSink: (RumblePayload) -> Unit = {},
+            handoverSink: (HandoverPayload) -> Unit = {},
         ): BluetoothRfcommConnector {
             require(permissionGate.isBluetoothSupported()) {
                 "Bluetooth is not supported on this device."
@@ -162,11 +190,18 @@ class BluetoothRfcommConnector(
             require(permissionGate.isBluetoothEnabled()) {
                 "Bluetooth is disabled."
             }
-            require(
-                device.bondState ==
-                    BluetoothDevice.BOND_BONDED,
-            ) {
-                "Bluetooth receiver is not OS-bonded. Complete pairing first."
+            try {
+                require(
+                    device.bondState ==
+                        BluetoothDevice.BOND_BONDED,
+                ) {
+                    "Bluetooth receiver is not OS-bonded. Complete pairing first."
+                }
+            } catch (exception: SecurityException) {
+                throw IllegalStateException(
+                    "Bluetooth permission was revoked while checking receiver bonding.",
+                    exception,
+                )
             }
 
             val manager =
@@ -180,17 +215,24 @@ class BluetoothRfcommConnector(
 
             val provider =
                 BluetoothRfcommSocketProvider {
-                    // Discovery slows RFCOMM setup and is unnecessary when
-                    // connecting to an already selected / bonded receiver.
-                    runCatching {
-                        adapter.cancelDiscovery()
-                    }
+                    try {
+                        // Discovery slows RFCOMM setup and is unnecessary when
+                        // connecting to an already selected / bonded receiver.
+                        runCatching {
+                            adapter.cancelDiscovery()
+                        }
 
-                    AndroidBluetoothRfcommSocket(
-                        device.createRfcommSocketToServiceRecord(
-                            SERVICE_UUID,
-                        ),
-                    )
+                        AndroidBluetoothRfcommSocket(
+                            device.createRfcommSocketToServiceRecord(
+                                SERVICE_UUID,
+                            ),
+                        )
+                    } catch (exception: SecurityException) {
+                        throw IllegalStateException(
+                            "Bluetooth permission was revoked while opening RFCOMM.",
+                            exception,
+                        )
+                    }
                 }
 
             return BluetoothRfcommConnector(
@@ -201,6 +243,8 @@ class BluetoothRfcommConnector(
                         receiverPeerId = receiverPeerId,
                         sessionRegistry = sessionRegistry,
                     ),
+                rumbleSink = rumbleSink,
+                handoverSink = handoverSink,
             )
         }
     }

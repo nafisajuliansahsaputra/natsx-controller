@@ -9,6 +9,38 @@ import org.junit.Test
 
 class ControlPayloadCodecsTest {
     @Test
+    fun transportPreferenceRoundTrips() {
+        TransportPreferenceMode.entries
+            .forEach { mode ->
+                val encoded =
+                    TransportPreferencePayloadCodec
+                        .encode(
+                            TransportPreferencePayload(
+                                mode,
+                            ),
+                        )
+
+                val decoded =
+                    TransportPreferencePayloadCodec
+                        .decode(encoded)
+
+                assertEquals(
+                    mode,
+                    decoded.mode,
+                )
+                assertArrayEquals(
+                    byteArrayOf(
+                        mode.wireValue.toByte(),
+                        0,
+                        0,
+                        0,
+                    ),
+                    encoded,
+                )
+            }
+    }
+
+    @Test
     fun heartbeatAckRoundTripsTimestamp() {
         val expected = HeartbeatAckPayload(0x0102030405060708uL)
         val decoded = HeartbeatAckPayloadCodec.decode(
@@ -66,6 +98,11 @@ class ControlPayloadCodecsTest {
 
     @Test
     fun reservedBytesAreRejected() {
+        assertThrows(IllegalArgumentException::class.java) {
+            TransportPreferencePayloadCodec.decode(
+                byteArrayOf(1, 1, 0, 0),
+            )
+        }
         assertThrows(IllegalArgumentException::class.java) {
             TransportReadyPayloadCodec.decode(byteArrayOf(1, 1, 0, 0))
         }

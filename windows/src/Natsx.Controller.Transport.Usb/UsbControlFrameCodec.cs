@@ -96,6 +96,114 @@ public static class UsbControlFrameCodec
         return System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(frame.Payload);
     }
 
+    public static byte[] EncodeRumble(
+        UsbTrustedSession session,
+        RumblePayload payload,
+        ulong timestampMicros) =>
+        ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.Rumble,
+                FrameFlags.Authenticated,
+                session.SessionId,
+                0,
+                timestampMicros,
+                RumblePayloadCodec.Encode(
+                    payload)),
+            session.SessionKey);
+
+    public static RumblePayload DecodeRumble(
+        ReadOnlySpan<byte> frameBytes,
+        UsbTrustedSession session)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                session);
+
+        if (frame.MessageType !=
+            MessageType.Rumble)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.Rumble}, received {frame.MessageType}.");
+        }
+
+        return RumblePayloadCodec.Decode(
+            frame.Payload);
+    }
+
+    public static byte[] EncodeTransportPreference(
+        UsbTrustedSession session,
+        TransportPreferencePayload payload,
+        ulong timestampMicros) =>
+        ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.TransportPreference,
+                FrameFlags.Authenticated,
+                session.SessionId,
+                0,
+                timestampMicros,
+                TransportPreferencePayloadCodec
+                    .Encode(payload)),
+            session.SessionKey);
+
+    public static TransportPreferencePayload DecodeTransportPreference(
+        ReadOnlySpan<byte> frameBytes,
+        UsbTrustedSession session)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                session);
+
+        if (frame.MessageType !=
+            MessageType.TransportPreference)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.TransportPreference}, received {frame.MessageType}.");
+        }
+
+        return TransportPreferencePayloadCodec
+            .Decode(frame.Payload);
+    }
+
+    public static byte[] EncodeHandoverCommit(
+        UsbTrustedSession session,
+        HandoverPayload payload,
+        ulong timestampMicros) =>
+        ProtocolFrameCodec.Encode(
+            new ProtocolFrame(
+                ProtocolVersion.Current,
+                MessageType.HandoverCommit,
+                FrameFlags.Authenticated,
+                session.SessionId,
+                0,
+                timestampMicros,
+                HandoverPayloadCodec.Encode(
+                    payload)),
+            session.SessionKey);
+
+    public static HandoverPayload DecodeHandoverCommit(
+        ReadOnlySpan<byte> frameBytes,
+        UsbTrustedSession session)
+    {
+        ProtocolFrame frame =
+            DecodeAuthenticatedFrame(
+                frameBytes,
+                session);
+
+        if (frame.MessageType !=
+            MessageType.HandoverCommit)
+        {
+            throw new FormatException(
+                $"Expected {MessageType.HandoverCommit}, received {frame.MessageType}.");
+        }
+
+        return HandoverPayloadCodec.Decode(
+            frame.Payload);
+    }
+
     public static byte[] EncodeTransportReady(
         UsbTrustedSession session,
         ProtocolTransport transport,

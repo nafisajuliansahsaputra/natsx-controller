@@ -60,6 +60,9 @@ public sealed class BluetoothRealtimeStreamReceiver : IAsyncDisposable
                 });
     }
 
+    public event Action<TransportPreferencePayload>?
+        TransportPreferenceReceived;
+
     public ChannelReader<BluetoothGamepadFrame> States =>
         _latestState.Reader;
 
@@ -95,6 +98,125 @@ public sealed class BluetoothRealtimeStreamReceiver : IAsyncDisposable
                 : _timeProvider.GetElapsedTime(
                     acceptedAt,
                     _timeProvider.GetTimestamp());
+        }
+    }
+
+    public async ValueTask<bool> TrySendRumbleAsync(
+        RumbleState rumble,
+        CancellationToken cancellationToken = default)
+    {
+        Stream? outputStream =
+            _outputStream;
+
+        if (outputStream is null ||
+            _receiveLoop is null)
+        {
+            return false;
+        }
+
+        byte[] frame =
+            BluetoothControlFrameCodec
+                .EncodeRumble(
+                    _trustedSession,
+                    new RumblePayload(
+                        rumble.LowFrequencyMotor,
+                        rumble.HighFrequencyMotor),
+                    GetMonotonicMicroseconds());
+
+        byte[] framed =
+            BluetoothStreamFrameCodec
+                .Encode(
+                    frame);
+
+        await _outputGate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await outputStream.WriteAsync(
+                    framed,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            await outputStream.FlushAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        finally
+        {
+            _outputGate.Release();
+        }
+    }
+
+    public async ValueTask<bool> TrySendHandoverCommitAsync(
+        ProtocolTransport activeTransport,
+        uint stateSequence,
+        CancellationToken cancellationToken = default)
+    {
+        Stream? outputStream =
+            _outputStream;
+
+        if (outputStream is null ||
+            _receiveLoop is null)
+        {
+            return false;
+        }
+
+        byte[] frame =
+            BluetoothControlFrameCodec
+                .EncodeHandoverCommit(
+                    _trustedSession,
+                    new HandoverPayload(
+                        activeTransport,
+                        stateSequence),
+                    GetMonotonicMicroseconds());
+
+        byte[] framed =
+            BluetoothStreamFrameCodec
+                .Encode(
+                    frame);
+
+        await _outputGate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await outputStream.WriteAsync(
+                    framed,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            await outputStream.FlushAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        finally
+        {
+            _outputGate.Release();
         }
     }
 
@@ -260,6 +382,35 @@ public sealed class BluetoothRealtimeStreamReceiver : IAsyncDisposable
                         ProtocolConstants.HeaderSize
                         ? (MessageType)frameBytes[6]
                         : 0;
+
+                if (messageType ==
+                    MessageType.TransportPreference)
+                {
+                    try
+                    {
+                        TransportPreferencePayload preference =
+                            BluetoothControlFrameCodec
+                                .DecodeTransportPreference(
+                                    frameBytes,
+                                    _trustedSession);
+
+                        TransportPreferenceReceived
+                            ?.Invoke(preference);
+
+                        Interlocked.Increment(
+                            ref _acceptedControlFrames);
+                    }
+                    catch (Exception exception) when (
+                        exception is FormatException or
+                        CryptographicException or
+                        ArgumentException)
+                    {
+                        Interlocked.Increment(
+                            ref _rejectedFrames);
+                    }
+
+                    continue;
+                }
 
                 if (messageType ==
                     MessageType.HeartbeatAck)

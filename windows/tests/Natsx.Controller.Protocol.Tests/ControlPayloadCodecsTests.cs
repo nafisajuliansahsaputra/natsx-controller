@@ -4,6 +4,38 @@ namespace Natsx.Controller.Protocol.Tests;
 
 public sealed class ControlPayloadCodecsTests
 {
+    [Theory]
+    [InlineData(TransportPreferenceMode.Auto)]
+    [InlineData(TransportPreferenceMode.Wifi)]
+    [InlineData(TransportPreferenceMode.Bluetooth)]
+    [InlineData(TransportPreferenceMode.UsbDirect)]
+    public void TransportPreferenceRoundTrips(
+        TransportPreferenceMode mode)
+    {
+        byte[] bytes =
+            TransportPreferencePayloadCodec
+                .Encode(
+                    new TransportPreferencePayload(
+                        mode));
+
+        TransportPreferencePayload decoded =
+            TransportPreferencePayloadCodec
+                .Decode(bytes);
+
+        Assert.Equal(
+            mode,
+            decoded.Mode);
+        Assert.Equal(
+            new byte[]
+            {
+                (byte)mode,
+                0,
+                0,
+                0,
+            },
+            bytes);
+    }
+
     [Fact]
     public void HeartbeatAckRoundTripsTimestamp()
     {
@@ -71,6 +103,9 @@ public sealed class ControlPayloadCodecsTests
     [Fact]
     public void ReservedBytesAreRejected()
     {
+        Assert.Throws<FormatException>(
+            () => TransportPreferencePayloadCodec.Decode([1, 1, 0, 0]));
+
         Assert.Throws<FormatException>(
             () => TransportReadyPayloadCodec.Decode([1, 1, 0, 0]));
 

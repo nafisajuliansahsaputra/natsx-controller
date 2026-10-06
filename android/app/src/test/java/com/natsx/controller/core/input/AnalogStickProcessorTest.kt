@@ -105,6 +105,109 @@ class AnalogStickProcessorTest {
     }
 
     @Test
+    fun calibrationCenterOffsetRecentersNaturalThumbPosition() {
+        val calibrated =
+            AnalogStickProcessor(
+                deadzone = 0.05f,
+                calibration =
+                    StickCalibration(
+                        centerOffsetX = 0.10f,
+                        centerOffsetY = -0.06f,
+                        travelScale = 1f,
+                    ),
+                jitterThreshold = 0,
+            )
+
+        val output =
+            calibrated.process(
+                pointerX = 105f,
+                pointerY = 103f,
+                centerX = 100f,
+                centerY = 100f,
+                radius = 50f,
+            )
+
+        assertEquals(0, output.x)
+        assertEquals(0, output.y)
+    }
+
+    @Test
+    fun shorterCalibratedTravelStillReachesFullScale() {
+        val calibrated =
+            AnalogStickProcessor(
+                deadzone = 0f,
+                calibration =
+                    StickCalibration(
+                        travelScale = 0.80f,
+                    ),
+                jitterThreshold = 0,
+            )
+
+        val output =
+            calibrated.process(
+                pointerX = 140f,
+                pointerY = 100f,
+                centerX = 100f,
+                centerY = 100f,
+                radius = 50f,
+            )
+
+        assertEquals(32767, output.x)
+        assertEquals(0, output.y)
+    }
+
+    @Test
+    fun higherSensitivityBoostsMidTravelWithoutChangingFullScale() {
+        val normal =
+            AnalogStickProcessor(
+                deadzone = 0f,
+                sensitivity = 1f,
+                jitterThreshold = 0,
+            )
+        val faster =
+            AnalogStickProcessor(
+                deadzone = 0f,
+                sensitivity = 1.25f,
+                jitterThreshold = 0,
+            )
+
+        val normalMid =
+            normal.process(
+                pointerX = 125f,
+                pointerY = 100f,
+                centerX = 100f,
+                centerY = 100f,
+                radius = 50f,
+            )
+        val fasterMid =
+            faster.process(
+                pointerX = 125f,
+                pointerY = 100f,
+                centerX = 100f,
+                centerY = 100f,
+                radius = 50f,
+            )
+
+        assertTrue(
+            fasterMid.x > normalMid.x,
+        )
+
+        val fasterEdge =
+            faster.process(
+                pointerX = 150f,
+                pointerY = 100f,
+                centerX = 100f,
+                centerY = 100f,
+                radius = 50f,
+            )
+
+        assertEquals(
+            32767,
+            fasterEdge.x,
+        )
+    }
+
+    @Test
     fun diagonalIsRadiallyClamped() {
         val output = processor.process(
             pointerX = 200f,

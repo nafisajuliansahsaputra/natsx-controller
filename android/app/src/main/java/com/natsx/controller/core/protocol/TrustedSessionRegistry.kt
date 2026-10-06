@@ -105,6 +105,16 @@ class TrustedSessionRegistry : Closeable {
         }
     }
 
+    fun hasAnyActiveSession(): Boolean {
+        check(!closed) {
+            "Trusted session registry is closed."
+        }
+
+        return synchronized(gate) {
+            sessions.isNotEmpty()
+        }
+    }
+
     fun getBySessionId(
         sessionId: SessionId,
     ): TrustedSessionRegistration? {
@@ -142,6 +152,30 @@ class TrustedSessionRegistry : Closeable {
             sessions
                 .remove(peerId)
                 ?.close()
+        }
+    }
+
+    fun removeIfSession(
+        peerId: PeerId,
+        sessionId: SessionId,
+    ): Boolean {
+        check(!closed) {
+            "Trusted session registry is closed."
+        }
+
+        return synchronized(gate) {
+            val current =
+                sessions[peerId]
+                    ?: return@synchronized false
+
+            if (current.sessionId != sessionId) {
+                return@synchronized false
+            }
+
+            sessions.remove(peerId)
+                ?.close()
+
+            true
         }
     }
 

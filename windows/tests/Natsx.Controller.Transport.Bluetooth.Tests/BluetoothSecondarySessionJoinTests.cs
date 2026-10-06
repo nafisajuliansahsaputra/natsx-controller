@@ -55,11 +55,8 @@ public sealed class BluetoothSecondarySessionJoinTests
 
         using var input =
             new MemoryStream(
-                Concat(
-                    BluetoothStreamFrameCodec.Encode(
-                        remoteReady),
-                    BluetoothStreamFrameCodec.Encode(
-                        remoteTransportReady)));
+                BluetoothStreamFrameCodec.Encode(
+                    remoteTransportReady));
 
         using var output =
             new MemoryStream();
@@ -79,7 +76,8 @@ public sealed class BluetoothSecondarySessionJoinTests
         using BluetoothSecondarySessionJoinCompletion completion =
             await server.JoinAsync(
                 input,
-                output);
+                output,
+                remoteReady);
 
         Assert.Equal(
             androidPeer,

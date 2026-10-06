@@ -1,0 +1,111 @@
+name: Release Policy CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feat/**"
+      - "fix/**"
+    paths:
+      - ".github/workflows/release.yml"
+      - ".github/workflows/release-policy-ci.yml"
+      - "VERSION"
+      - "VERSION_CODE"
+      - "CHANGELOG.md"
+      - "docs/release/**"
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - ".github/workflows/release-policy-ci.yml"
+      - "VERSION"
+      - "VERSION_CODE"
+      - "CHANGELOG.md"
+      - "docs/release/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-release-contract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse release workflow YAML
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruby -e 'require "yaml"; YAML.parse_file(ARGV.fetch(0)); puts "release.yml YAML parse passed"' .github/workflows/release.yml
+
+      - name: Enforce fail-closed release contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          workflow=".github/workflows/release.yml"
+
+          required=(
+            'NATSX_PHYSICAL_RELEASE_APPROVED_SHA'
+            'NATSX_INNO_LICENSE_CONFIRMED'
+            'NATSX_PRODUCTION_DRIVER_BUNDLE_URL'
+            'NATSX_PRODUCTION_DRIVER_BUNDLE_SHA256'
+            'ANDROID_KEYSTORE_BASE64'
+            'WINDOWS_SIGNING_PFX_BASE64'
+            'WINDOWS_TIMESTAMP_URL'
+            'verifyReleaseSigning'
+            'apksigner" verify'
+            'sign-windows-release.ps1'
+            'build-installer.ps1'
+            'sha256sum -c'
+            'publish-release:'
+            'gh release'
+          )
+
+          for token in "${required[@]}"; do
+            if ! grep -Fq "$token" "$workflow"; then
+              echo "Release workflow is missing required production gate/token: $token" >&2
+              exit 1
+            fi
+          done
+
+          if grep -Fq -- '-AllowMissingProductionUsbDrivers' "$workflow"; then
+            echo "Production release workflow must never allow missing USB production drivers." >&2
+            exit 1
+          fi
+
+          publish_section="$(
+            awk '
+              /^  publish-release:/ { capture=1 }
+              capture { print }
+            ' "$workflow"
+          )"
+
+          if grep -Fq 'natsx-controller-windows-x64-validation' <<<"$publish_section"; then
+            echo "Portable Windows validation ZIP must not be published as an end-user release asset." >&2
+            exit 1
+          fi
+
+          if ! grep -Fq 'natsx-controller-windows-installer' <<<"$publish_section"; then
+            echo "End-user Windows installer artifact is missing from publish-release." >&2
+            exit 1
+          fi
+
+      - name: Validate development version shape
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="$(tr -d '\r\n' < VERSION)"
+          version_code="$(tr -d '\r\n' < VERSION_CODE)"
+
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-dev)?$ ]]; then
+            echo "VERSION must be x.y.z or x.y.z-dev on development branches, got: $version" >&2
+            exit 1
+          fi
+
+          if [[ ! "$version_code" =~ ^[1-9][0-9]*$ ]]; then
+            echo "VERSION_CODE must be a positive integer, got: $version_code" >&2
+            exit 1
+          fi

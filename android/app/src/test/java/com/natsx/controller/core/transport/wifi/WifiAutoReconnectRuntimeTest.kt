@@ -2,6 +2,8 @@ package com.natsx.controller.core.transport.wifi
 
 import com.natsx.controller.core.gamepad.GamepadState
 import com.natsx.controller.core.protocol.PeerId
+import com.natsx.controller.core.protocol.TransportPreferenceMode
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.session.RealtimeStateBroadcaster
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.SessionSequence
@@ -63,6 +65,165 @@ class WifiAutoReconnectRuntimeTest {
         }
 
         assertTrue(link.closed.get())
+    }
+
+    @Test
+    fun activeLinkReceivesTransportPreference() {
+        val endpoint =
+            InetSocketAddress(
+                InetAddress.getByName("127.0.0.1"),
+                43860,
+            )
+        val link =
+            FakeLink(
+                System.nanoTime(),
+            )
+        val broadcaster =
+            RealtimeStateBroadcaster(
+                sequence = SessionSequence(),
+                monotonicMicros = { 1uL },
+            )
+        val runtime =
+            WifiAutoReconnectRuntime(
+                broadcaster = broadcaster,
+                endpointProvider =
+                    WifiEndpointProvider {
+                        WifiResolvedEndpoint(
+                            endpoint = endpoint,
+                            source =
+                                WifiEndpointResolutionSource.CACHED_DIRECT,
+                        )
+                    },
+                linkFactory =
+                    WifiRealtimeLinkFactory {
+                        link
+                    },
+                nowNanos = System::nanoTime,
+                firstHeartbeatTimeoutMillis = 250,
+                heartbeatLostTimeoutMillis = 500,
+                pollIntervalMillis = 25,
+            )
+
+        try {
+            runtime.start()
+
+            waitUntil(1_000) {
+                runtime.state ==
+                    WifiReconnectState.ACTIVE
+            }
+
+            val expected =
+                TransportPreferencePayload(
+                    TransportPreferenceMode.WIFI,
+                )
+
+            assertTrue(
+                runtime.trySendTransportPreference(
+                    expected,
+                ),
+            )
+            assertEquals(
+                expected,
+                link.lastPreference,
+            )
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun repeatedHeartbeatLossRecoversAcrossFiveWifiCycles() {
+        val endpoint =
+            InetSocketAddress(
+                InetAddress.getByName(
+                    "127.0.0.1",
+                ),
+                43860,
+            )
+
+        val createdLinks =
+            java.util.concurrent
+                .CopyOnWriteArrayList<FakeLink>()
+
+        val broadcaster =
+            RealtimeStateBroadcaster(
+                sequence =
+                    SessionSequence(),
+                monotonicMicros = {
+                    1uL
+                },
+            )
+
+        val runtime =
+            WifiAutoReconnectRuntime(
+                broadcaster = broadcaster,
+                endpointProvider =
+                    WifiEndpointProvider {
+                        WifiResolvedEndpoint(
+                            endpoint = endpoint,
+                            source =
+                                WifiEndpointResolutionSource
+                                    .CACHED_DIRECT,
+                        )
+                    },
+                linkFactory =
+                    WifiRealtimeLinkFactory {
+                        FakeLink(
+                            System.nanoTime(),
+                        ).also(
+                            createdLinks::add,
+                        )
+                    },
+                nowNanos =
+                    System::nanoTime,
+                firstHeartbeatTimeoutMillis =
+                    250,
+                heartbeatLostTimeoutMillis =
+                    500,
+                pollIntervalMillis =
+                    25,
+            )
+
+        try {
+            runtime.start()
+
+            repeat(5) { cycle ->
+                waitUntil(1_500) {
+                    createdLinks.size >=
+                        cycle + 1 &&
+                        runtime.state ==
+                        WifiReconnectState.ACTIVE
+                }
+
+                val active =
+                    createdLinks[cycle]
+
+                active.lastHeartbeatReceivedNanos =
+                    System.nanoTime() -
+                        1_000_000_000L
+
+                waitUntil(1_500) {
+                    createdLinks.size >=
+                        cycle + 2
+                }
+
+                assertTrue(
+                    active.closed.get(),
+                )
+            }
+
+            waitUntil(1_500) {
+                runtime.state ==
+                    WifiReconnectState.ACTIVE
+            }
+
+            assertTrue(
+                runtime.reconnectAttempts >=
+                    5,
+            )
+        } finally {
+            runtime.close()
+        }
     }
 
     @Test
@@ -154,6 +315,17 @@ class WifiAutoReconnectRuntimeTest {
     ) : WifiRealtimeLink {
         override var lastHeartbeatReceivedNanos: Long = initialHeartbeat
         val closed = AtomicBoolean(false)
+
+        @Volatile
+        var lastPreference:
+            TransportPreferencePayload? = null
+
+        override fun trySendTransportPreference(
+            payload: TransportPreferencePayload,
+        ): Boolean {
+            lastPreference = payload
+            return true
+        }
 
         override fun publish(envelope: RealtimeStateEnvelope) {
             @Suppress("UNUSED_VARIABLE")

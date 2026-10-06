@@ -67,3 +67,32 @@ public sealed class HidMaestroStateMapperTests
         Assert.Equal(expected, HidMaestroStateMapper.MapHat(input));
     }
 }
+
+
+public sealed class HidMaestroVirtualGamepadDiagnosticsTests
+{
+    [Fact]
+    public async Task FreshBackendReportsStableIdentityWithoutStartingDriver()
+    {
+        await using var backend =
+            new HidMaestroVirtualGamepadBackend();
+
+        HidMaestroVirtualGamepadDiagnostics diagnostics =
+            backend.GetDiagnostics();
+
+        Assert.False(
+            diagnostics.IsStarted);
+        Assert.Equal(
+            HidMaestroVirtualGamepadBackend.ProfileId,
+            diagnostics.ProfileId);
+        Assert.Equal(
+            HidMaestroVirtualGamepadBackend.IdentityKey,
+            diagnostics.IdentityKey);
+        Assert.Equal(
+            0,
+            diagnostics.SubmittedStateCount);
+        Assert.Equal(
+            0,
+            diagnostics.RumblePacketCount);
+    }
+}

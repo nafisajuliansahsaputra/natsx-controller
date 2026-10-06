@@ -14,4 +14,9 @@ public enum MessageType : byte
     HandoverCommit = 10,
     Rumble = 11,
     Disconnect = 12,
+    PairingOffer = 13,
+    PairingResponse = 14,
+    PairingConfirm = 15,
+    PairingAbort = 16,
+    TransportPreference = 17,
 }

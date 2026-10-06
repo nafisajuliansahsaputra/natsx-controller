@@ -1,15 +1,20 @@
 package com.natsx.controller.core.transport.wifi
 
 import com.natsx.controller.core.protocol.FrameFlags
+import com.natsx.controller.core.protocol.HandoverPayload
 import com.natsx.controller.core.protocol.MessageType
 import com.natsx.controller.core.protocol.PeerId
 import com.natsx.controller.core.protocol.PeerRole
 import com.natsx.controller.core.protocol.ProtocolFrame
 import com.natsx.controller.core.protocol.ProtocolFrameCodec
+import com.natsx.controller.core.protocol.ProtocolTransport
 import com.natsx.controller.core.protocol.ProtocolVersion
+import com.natsx.controller.core.protocol.RumblePayload
 import com.natsx.controller.core.protocol.SessionId
 import com.natsx.controller.core.protocol.SessionReadyPayload
 import com.natsx.controller.core.protocol.TransportCapabilities
+import com.natsx.controller.core.protocol.TransportPreferenceMode
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -57,6 +62,85 @@ class WifiControlDatagramCodecTest {
             assertEquals(444_000uL, decodedEcho)
         }
     }
+    @Test
+    fun rumbleRoundTripPreservesMotorStrengths() {
+        WifiTrustedSession(sessionId, key).use { trusted ->
+            val expected =
+                RumblePayload(
+                    lowFrequencyMotor = 210,
+                    highFrequencyMotor = 88,
+                )
+
+            val encoded =
+                WifiControlDatagramCodec.encodeRumble(
+                    trustedSession = trusted,
+                    payload = expected,
+                    monotonicTimestampMicros = 555uL,
+                )
+
+            assertEquals(
+                expected,
+                WifiControlDatagramCodec.decodeRumble(
+                    encoded,
+                    trusted,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun handoverCommitRoundTripPreservesAuthorityAndSequence() {
+        WifiTrustedSession(sessionId, key).use { trusted ->
+            val expected =
+                HandoverPayload(
+                    transport = ProtocolTransport.USB_DIRECT,
+                    stateSequence = 0xCAFE_BABEu,
+                )
+
+            val encoded =
+                WifiControlDatagramCodec.encodeHandoverCommit(
+                    trustedSession = trusted,
+                    payload = expected,
+                    monotonicTimestampMicros = 777uL,
+                )
+
+            assertEquals(
+                expected,
+                WifiControlDatagramCodec.decodeHandoverCommit(
+                    encoded,
+                    trusted,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun transportPreferenceRoundTripPreservesMode() {
+        WifiTrustedSession(sessionId, key).use { trusted ->
+            val expected =
+                TransportPreferencePayload(
+                    TransportPreferenceMode.USB_DIRECT,
+                )
+
+            val encoded =
+                WifiControlDatagramCodec
+                    .encodeTransportPreference(
+                        trustedSession = trusted,
+                        payload = expected,
+                        monotonicTimestampMicros = 778uL,
+                    )
+
+            assertEquals(
+                expected,
+                WifiControlDatagramCodec
+                    .decodeTransportPreference(
+                        encoded,
+                        trusted,
+                    ),
+            )
+        }
+    }
+
     @Test
     fun heartbeatEncoderProducesAuthenticatedSessionProbe() {
         WifiTrustedSession(sessionId, key).use { trusted ->

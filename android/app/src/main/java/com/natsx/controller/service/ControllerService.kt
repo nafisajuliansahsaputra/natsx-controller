@@ -1,26 +1,185 @@
 package com.natsx.controller.service
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.hardware.usb.UsbAccessory
+import android.hardware.usb.UsbManager
+import android.os.Build
 import android.os.IBinder
 import com.natsx.controller.NatsxControllerApplication
+import com.natsx.controller.core.connection.AndroidConnectionStatus
+import com.natsx.controller.core.connection.AndroidLinkState
+import com.natsx.controller.core.protocol.PeerId
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.session.ControllerRealtimePublisher
+import com.natsx.controller.core.transport.bluetooth.BluetoothAutoReconnectRuntime
+import com.natsx.controller.core.transport.bluetooth.BluetoothPermissionGate
+import com.natsx.controller.core.transport.bluetooth.BluetoothRealtimeLink
+import com.natsx.controller.core.transport.bluetooth.BluetoothRealtimeLinkFactory
+import com.natsx.controller.core.transport.bluetooth.BluetoothReconnectState
+import com.natsx.controller.core.transport.bluetooth.BluetoothRfcommConnector
+import com.natsx.controller.core.transport.usb.UsbAccessoryConnector
+import com.natsx.controller.core.transport.usb.UsbAccessoryIdentity
+import com.natsx.controller.core.transport.usb.UsbAccessoryRuntime
+import com.natsx.controller.core.transport.wifi.TrustedReceiverHelloProbe
+import com.natsx.controller.core.transport.wifi.TrustedWifiRealtimeLinkFactory
+import com.natsx.controller.core.transport.wifi.WifiAutoReconnectRuntime
+import com.natsx.controller.core.transport.wifi.WifiDiscoveryClient
+import com.natsx.controller.core.transport.wifi.WifiEndpointResolver
+import com.natsx.controller.core.transport.wifi.WifiFirstPairingClient
+import com.natsx.controller.core.transport.wifi.WifiReconnectState
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class ControllerService : Service() {
+    private lateinit var app: NatsxControllerApplication
     private lateinit var realtimePublisher: ControllerRealtimePublisher
+    private lateinit var usbManager: UsbManager
+    private lateinit var usbRuntime: UsbAccessoryRuntime
+    private val connectionExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "natsx-connection-bootstrap").apply {
+                isDaemon = true
+            }
+        }
+    private val connectionBootstrapStarted = AtomicBoolean(false)
+    private val usbPermissionRequestInFlight = AtomicBoolean(false)
+    private val wifiRuntimeGate = Any()
+    private val bluetoothRuntimeGate = Any()
+    private val usbAttachWatcher: ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor { runnable ->
+            Thread(runnable, "natsx-usb-attach-watcher").apply {
+                isDaemon = true
+            }
+        }
+
+    @Volatile
+    private var wifiRuntime: WifiAutoReconnectRuntime? = null
+
+    @Volatile
+    private var bluetoothRuntime: BluetoothAutoReconnectRuntime? = null
+
+    private val usbReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context,
+                intent: Intent,
+            ) {
+                val accessory =
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        intent.getParcelableExtra(
+                            UsbManager.EXTRA_ACCESSORY,
+                            UsbAccessory::class.java,
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(
+                            UsbManager.EXTRA_ACCESSORY,
+                        )
+                    }
+
+                when (intent.action) {
+                    ACTION_USB_PERMISSION -> {
+                        usbPermissionRequestInFlight.set(false)
+
+                        if (
+                            accessory != null &&
+                            UsbAccessoryIdentity.matches(
+                                accessory,
+                            ) &&
+                            intent.getBooleanExtra(
+                                UsbManager.EXTRA_PERMISSION_GRANTED,
+                                false,
+                            ) &&
+                            UsbAccessoryConnector.hasPermission(
+                                usbManager,
+                                accessory,
+                            )
+                        ) {
+                            app.usbRuntimeStatus.publish(
+                                "USB permission granted. Connecting…",
+                            )
+                            usbRuntime.connect(accessory)
+                        } else {
+                            app.usbRuntimeStatus.publish(
+                                "USB permission was denied.",
+                                isError = true,
+                            )
+                        }
+                    }
+
+                    UsbManager.ACTION_USB_ACCESSORY_ATTACHED -> {
+                        if (
+                            accessory != null &&
+                            UsbAccessoryIdentity.matches(accessory)
+                        ) {
+                            app.usbRuntimeStatus.publish(
+                                "USB accessory attached. Preparing uplink…",
+                            )
+                            connectUsbAccessory(accessory)
+                        }
+                    }
+
+                    UsbManager.ACTION_USB_ACCESSORY_DETACHED -> {
+                        usbPermissionRequestInFlight.set(false)
+
+                        if (
+                            accessory != null &&
+                            UsbAccessoryIdentity.matches(accessory)
+                        ) {
+                            usbRuntime.disconnect(accessory)
+                        }
+                    }
+                }
+            }
+        }
 
     override fun onCreate() {
         super.onCreate()
 
-        val app = application as NatsxControllerApplication
+        app = application as NatsxControllerApplication
+        app.connectionStatus.resetSmartAutoAuthority()
+
         realtimePublisher = ControllerRealtimePublisher(
             stateStore = app.gamepadStateStore,
             broadcaster = app.realtimeBroadcaster,
         )
         realtimePublisher.start()
+
+        usbManager =
+            getSystemService(UsbManager::class.java)
+
+        usbRuntime =
+            UsbAccessoryRuntime(
+                usbManager = usbManager,
+                localPeerId = app.localPeerId,
+                trustedPeerStore = app.trustedPeerStore,
+                sessionRegistry = app.trustedSessionRegistry,
+                broadcaster = app.realtimeBroadcaster,
+                pairingConfirmation = app.pairingConfirmation,
+                status = app.usbRuntimeStatus,
+                rumbleSink =
+                    app.hapticEngine::handleGameRumble,
+                handoverSink =
+                    app.connectionStatus::applyHandoverCommit,
+            )
+
+        registerUsbReceiver()
+        publishConnectionStatus()
+        ensureConnectionBootstrap()
+        startUsbAttachWatcher()
 
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.createNotificationChannel(
@@ -42,15 +201,627 @@ class ControllerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        ensureConnectionBootstrap()
         return START_STICKY
     }
 
     override fun onDestroy() {
+        synchronized(bluetoothRuntimeGate) {
+            bluetoothRuntime?.close()
+            bluetoothRuntime = null
+        }
+
+        synchronized(wifiRuntimeGate) {
+            wifiRuntime?.close()
+            wifiRuntime = null
+        }
+        connectionExecutor.shutdownNow()
+        usbAttachWatcher.shutdownNow()
+
+        if (::usbRuntime.isInitialized) {
+            usbRuntime.close()
+        }
+
+        runCatching {
+            unregisterReceiver(usbReceiver)
+        }
+
         if (::realtimePublisher.isInitialized) {
             realtimePublisher.close()
         }
 
+        if (::app.isInitialized) {
+            app.hapticEngine.stopGameRumble()
+        }
+
         super.onDestroy()
+    }
+
+    private fun ensureConnectionBootstrap() {
+        if (!connectionBootstrapStarted.compareAndSet(false, true)) {
+            return
+        }
+
+        connectionExecutor.execute {
+            try {
+                bootstrapTrustedConnection()
+            } finally {
+                if (wifiRuntime == null) {
+                    connectionBootstrapStarted.set(false)
+                }
+            }
+        }
+    }
+
+    private fun bootstrapTrustedConnection() {
+        var retryIndex = 0
+
+        while (!Thread.currentThread().isInterrupted) {
+            try {
+                val peers =
+                    app.trustedPeerStore.list()
+
+                val peer =
+                    when (
+                        val plan =
+                            TrustedConnectionBootstrapPlanner
+                                .plan(peers)
+                    ) {
+                        TrustedConnectionBootstrapPlan.PairNew -> {
+                            app.usbRuntimeStatus.publish(
+                                "No trusted PC yet. Secure pairing is using LAN/Wi-Fi…",
+                            )
+
+                            WifiFirstPairingClient(
+                                localPeerId = app.localPeerId,
+                                trustedPeerStore = app.trustedPeerStore,
+                                pairingConfirmation = app.pairingConfirmation,
+                            ).pair().also {
+                                app.usbRuntimeStatus.publish(
+                                    "LAN pairing complete. Establishing trusted Wi-Fi session…",
+                                )
+                            }
+                        }
+
+                        is TrustedConnectionBootstrapPlan.Reconnect ->
+                            plan.peer
+
+                        TrustedConnectionBootstrapPlan.RequireReceiverSelection -> {
+                            app.usbRuntimeStatus.publish(
+                                "Multiple trusted PCs found. Receiver selection is required.",
+                                isError = true,
+                            )
+                            return
+                        }
+                    }
+
+                startTrustedWifi(peer.peerId)
+                startTrustedBluetooth(peer.peerId)
+
+                if (waitForTrustedSession(peer.peerId)) {
+                    app.usbRuntimeStatus.publish(
+                        "Trusted Wi-Fi session active. Attaching USB as low-latency uplink…",
+                    )
+
+                    connectUsbIfPresent()
+                } else {
+                    app.usbRuntimeStatus.publish(
+                        "Wi-Fi trust is saved; waiting for receiver session. USB will attach after reconnect.",
+                    )
+                }
+
+                return
+            } catch (exception: Exception) {
+                val detail =
+                    exception.message
+                        ?.takeIf { it.isNotBlank() }
+                        ?: exception::class.java.simpleName
+
+                app.usbRuntimeStatus.publish(
+                    "LAN connection retry: $detail",
+                    isError = true,
+                )
+
+                val delay =
+                    RETRY_BACKOFF_MILLIS[
+                        retryIndex.coerceAtMost(
+                            RETRY_BACKOFF_MILLIS.lastIndex,
+                        )
+                    ]
+
+                retryIndex += 1
+
+                try {
+                    Thread.sleep(delay)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return
+                }
+            }
+        }
+    }
+
+    private fun startTrustedWifi(
+        receiverPeerId: com.natsx.controller.core.protocol.PeerId,
+    ) {
+        synchronized(wifiRuntimeGate) {
+            val existing =
+                wifiRuntime
+
+            if (
+                existing != null &&
+                existing.state != WifiReconnectState.STOPPED
+            ) {
+                return
+            }
+
+            existing?.close()
+            wifiRuntime = null
+
+            val resolver =
+                WifiEndpointResolver(
+                receiverPeerId = receiverPeerId,
+                endpointCache = app.wifiEndpointCache,
+                endpointProbe =
+                    TrustedReceiverHelloProbe(
+                        localPeerId = app.localPeerId,
+                        expectedReceiverPeerId = receiverPeerId,
+                    ),
+                discovery =
+                    WifiDiscoveryClient(
+                        localPeerId = app.localPeerId,
+                    ),
+            )
+
+        val linkFactory =
+            TrustedWifiRealtimeLinkFactory(
+                localPeerId = app.localPeerId,
+                receiverPeerId = receiverPeerId,
+                trustedPeerStore = app.trustedPeerStore,
+                sessionRegistry = app.trustedSessionRegistry,
+                rumbleSink =
+                    app.hapticEngine::handleGameRumble,
+                handoverSink =
+                    app.connectionStatus::applyHandoverCommit,
+            )
+
+        val runtime =
+            WifiAutoReconnectRuntime(
+                broadcaster = app.realtimeBroadcaster,
+                endpointProvider = resolver,
+                linkFactory = linkFactory,
+            )
+
+            wifiRuntime = runtime
+            runtime.start()
+        }
+    }
+
+    private fun startTrustedBluetooth(
+        receiverPeerId: PeerId,
+    ) {
+        synchronized(bluetoothRuntimeGate) {
+            val permissionGate =
+                BluetoothPermissionGate(this)
+
+            if (
+                !permissionGate.isBluetoothSupported() ||
+                !permissionGate.hasRequiredRuntimePermissions() ||
+                !permissionGate.isBluetoothEnabled()
+            ) {
+                return
+            }
+
+            val existing =
+                bluetoothRuntime
+
+            if (
+                existing != null &&
+                existing.state != BluetoothReconnectState.STOPPED
+            ) {
+                return
+            }
+
+            existing?.close()
+            bluetoothRuntime = null
+
+            val runtime =
+                BluetoothAutoReconnectRuntime(
+                    broadcaster = app.realtimeBroadcaster,
+                    linkFactory =
+                        BluetoothRealtimeLinkFactory {
+                            createBondedBluetoothLink(
+                                receiverPeerId,
+                            )
+                        },
+                )
+
+            bluetoothRuntime = runtime
+            runtime.start()
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun createBondedBluetoothLink(
+        receiverPeerId: PeerId,
+    ): BluetoothRealtimeLink {
+        val permissionGate =
+            BluetoothPermissionGate(this)
+
+        require(permissionGate.isBluetoothSupported()) {
+            "Bluetooth is not supported on this device."
+        }
+        require(permissionGate.hasRequiredRuntimePermissions()) {
+            "Bluetooth runtime permissions are not granted."
+        }
+        require(permissionGate.isBluetoothEnabled()) {
+            "Bluetooth is disabled."
+        }
+
+        val manager =
+            getSystemService(
+                BluetoothManager::class.java,
+            )
+        val adapter =
+            checkNotNull(manager?.adapter) {
+                "Bluetooth adapter is unavailable."
+            }
+
+        val candidates =
+            try {
+                adapter.bondedDevices
+                    .filter {
+                        it.bondState ==
+                            BluetoothDevice.BOND_BONDED
+                    }
+                    .sortedBy {
+                        it.address
+                    }
+            } catch (exception: SecurityException) {
+                throw IllegalStateException(
+                    "Bluetooth permission was revoked while enumerating bonded devices.",
+                    exception,
+                )
+            }
+
+        require(candidates.isNotEmpty()) {
+            "No OS-bonded Bluetooth devices are available."
+        }
+
+        var lastFailure: Exception? = null
+
+        candidates.forEach { device ->
+            try {
+                return BluetoothRfcommConnector
+                    .forDevice(
+                        context = this,
+                        device = device,
+                        localPeerId = app.localPeerId,
+                        receiverPeerId = receiverPeerId,
+                        sessionRegistry =
+                            app.trustedSessionRegistry,
+                        permissionGate =
+                            permissionGate,
+                        rumbleSink =
+                            app.hapticEngine::handleGameRumble,
+                        handoverSink =
+                            app.connectionStatus::applyHandoverCommit,
+                    )
+                    .connect()
+            } catch (exception: Exception) {
+                lastFailure = exception
+            }
+        }
+
+        throw IllegalStateException(
+            "No bonded Bluetooth device accepted the authenticated NATSX RFCOMM session.",
+            lastFailure,
+        )
+    }
+
+    private fun waitForTrustedSession(
+        receiverPeerId: com.natsx.controller.core.protocol.PeerId,
+    ): Boolean {
+        repeat(80) {
+            app.trustedSessionRegistry
+                .get(receiverPeerId)
+                ?.use {
+                    return true
+                }
+
+            try {
+                Thread.sleep(100)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return false
+            }
+        }
+
+        return false
+    }
+
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    private fun registerUsbReceiver() {
+        val filter =
+            IntentFilter().apply {
+                addAction(ACTION_USB_PERMISSION)
+                addAction(
+                    UsbManager.ACTION_USB_ACCESSORY_ATTACHED,
+                )
+                addAction(
+                    UsbManager.ACTION_USB_ACCESSORY_DETACHED,
+                )
+            }
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(
+                usbReceiver,
+                filter,
+                RECEIVER_NOT_EXPORTED,
+            )
+        } else {
+            // Android 8-12 do not expose RECEIVER_NOT_EXPORTED for dynamic
+            // receivers. The custom permission callback is package-scoped by
+            // PendingIntent and UsbManager.hasPermission is rechecked before
+            // opening the accessory, so a spoofed broadcast cannot grant USB.
+            @Suppress("DEPRECATION")
+            registerReceiver(
+                usbReceiver,
+                filter,
+            )
+        }
+    }
+
+    private fun startUsbAttachWatcher() {
+        usbAttachWatcher.scheduleWithFixedDelay(
+            {
+                runCatching {
+                    val trustedPeers =
+                        app.trustedPeerStore.list()
+
+                    if (trustedPeers.size == 1) {
+                        val receiverPeerId =
+                            trustedPeers.single().peerId
+
+                        startTrustedWifi(
+                            receiverPeerId,
+                        )
+                        startTrustedBluetooth(
+                            receiverPeerId,
+                        )
+                    }
+
+                    val accessory =
+                        UsbAccessoryConnector
+                            .findNatsxAccessory(
+                                usbManager,
+                            )
+
+                    if (usbRuntime.isConnected()) {
+                        if (accessory == null) {
+                            usbPermissionRequestInFlight.set(false)
+                            app.usbRuntimeStatus.publish(
+                                "USB accessory disappeared. Falling back to Wi-Fi…",
+                            )
+                            usbRuntime.disconnect()
+                        }
+
+                        return@runCatching
+                    }
+
+                    if (
+                        accessory != null &&
+                        app.trustedPeerStore.list().isNotEmpty() &&
+                        app.trustedSessionRegistry.hasAnyActiveSession()
+                    ) {
+                        connectUsbAccessory(
+                            accessory,
+                        )
+                    }
+                }.also {
+                    publishConnectionStatus()
+                    broadcastTransportPreference()
+                }
+            },
+            0,
+            USB_ATTACH_POLL_MILLIS,
+            TimeUnit.MILLISECONDS,
+        )
+    }
+
+    private fun broadcastTransportPreference() {
+        val payload:
+            TransportPreferencePayload =
+            app.transportPreferenceSettings
+                .preference
+                .toPayload()
+
+        wifiRuntime
+            ?.trySendTransportPreference(
+                payload,
+            )
+
+        bluetoothRuntime
+            ?.trySendTransportPreference(
+                payload,
+            )
+
+        if (::usbRuntime.isInitialized) {
+            usbRuntime
+                .trySendTransportPreference(
+                    payload,
+                )
+        }
+    }
+
+    private fun publishConnectionStatus() {
+        val wifi =
+            wifiRuntime
+        val bluetooth =
+            bluetoothRuntime
+        val bluetoothGate =
+            BluetoothPermissionGate(this)
+
+        val bluetoothState =
+            when {
+                !bluetoothGate.isBluetoothSupported() ->
+                    AndroidLinkState.UNAVAILABLE
+
+                !bluetoothGate.hasRequiredRuntimePermissions() ->
+                    AndroidLinkState.PERMISSION_REQUIRED
+
+                !bluetoothGate.isBluetoothEnabled() ->
+                    AndroidLinkState.OFF
+
+                bluetooth == null ->
+                    AndroidLinkState.IDLE
+
+                else ->
+                    when (bluetooth.state) {
+                        BluetoothReconnectState.IDLE ->
+                            AndroidLinkState.IDLE
+
+                        BluetoothReconnectState.CONNECTING,
+                        BluetoothReconnectState.AWAITING_HEARTBEAT,
+                        ->
+                            AndroidLinkState.CONNECTING
+
+                        BluetoothReconnectState.ACTIVE ->
+                            AndroidLinkState.ACTIVE
+
+                        BluetoothReconnectState.RECONNECTING ->
+                            AndroidLinkState.RECONNECTING
+
+                        BluetoothReconnectState.STOPPED ->
+                            AndroidLinkState.STOPPED
+                    }
+            }
+
+        val wifiState =
+            when (wifi?.state) {
+                null,
+                WifiReconnectState.IDLE,
+                ->
+                    AndroidLinkState.IDLE
+
+                WifiReconnectState.RESOLVING,
+                WifiReconnectState.CONNECTING,
+                WifiReconnectState.AWAITING_HEARTBEAT,
+                ->
+                    AndroidLinkState.CONNECTING
+
+                WifiReconnectState.ACTIVE ->
+                    AndroidLinkState.ACTIVE
+
+                WifiReconnectState.RECONNECTING ->
+                    AndroidLinkState.RECONNECTING
+
+                WifiReconnectState.STOPPED ->
+                    AndroidLinkState.STOPPED
+            }
+
+        val usbState =
+            if (
+                ::usbRuntime.isInitialized &&
+                usbRuntime.isConnected()
+            ) {
+                AndroidLinkState.ACTIVE
+            } else {
+                AndroidLinkState.IDLE
+            }
+
+        app.connectionStatus.publishLinks(
+            AndroidConnectionStatus(
+                wifi = wifiState,
+                bluetooth = bluetoothState,
+                usb = usbState,
+                trustedPcCount =
+                    app.trustedPeerStore
+                        .list()
+                        .size,
+                wifiReconnectAttempts =
+                    wifi?.reconnectAttempts
+                        ?: 0,
+                bluetoothReconnectAttempts =
+                    bluetooth?.reconnectAttempts
+                        ?: 0,
+            ),
+        )
+    }
+
+    private fun connectUsbIfPresent(
+        publishMissing: Boolean = true,
+    ) {
+        val accessory =
+            UsbAccessoryConnector.findNatsxAccessory(
+                usbManager,
+            )
+
+        if (accessory == null) {
+            usbPermissionRequestInFlight.set(false)
+
+            if (publishMissing) {
+                app.usbRuntimeStatus.publish(
+                    "NATSX USB accessory not detected.",
+                )
+            }
+            return
+        }
+
+        connectUsbAccessory(accessory)
+    }
+
+    private fun connectUsbAccessory(
+        accessory: UsbAccessory,
+    ) {
+        if (!UsbAccessoryIdentity.matches(accessory)) {
+            return
+        }
+
+        if (
+            UsbAccessoryConnector.hasPermission(
+                usbManager,
+                accessory,
+            )
+        ) {
+            usbPermissionRequestInFlight.set(false)
+            app.usbRuntimeStatus.publish(
+                "USB permission granted. Connecting…",
+            )
+            usbRuntime.connect(accessory)
+            return
+        }
+
+        if (!usbPermissionRequestInFlight.compareAndSet(false, true)) {
+            return
+        }
+
+        app.usbRuntimeStatus.publish(
+            "Waiting for Android USB permission…",
+        )
+
+        val flags =
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= 31) {
+                    PendingIntent.FLAG_MUTABLE
+                } else {
+                    0
+                }
+
+        val permissionIntent =
+            PendingIntent.getBroadcast(
+                this,
+                0,
+                Intent(ACTION_USB_PERMISSION)
+                    .setPackage(packageName),
+                flags,
+            )
+
+        UsbAccessoryConnector.requestPermission(
+            usbManager,
+            accessory,
+            permissionIntent,
+        )
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -58,5 +829,16 @@ class ControllerService : Service() {
     private companion object {
         const val CHANNEL_ID = "controller_connection"
         const val NOTIFICATION_ID = 1001
+        const val ACTION_USB_PERMISSION =
+            "com.natsx.controller.action.USB_PERMISSION"
+        const val USB_ATTACH_POLL_MILLIS = 750L
+
+        val RETRY_BACKOFF_MILLIS =
+            longArrayOf(
+                1_000,
+                2_000,
+                4_000,
+                8_000,
+            )
     }
 }

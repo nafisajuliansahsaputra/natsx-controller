@@ -4,7 +4,13 @@ import android.app.PendingIntent
 import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
 import android.os.ParcelFileDescriptor
+import android.system.Os
+import android.system.OsConstants
+import android.system.StructPollfd
 import java.io.Closeable
+import java.io.IOException
+import java.net.SocketTimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -25,15 +31,67 @@ class UsbAccessoryConnection private constructor(
     val input: InputStream,
     val output: OutputStream,
 ) : Closeable {
-    override fun close() {
-        try {
-            input.close()
-        } finally {
-            try {
-                output.close()
-            } finally {
-                descriptor.close()
+    private val closed = AtomicBoolean(false)
+
+    fun awaitReadable(
+        timeoutMillis: Int,
+        stage: String,
+    ) {
+        require(timeoutMillis >= 0)
+
+        if (closed.get()) {
+            throw IOException(
+                "USB accessory connection is closed.",
+            )
+        }
+
+        val pollFd =
+            StructPollfd().apply {
+                fd = descriptor.fileDescriptor
+                events =
+                    OsConstants.POLLIN
+                        .toShort()
             }
+
+        val ready =
+            Os.poll(
+                arrayOf(pollFd),
+                timeoutMillis,
+            )
+
+        if (ready == 0) {
+            throw SocketTimeoutException(
+                "$stage timed out.",
+            )
+        }
+
+        val revents =
+            pollFd.revents.toInt()
+
+        if (
+            revents and
+                (
+                    OsConstants.POLLERR or
+                        OsConstants.POLLHUP or
+                        OsConstants.POLLNVAL
+                ) != 0
+        ) {
+            throw IOException(
+                "$stage failed because the USB accessory pipe closed.",
+            )
+        }
+    }
+
+    override fun close() {
+        if (!closed.compareAndSet(false, true)) {
+            return
+        }
+
+        // input/output are wrappers over the same accessory descriptor.
+        // Closing them independently can double-close the underlying FD.
+        // The ParcelFileDescriptor is the single lifetime owner.
+        runCatching {
+            descriptor.close()
         }
     }
 

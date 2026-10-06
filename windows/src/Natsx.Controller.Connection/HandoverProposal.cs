@@ -11,6 +11,7 @@ public enum HandoverReason
     ActiveCritical,
     ActiveLost,
     BetterCandidate,
+    ManualPreference,
 }
 
 public readonly record struct HandoverProposal(

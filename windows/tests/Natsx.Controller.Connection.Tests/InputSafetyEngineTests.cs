@@ -70,6 +70,100 @@ public sealed class InputSafetyEngineTests
         Assert.Equal(GamepadButtons.B, backend.LastState.Buttons);
     }
 
+    [Fact]
+    public async Task DuplicateAndReorderedStates_AreRejectedWithoutChangingOutput()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new RecordingVirtualGamepadBackend();
+        await backend.StartAsync();
+
+        var session = new ControllerSession();
+        session.SetAuthoritativeTransport(TransportKind.Wifi);
+
+        var engine = new InputSafetyEngine(
+            session,
+            backend,
+            ConnectionPolicy.Competitive,
+            clock);
+
+        GamepadState accepted =
+            GamepadState.Neutral with
+            {
+                Buttons = GamepadButtons.A,
+                LeftX = 4000,
+            };
+
+        Assert.True(
+            engine.TryAccept(
+                TransportKind.Wifi,
+                100,
+                accepted));
+
+        Assert.False(
+            engine.TryAccept(
+                TransportKind.Wifi,
+                100,
+                GamepadState.Neutral with
+                {
+                    Buttons = GamepadButtons.B,
+                }));
+
+        Assert.False(
+            engine.TryAccept(
+                TransportKind.Wifi,
+                99,
+                GamepadState.Neutral with
+                {
+                    Buttons = GamepadButtons.X,
+                }));
+
+        Assert.Equal(
+            accepted,
+            backend.LastState);
+        Assert.True(
+            backend.IsStarted);
+    }
+
+    [Fact]
+    public async Task TransportSilence_NeutralizesWithoutStoppingVirtualBackend()
+    {
+        var clock = new ManualTimeProvider();
+        var backend = new RecordingVirtualGamepadBackend();
+        await backend.StartAsync();
+
+        var session = new ControllerSession();
+        session.SetAuthoritativeTransport(TransportKind.Usb);
+
+        var engine = new InputSafetyEngine(
+            session,
+            backend,
+            ConnectionPolicy.Competitive,
+            clock);
+
+        Assert.True(
+            engine.TryAccept(
+                TransportKind.Usb,
+                7,
+                GamepadState.Neutral with
+                {
+                    Buttons = GamepadButtons.RightShoulder,
+                    RightTrigger = 255,
+                }));
+
+        clock.Advance(
+            ConnectionPolicy
+                .Competitive
+                .NeutralizeSilence);
+
+        Assert.True(
+            engine.Evaluate());
+        Assert.Equal(
+            GamepadState.Neutral,
+            backend.LastState);
+        Assert.True(
+            backend.IsStarted);
+    }
+
     private sealed class ManualTimeProvider : TimeProvider
     {
         private long _timestamp;

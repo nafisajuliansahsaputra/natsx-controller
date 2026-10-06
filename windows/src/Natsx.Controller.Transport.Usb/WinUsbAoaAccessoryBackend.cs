@@ -75,7 +75,7 @@ public sealed class WinUsbAoaAccessoryBackend : IAoaAccessoryDataBackend
         return null;
     }
 
-    public async ValueTask<WinUsbAoaAccessoryConnection?>
+    public ValueTask<WinUsbAoaAccessoryConnection?>
         TryOpenAsync(
             WinUsbAoaAccessoryDevice candidate,
             CancellationToken cancellationToken = default)
@@ -94,47 +94,34 @@ public sealed class WinUsbAoaAccessoryBackend : IAoaAccessoryDataBackend
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        UsbDevice? device =
-            await UsbDevice.FromIdAsync(
-                candidate.DeviceId);
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (device is null)
-        {
-            return null;
-        }
+        NativeWinUsbAoaConnectionOwner? owner =
+            null;
 
         try
         {
-            UsbInterface dataInterface =
-                device.DefaultInterface;
+            owner =
+                NativeWinUsbAoaConnectionOwner.Open(
+                    candidate.DeviceId);
 
-            if (dataInterface.BulkInPipes.Count == 0 ||
-                dataInterface.BulkOutPipes.Count == 0)
-            {
-                return null;
-            }
+            var connection =
+                new WinUsbAoaAccessoryConnection(
+                    owner,
+                    candidate,
+                    owner.Input,
+                    owner.Output,
+                    owner.BulkInPipeId,
+                    owner.BulkOutPipeId,
+                    owner.MaximumPacketSize);
 
-            Stream input =
-                dataInterface.BulkInPipes[0]
-                    .InputStream
-                    .AsStreamForRead();
+            owner =
+                null;
 
-            Stream output =
-                dataInterface.BulkOutPipes[0]
-                    .OutputStream
-                    .AsStreamForWrite();
-
-            return new WinUsbAoaAccessoryConnection(
-                device,
-                candidate,
-                input,
-                output);
+            return ValueTask.FromResult<WinUsbAoaAccessoryConnection?>(
+                connection);
         }
         catch
         {
-            device.Dispose();
+            owner?.Dispose();
             throw;
         }
     }

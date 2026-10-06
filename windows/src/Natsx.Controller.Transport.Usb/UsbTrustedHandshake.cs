@@ -126,6 +126,34 @@ public sealed class UsbTrustedHandshakeServer
             Stream inputStream,
             Stream outputStream,
             Func<PeerId, byte[]?> trustSecretResolver,
+            byte[] firstFrame,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(inputStream);
+        ArgumentNullException.ThrowIfNull(firstFrame);
+
+        byte[] framed =
+            UsbStreamFrameCodec
+                .Encode(firstFrame);
+
+        using var replay =
+            new UsbPrefixedReadStream(
+                framed,
+                inputStream);
+
+        return await AuthenticateAsync(
+                replay,
+                outputStream,
+                trustSecretResolver,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async ValueTask<UsbTrustedHandshakeCompletion>
+        AuthenticateAsync(
+            Stream inputStream,
+            Stream outputStream,
+            Func<PeerId, byte[]?> trustSecretResolver,
             CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(inputStream);
@@ -291,8 +319,17 @@ public sealed class UsbTrustedHandshakeServer
             packet,
             cancellationToken).ConfigureAwait(false);
 
-        await outputStream.FlushAsync(
-            cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await outputStream.FlushAsync(
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (NotImplementedException)
+        {
+        }
+        catch (NotSupportedException)
+        {
+        }
     }
 
     private ulong MonotonicMicros()

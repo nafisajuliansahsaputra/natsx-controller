@@ -3,6 +3,7 @@ package com.natsx.controller.core.input
 import com.natsx.controller.core.gamepad.GamepadState
 import kotlin.math.abs
 import kotlin.math.hypot
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 data class StickOutput(
@@ -12,12 +13,15 @@ data class StickOutput(
 
 class AnalogStickProcessor(
     private val deadzone: Float = 0.05f,
+    private val sensitivity: Float = 1f,
+    private val calibration: StickCalibration = StickCalibration.Default,
     private val jitterThreshold: Int = 96,
 ) {
     private var lastOutput = StickOutput(0, 0)
 
     init {
         require(deadzone in 0f..<1f)
+        require(sensitivity in 0.5f..1.5f)
         require(jitterThreshold >= 0)
     }
 
@@ -30,8 +34,18 @@ class AnalogStickProcessor(
     ): StickOutput {
         require(radius > 0f)
 
-        val rawX = (pointerX - centerX) / radius
-        val rawY = -(pointerY - centerY) / radius
+        val normalizedX =
+            (pointerX - centerX) / radius
+        val normalizedY =
+            -(pointerY - centerY) / radius
+
+        val rawX =
+            (normalizedX - calibration.centerOffsetX) /
+                calibration.travelScale
+        val rawY =
+            (normalizedY - calibration.centerOffsetY) /
+                calibration.travelScale
+
         val magnitude = hypot(rawX, rawY)
 
         if (magnitude <= deadzone) {
@@ -42,13 +56,17 @@ class AnalogStickProcessor(
         val clampedMagnitude = magnitude.coerceAtMost(1f)
         val scaledMagnitude =
             ((clampedMagnitude - deadzone) / (1f - deadzone)).coerceIn(0f, 1f)
+        val responseMagnitude =
+            scaledMagnitude
+                .pow(1f / sensitivity)
+                .coerceIn(0f, 1f)
 
         val unitX = rawX / magnitude
         val unitY = rawY / magnitude
 
         val candidate = StickOutput(
-            x = toStickRange(unitX * scaledMagnitude),
-            y = toStickRange(unitY * scaledMagnitude),
+            x = toStickRange(unitX * responseMagnitude),
+            y = toStickRange(unitY * responseMagnitude),
         )
 
         if (

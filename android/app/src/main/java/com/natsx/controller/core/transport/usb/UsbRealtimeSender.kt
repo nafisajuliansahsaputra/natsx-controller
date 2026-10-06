@@ -1,6 +1,11 @@
 package com.natsx.controller.core.transport.usb
 
 import android.os.SystemClock
+import com.natsx.controller.core.protocol.HandoverPayload
+import com.natsx.controller.core.protocol.MessageType
+import com.natsx.controller.core.protocol.ProtocolConstants
+import com.natsx.controller.core.protocol.RumblePayload
+import com.natsx.controller.core.protocol.TransportPreferencePayload
 import com.natsx.controller.core.session.RealtimeStateEnvelope
 import com.natsx.controller.core.session.RealtimeStateSink
 import java.io.Closeable
@@ -18,6 +23,8 @@ class UsbRealtimeSender(
     private val inputStream: InputStream? = null,
     private val nowNanos: () -> Long =
         SystemClock::elapsedRealtimeNanos,
+    private val rumbleSink: (RumblePayload) -> Unit = {},
+    private val handoverSink: (HandoverPayload) -> Unit = {},
 ) : RealtimeStateSink, Closeable {
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -53,6 +60,9 @@ class UsbRealtimeSender(
     private val closed =
         AtomicBoolean(false)
 
+    private val lastTransportPreference =
+        AtomicReference<TransportPreferencePayload?>(null)
+
     @Volatile
     var sentFrames: Long = 0
         private set
@@ -67,6 +77,14 @@ class UsbRealtimeSender(
 
     @Volatile
     var heartbeatAcksSent: Long = 0
+        private set
+
+    @Volatile
+    var rumblesReceived: Long = 0
+        private set
+
+    @Volatile
+    var handoverCommitsReceived: Long = 0
         private set
 
     @Volatile
@@ -101,6 +119,47 @@ class UsbRealtimeSender(
         }
     }
 
+    fun trySendTransportPreference(
+        payload: TransportPreferencePayload,
+    ): Boolean {
+        if (closed.get()) {
+            return false
+        }
+
+        if (lastTransportPreference.get() == payload) {
+            return true
+        }
+
+        return try {
+            val frame =
+                UsbControlFrameCodec
+                    .encodeTransportPreference(
+                        trustedSession = trustedSession,
+                        payload = payload,
+                        monotonicTimestampMicros =
+                            monotonicMicroseconds(),
+                    )
+
+            writePacket(
+                UsbStreamFrameCodec
+                    .encode(frame),
+            )
+
+            lastTransportPreference.set(payload)
+            true
+        } catch (_: IOException) {
+            if (!closed.get()) {
+                controlFailures += 1
+            }
+            false
+        } catch (_: RuntimeException) {
+            if (!closed.get()) {
+                controlFailures += 1
+            }
+            false
+        }
+    }
+
     override fun close() {
         if (!closed.compareAndSet(
                 false,
@@ -114,20 +173,14 @@ class UsbRealtimeSender(
         executor.shutdownNow()
         controlExecutor?.shutdownNow()
 
-        try {
-            inputStream?.close()
-        } catch (_: IOException) {
-        }
-
-        synchronized(outputLock) {
-            try {
-                outputStream.close()
-            } catch (_: IOException) {
-            }
-        }
-
-        // UsbTrustedSession belongs to the logical controller
-        // session and may be shared with a reconnecting transport.
+        // The UsbAccessoryConnection owns the shared accessory file
+        // descriptor and its stream wrappers. Closing either stream here can
+        // invalidate the same descriptor before the connection owner tears it
+        // down, which is especially fragile during physical detach on OEM
+        // Android builds.
+        //
+        // UsbTrustedSession belongs to the logical controller session and may
+        // be shared with a reconnecting transport.
     }
 
     private fun drainLatest() {
@@ -193,34 +246,65 @@ class UsbRealtimeSender(
                     UsbStreamFrameCodec
                         .readFrame(activeInput)
 
-                val echoedProbe =
-                    UsbControlFrameCodec
-                        .decodeHeartbeat(
-                            frame,
-                            trustedSession,
+                when (readMessageType(frame)) {
+                    MessageType.HEARTBEAT -> {
+                        val echoedProbe =
+                            UsbControlFrameCodec
+                                .decodeHeartbeat(
+                                    frame,
+                                    trustedSession,
+                                )
+
+                        heartbeatsReceived += 1
+                        lastHeartbeatReceivedNanos =
+                            nowNanos()
+
+                        val ack =
+                            UsbControlFrameCodec
+                                .encodeHeartbeatAck(
+                                    trustedSession =
+                                        trustedSession,
+                                    responderTimestampMicros =
+                                        monotonicMicroseconds(),
+                                    echoedProbeTimestampMicros =
+                                        echoedProbe,
+                                )
+
+                        writePacket(
+                            UsbStreamFrameCodec
+                                .encode(ack),
                         )
 
-                heartbeatsReceived += 1
-                lastHeartbeatReceivedNanos =
-                    nowNanos()
+                        heartbeatAcksSent += 1
+                    }
 
-                val ack =
-                    UsbControlFrameCodec
-                        .encodeHeartbeatAck(
-                            trustedSession =
-                                trustedSession,
-                            responderTimestampMicros =
-                                monotonicMicroseconds(),
-                            echoedProbeTimestampMicros =
-                                echoedProbe,
-                        )
+                    MessageType.RUMBLE -> {
+                        val rumble =
+                            UsbControlFrameCodec
+                                .decodeRumble(
+                                    frame,
+                                    trustedSession,
+                                )
 
-                writePacket(
-                    UsbStreamFrameCodec
-                        .encode(ack),
-                )
+                        rumbleSink(rumble)
+                        rumblesReceived += 1
+                    }
 
-                heartbeatAcksSent += 1
+                    MessageType.HANDOVER_COMMIT -> {
+                        val handover =
+                            UsbControlFrameCodec
+                                .decodeHandoverCommit(
+                                    frame,
+                                    trustedSession,
+                                )
+
+                        handoverSink(handover)
+                        handoverCommitsReceived += 1
+                    }
+
+                    else ->
+                        controlFailures += 1
+                }
             } catch (_: IOException) {
                 if (!closed.get()) {
                     controlFailures += 1
@@ -235,6 +319,25 @@ class UsbRealtimeSender(
                     controlFailures += 1
                 }
             }
+        }
+    }
+
+    private fun readMessageType(
+        frame: ByteArray,
+    ): MessageType {
+        require(
+            frame.size >=
+                ProtocolConstants.HEADER_SIZE,
+        ) {
+            "Usb control frame is shorter than the protocol header."
+        }
+
+        return requireNotNull(
+            MessageType.fromWireValue(
+                frame[6].toInt() and 0xFF,
+            ),
+        ) {
+            "Usb control frame has an unknown message type."
         }
     }
 
