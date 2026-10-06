@@ -49,7 +49,7 @@ windows/       Windows receiver and controller core
 protocol/      Cross-platform wire protocol specification
 docs/          Architecture decision records and project docs
 PRD.md         Product requirements
-AGENTS.md      Rules for coding agents/contributors
+AGENTS.md      Contributor implementation rules
 ARCHITECTURE.md
 TODO.md
 SKILL.md
@@ -140,16 +140,13 @@ A preferred transport does not take over merely because it exists.
 
 ## Documentation
 
-Before implementing a feature, read:
+For a technical review of the project, start with:
 
 1. `PRD.md`
 2. `ARCHITECTURE.md`
 3. `TODO.md`
-4. `WORKFLOW.md`
-5. `SKILL.md`
-6. `AGENTS.md`
 
-Architecture-changing decisions should be recorded under `docs/decisions/`.
+Architecture-changing decisions are recorded under `docs/decisions/`. Internal contributor workflow files remain in the repository for implementation consistency, but they are not part of the recruiter-facing project overview.
 
 ## License
 
