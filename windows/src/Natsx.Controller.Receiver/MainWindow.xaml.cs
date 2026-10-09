@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
-using System.Windows.Media;
+using WpfBrush = System.Windows.Media.Brush;
+using WpfSolidColorBrush = System.Windows.Media.SolidColorBrush;
+using WpfColor = System.Windows.Media.Color;
 using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Receiver;
@@ -217,17 +219,17 @@ public partial class MainWindow : Window
 
     // Presentation only: authority and reconnect decisions remain in ReceiverRuntime.
     // The indicator follows the actual authoritative transport, not cable presence.
-    private static readonly Brush InactiveLinkBrush =
-        new SolidColorBrush(Color.FromRgb(0xD9, 0xD5, 0xDF));
+    private static readonly WpfBrush InactiveLinkBrush =
+        new WpfSolidColorBrush(WpfColor.FromRgb(0xD9, 0xD5, 0xDF));
 
-    private static readonly Brush UsbLinkBrush =
-        new SolidColorBrush(Color.FromRgb(0x9D, 0x89, 0xCF));
+    private static readonly WpfBrush UsbLinkBrush =
+        new WpfSolidColorBrush(WpfColor.FromRgb(0x9D, 0x89, 0xCF));
 
-    private static readonly Brush WifiLinkBrush =
-        new SolidColorBrush(Color.FromRgb(0x71, 0xC9, 0x82));
+    private static readonly WpfBrush WifiLinkBrush =
+        new WpfSolidColorBrush(WpfColor.FromRgb(0x71, 0xC9, 0x82));
 
-    private static readonly Brush BluetoothLinkBrush =
-        new SolidColorBrush(Color.FromRgb(0x8F, 0x7B, 0xC4));
+    private static readonly WpfBrush BluetoothLinkBrush =
+        new WpfSolidColorBrush(WpfColor.FromRgb(0x8F, 0x7B, 0xC4));
 
     private void UpdateTransportIndicators(string activeTransport)
     {
