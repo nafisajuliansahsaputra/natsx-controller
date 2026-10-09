@@ -249,7 +249,7 @@ public partial class MainWindow : Window
         BluetoothLinkStateText.Text = bluetooth ? "ACTIVE" : "NOT ACTIVE";
 
         bool connected = usb || wifi || bluetooth;
-        ConnectionDot.Fill = connected ? WifiLinkBrush : InactiveLinkBrush;
+        ConnectionDot.Fill = usb ? UsbLinkBrush : wifi ? WifiLinkBrush : bluetooth ? BluetoothLinkBrush : InactiveLinkBrush;
         ConnectionStateText.Text =
             connected ? "CONTROLLER CONNECTED" : "WAITING FOR CONTROLLER";
     }
