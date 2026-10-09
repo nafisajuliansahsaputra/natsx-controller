@@ -1,6 +1,9 @@
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
+using WpfBrush = System.Windows.Media.Brush;
+using WpfSolidColorBrush = System.Windows.Media.SolidColorBrush;
+using WpfColor = System.Windows.Media.Color;
 using Natsx.Controller.Protocol;
 
 namespace Natsx.Controller.Receiver;
@@ -170,7 +173,16 @@ public partial class MainWindow : Window
             snapshot.SmartAutoState;
 
         ActiveTransportText.Text =
-            snapshot.ActiveTransport;
+            snapshot.ActiveTransport switch
+            {
+                "Usb" => "USB Direct",
+                "Wifi" => "Wi-Fi",
+                "Bluetooth" => "Bluetooth",
+                _ => "None"
+            };
+
+        UpdateTransportIndicators(
+            snapshot.ActiveTransport);
 
         BackupTransportsText.Text =
             snapshot.BackupTransports;
@@ -217,6 +229,43 @@ public partial class MainWindow : Window
             snapshot.ActiveTransport == "None"
                 ? $"Smart Auto: {snapshot.SmartAutoState}"
                 : $"Active: {snapshot.ActiveTransport}");
+    }
+
+    // Presentation only: authority and reconnect decisions remain in ReceiverRuntime.
+    // The indicator follows the actual authoritative transport, not cable presence.
+    private static readonly WpfBrush InactiveLinkBrush =
+        new WpfSolidColorBrush(WpfColor.FromRgb(0xD9, 0xD5, 0xDF));
+
+    private static readonly WpfBrush UsbLinkBrush =
+        new WpfSolidColorBrush(WpfColor.FromRgb(0x9D, 0x89, 0xCF));
+
+    private static readonly WpfBrush WifiLinkBrush =
+        new WpfSolidColorBrush(WpfColor.FromRgb(0x71, 0xC9, 0x82));
+
+    private static readonly WpfBrush BluetoothLinkBrush =
+        new WpfSolidColorBrush(WpfColor.FromRgb(0x8F, 0x7B, 0xC4));
+
+    private void UpdateTransportIndicators(string activeTransport)
+    {
+        bool usb = string.Equals(
+            activeTransport, "Usb", StringComparison.OrdinalIgnoreCase);
+        bool wifi = string.Equals(
+            activeTransport, "Wifi", StringComparison.OrdinalIgnoreCase);
+        bool bluetooth = string.Equals(
+            activeTransport, "Bluetooth", StringComparison.OrdinalIgnoreCase);
+
+        UsbDot.Background = usb ? UsbLinkBrush : InactiveLinkBrush;
+        WifiDot.Background = wifi ? WifiLinkBrush : InactiveLinkBrush;
+        BluetoothDot.Background = bluetooth ? BluetoothLinkBrush : InactiveLinkBrush;
+
+        UsbLinkStateText.Text = usb ? "ACTIVE" : "NOT ACTIVE";
+        WifiLinkStateText.Text = wifi ? "ACTIVE" : "NOT ACTIVE";
+        BluetoothLinkStateText.Text = bluetooth ? "ACTIVE" : "NOT ACTIVE";
+
+        bool connected = usb || wifi || bluetooth;
+        ConnectionDot.Fill = connected ? WifiLinkBrush : InactiveLinkBrush;
+        ConnectionStateText.Text =
+            connected ? "CONTROLLER CONNECTED" : "WAITING FOR CONTROLLER";
     }
 
     private static string FormatDuration(
