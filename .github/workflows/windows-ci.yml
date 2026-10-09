@@ -143,6 +143,17 @@ jobs:
         shell: pwsh
         run: ./windows/installer/build-installer.ps1 -PublishDir "artifacts/windows-receiver-ci" -OutputDir "artifacts/installer-ci" -AllowMissingProductionUsbDrivers
 
+      # Preview only: does not include Microsoft-signed production USB driver.
+      # CI artifacts are intended for existing-driver developer installs, not public release.
+      - name: Upload Receiver UI preview installer
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NATSX-Receiver-UI-Preview-Setup
+          path: artifacts/installer-ci/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Exercise installer lifecycle
         shell: pwsh
         run: |
